@@ -24,9 +24,11 @@ class Config:
         if origin.strip()
     ]
 
-    # ── JSON2Video API ───────────────────────────────────────────────
+    # ── JSON2Video API (optional — premium processor) ────────────────
+    # Only used when API key is provided. FFmpeg is the default processor.
     JSON2VIDEO_API_KEY: str | None = os.getenv("JSON2VIDEO_API_KEY")
     JSON2VIDEO_API_URL: str = "https://api.json2video.com/v2"
+    USE_JSON2VIDEO: bool = os.getenv("USE_JSON2VIDEO", "false").lower() in ("true", "1", "yes")
 
     # ── Google Gemini ────────────────────────────────────────────────
     GEMINI_API_KEY: str | None = os.getenv("GEMINI_API_KEY")
@@ -88,8 +90,10 @@ class Config:
     def validate(cls) -> list[str]:
         """Return a list of missing critical config values."""
         warnings: list[str] = []
-        if not cls.JSON2VIDEO_API_KEY:
-            warnings.append("JSON2VIDEO_API_KEY not set — FFmpeg fallback will be used")
+        if not cls.JSON2VIDEO_API_KEY or not cls.USE_JSON2VIDEO:
+            pass  # FFmpeg is the primary processor — JSON2Video is optional/premium
+        else:
+            warnings.append("JSON2VIDEO_API_KEY set — will use JSON2Video as primary (premium)")
         if not cls.GEMINI_API_KEY:
             warnings.append("GEMINI_API_KEY not set — video analysis will be unavailable")
         if not cls.GROQ_API_KEY:

@@ -9,7 +9,7 @@ Pipeline overview
 1.  Accept video (URL or upload)
 2.  Store source in Cloudflare R2
 3.  Analyse with Google Gemini (detect highlights)
-4.  Render clips via JSON2Video (primary) or FFmpeg (fallback)
+4.  Render clips via FFmpeg (primary, free) or JSON2Video (premium)
 5.  Upload results to R2
 6.  Persist metadata in Supabase
 """
@@ -348,10 +348,12 @@ def _process_video(job: Job) -> None:
         logger.info("[%s] Rendering %d clips", job.job_id, len(highlights))
         clips: list[dict[str, Any]] = []
 
-        # Try JSON2Video first
-        use_json2video = Config.JSON2VIDEO_API_KEY is not None
+        # FFmpeg is the primary processor (free, built-in)
+        # JSON2Video is optional/premium — only used when explicitly enabled
+        use_json2video = (Config.JSON2VIDEO_API_KEY is not None and Config.USE_JSON2VIDEO)
         if use_json2video:
             try:
+                logger.info("[%s] Using JSON2Video (premium processor)", job.job_id)
                 clips = _render_with_json2video(job, highlights)
             except Exception as exc:
                 logger.warning(
@@ -360,6 +362,7 @@ def _process_video(job: Job) -> None:
                 )
                 clips = _render_with_ffmpeg(job, highlights)
         else:
+            logger.info("[%s] Using FFmpeg (primary processor)", job.job_id)
             clips = _render_with_ffmpeg(job, highlights)
 
         job.clips = clips
