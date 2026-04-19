@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 interface AuthPageProps {
   onNavigate: (page: Page) => void;
@@ -51,11 +52,21 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
     setIsLoading(false);
   };
 
-  const handleGoogleAuth = () => {
-    // TODO: Implement Supabase OAuth — requires Google provider to be configured
-    // in the Supabase dashboard under Authentication > Providers > Google.
-    // Example: await supabase.auth.signInWithOAuth({ provider: 'google' });
-    toast.info('Google sign-in coming soon!');
+  const handleGoogleAuth = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+    } catch (error: unknown) {
+      const message = error instanceof Error
+        ? error.message
+        : 'Google sign-in failed. Please try again.';
+      toast.error(message);
+    }
   };
 
   return (
