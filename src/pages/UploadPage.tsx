@@ -182,7 +182,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
       <div className="min-h-screen flex items-center justify-center px-4 relative">
         {/* Background effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-clip-cyan/5 rounded-full blur-[150px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-clip-cyan/5 rounded-full blur-[60px]" />
         </div>
 
         <div className="w-full max-w-md text-center relative z-10">

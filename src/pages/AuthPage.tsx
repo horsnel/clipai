@@ -62,8 +62,8 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
     <div className="min-h-screen flex items-center justify-center py-20 px-4 relative">
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-clip-cyan/5 rounded-full blur-[150px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/5 rounded-full blur-[120px]" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-clip-cyan/5 rounded-full blur-[60px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/5 rounded-full blur-[60px]" />
       </div>
 
       <div className="w-full max-w-md relative z-10">

@@ -54,7 +54,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         showBg
-          ? 'bg-clip-dark/90 backdrop-blur-md border-b border-white/[0.06]'
+          ? 'bg-clip-dark/95 border-b border-white/[0.06]'
           : 'bg-transparent'
       }`}
     >
@@ -146,7 +146,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-clip-dark/98 backdrop-blur-lg border-b border-white/[0.06]">
+        <div className="md:hidden bg-clip-dark/98 border-b border-white/[0.06]">
           <div className="px-4 py-4 space-y-2">
             {navLinks.map((link) => (
               <button

@@ -18,12 +18,10 @@ html {
 }
 
 .btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 0 40px rgba(0, 240, 255, 0.25);
+  filter: brightness(1.1);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  transform: translateY(-2px);
   border-color: rgba(255, 255, 255, 0.15);
 }
 
@@ -141,17 +139,17 @@ html {
   }
 }
 
-/* Pulse glow animation */
+/* Pulse glow animation - simplified for mobile performance */
 .pulse-glow {
   animation: pulseGlow 2s ease-in-out infinite;
 }
 
 @keyframes pulseGlow {
   0%, 100% {
-    box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
   }
   50% {
-    box-shadow: 0 0 40px rgba(0, 240, 255, 0.4);
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
   }
 }
 

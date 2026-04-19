@@ -81,8 +81,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         {/* Background effects */}
         <div className="absolute inset-0 vignette pointer-events-none" />
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-clip-cyan/5 rounded-full blur-[120px]" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/5 rounded-full blur-[100px]" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-clip-cyan/5 rounded-full blur-[60px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/5 rounded-full blur-[60px]" />
         </div>
 
         {/* Content */}
@@ -144,7 +144,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             </div>
 
             {/* Decorative elements */}
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-3/4 h-8 bg-clip-cyan/20 blur-xl rounded-full" />
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-3/4 h-8 bg-clip-cyan/20 blur-md rounded-full" />
           </div>
 
           {/* Bottom Feature Cards */}
@@ -302,7 +302,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 
                 {/* Overlay UI elements */}
                 <div className="absolute bottom-4 left-4 right-4">
-                  <div className="bg-clip-dark/90 backdrop-blur-sm rounded-xl p-3 border border-white/[0.08]">
+                  <div className="bg-clip-dark/90 rounded-xl p-3 border border-white/[0.08]">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-clip-muted">Beat Sync</span>
                       <span className="text-xs text-clip-cyan">ON</span>
@@ -315,7 +315,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               </div>
               
               {/* Glow effect */}
-              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-2/3 h-16 bg-clip-cyan/20 blur-2xl rounded-full" />
+              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-2/3 h-16 bg-clip-cyan/20 blur-md rounded-full" />
             </div>
 
             {/* Content */}
@@ -354,7 +354,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
       {/* CTA Section */}
       <section className="py-20 lg:py-28 relative">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-clip-cyan/5 rounded-full blur-[150px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-clip-cyan/5 rounded-full blur-[60px]" />
         </div>
         
         <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 relative z-10">

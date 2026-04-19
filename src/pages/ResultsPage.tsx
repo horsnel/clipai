@@ -225,7 +225,7 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
                   </div>
 
                   {/* Duration */}
-                  <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium">
+                  <div className="absolute bottom-2 right-2 bg-black/80 px-2 py-1 rounded text-xs font-medium">
                     {clip.duration}
                   </div>
 
@@ -278,7 +278,7 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
                     </button>
 
                     {/* Format indicator */}
-                    <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <div className="absolute top-4 left-4 bg-black/60 px-3 py-1.5 rounded-lg flex items-center gap-2">
                       <Smartphone className="w-4 h-4 text-clip-cyan" />
                       <span className="text-xs font-medium uppercase">{format}</span>
                     </div>

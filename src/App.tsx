@@ -94,8 +94,6 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-clip-dark text-clip-text">
-      {/* Grain overlay */}
-      <div className="grain-overlay" />
 
       {/* Navigation */}
       <Navbar

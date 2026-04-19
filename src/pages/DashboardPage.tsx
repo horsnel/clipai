@@ -265,13 +265,13 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
                   
                   {/* Play button overlay */}
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="w-14 h-14 rounded-full bg-clip-cyan/90 flex items-center justify-center backdrop-blur-sm">
+                    <div className="w-14 h-14 rounded-full bg-clip-cyan/90 flex items-center justify-center">
                       <Play className="w-6 h-6 text-black ml-1" />
                     </div>
                   </div>
 
                   {/* Duration badge */}
-                  <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium">
+                  <div className="absolute bottom-3 right-3 bg-black/80 px-2 py-1 rounded text-xs font-medium">
                     {clip.duration}
                   </div>
 
