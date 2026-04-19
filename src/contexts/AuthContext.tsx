@@ -52,18 +52,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check for existing session and listen for auth changes
   useEffect(() => {
+    let mounted = true;
+
+    // Safety timeout: if getSession doesn't resolve in 5 seconds,
+    // stop loading so the app doesn't hang forever on a black screen
+    const safetyTimeout = setTimeout(() => {
+      if (mounted) {
+        setIsLoading(false);
+      }
+    }, 5000);
+
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      setSession(existingSession);
-      setIsLoading(false);
+      if (mounted) {
+        clearTimeout(safetyTimeout);
+        setSession(existingSession);
+        setIsLoading(false);
+      }
+    }).catch(() => {
+      if (mounted) {
+        clearTimeout(safetyTimeout);
+        setIsLoading(false);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
-        setSession(newSession);
+        if (mounted) {
+          setSession(newSession);
+        }
       },
     );
 
     return () => {
+      mounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
