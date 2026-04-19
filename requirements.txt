@@ -2,30 +2,30 @@
 # Railway.app Deployment
 
 # Web Framework
-Flask==3.0.0
-Flask-CORS==4.0.0
-Werkzeug==3.0.1
+Flask==3.1.0
+Flask-CORS==5.0.1
+Werkzeug==3.1.3
 
 # AWS S3 Compatible Storage (R2/B2)
-boto3==1.34.0
-botocore==1.34.0
+boto3==1.37.0
+botocore==1.37.0
 
 # HTTP Requests
-requests==2.31.0
-urllib3==2.1.0
+requests==2.32.3
+urllib3==2.3.0
 
 # Environment Variables
-python-dotenv==1.0.0
+python-dotenv==1.1.0
 
 # Data Processing (for future ML features)
-numpy==1.26.0
+numpy==2.2.4
 
 # Production Server (Railway will use this)
-gunicorn==21.2.0
+gunicorn==23.0.0
 
 # Development/Testing (optional, remove for production if desired)
-pytest==7.4.0
+pytest==8.3.5
 pytest-flask==1.3.0
 
 # Type Hints
-typing-extensions==4.8.0
+typing-extensions==4.13.0
