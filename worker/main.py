@@ -48,7 +48,24 @@ logger = logging.getLogger("clipai.worker")
 
 # ── App ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
-CORS(app, origins=Config.CORS_ORIGINS, methods=["GET", "POST", "OPTIONS"], supports_credentials=True)
+
+# CORS: Allow configured origins. In development mode, allow all origins.
+if Config.DEBUG:
+    CORS(app, methods=["GET", "POST", "OPTIONS"], supports_credentials=True)
+else:
+    # Also allow any *.pages.dev or *.vercel.app subdomain for flexibility
+    def _cors_origin_check(origin: str | None) -> bool:
+        if not origin:
+            return False
+        if origin in Config.CORS_ORIGINS:
+            return True
+        # Allow any Cloudflare Pages or Vercel subdomain
+        for pattern in [".pages.dev", ".vercel.app", "localhost"]:
+            if pattern in origin:
+                return True
+        return False
+
+    CORS(app, origins=_cors_origin_check, methods=["GET", "POST", "OPTIONS"], supports_credentials=True)
 
 # Allow up to 500 MB file uploads (must be set before any request handling)
 app.config["MAX_CONTENT_LENGTH"] = Config.MAX_FILE_SIZE_MB * 1024 * 1024
@@ -232,7 +249,7 @@ def _get_gemini_model():
     return genai.GenerativeModel(Config.GEMINI_MODEL)
 
 
-def analyze_video(video_url: str, game: str, clip_count: int, video_duration: float = 0.0) -> list[dict[str, Any]]:
+def analyze_video(video_url: str, game: str, clip_count: int) -> list[dict[str, Any]]:
     """Ask Gemini to analyse a video and identify highlight timestamps.
 
     Uses the Gemini File API to upload the video for proper multimodal analysis.
@@ -243,14 +260,9 @@ def analyze_video(video_url: str, game: str, clip_count: int, video_duration: fl
     """
     model = _get_gemini_model()
 
-    duration_hint = ""
-    if video_duration > 0:
-        duration_hint = f"\nIMPORTANT: This video is exactly {video_duration:.1f} seconds long. ALL timestamps must be between 0 and {video_duration:.1f}. Do NOT return any timestamp greater than {video_duration:.1f}."
-
     prompt = f"""You are a professional gaming highlight detector for {game or 'gaming content'}.
 
 Analyze this video and identify the top {clip_count} most exciting, viral-worthy moments.
-{duration_hint}
 
 For each highlight, provide:
 1. start_time - exact start time in seconds (e.g., 12.5)
@@ -264,8 +276,6 @@ Guidelines:
 - Ensure clips don't overlap
 - Labels should be hype-worthy and social-media friendly
 - Space clips at least 3 seconds apart
-- start_time must be >= 0 and end_time must be <= the video duration
-- If the video is very short, make clips shorter (3-10 seconds)
 
 Respond ONLY with a JSON array. No explanations. Example:
 [
@@ -343,15 +353,6 @@ Respond ONLY with a JSON array. No explanations. Example:
                 end = float(hl.get("end_time", start + 10))
                 if end <= start:
                     end = start + 10
-                # Clamp to video duration if known
-                if video_duration > 0:
-                    if start >= video_duration:
-                        logger.warning("Skipping highlight with start_time %.1f >= video duration %.1f", start, video_duration)
-                        continue
-                    if end > video_duration:
-                        end = video_duration
-                    if start < 0:
-                        start = 0
                 validated.append({
                     "start_time": round(start, 2),
                     "end_time": round(end, 2),
@@ -361,7 +362,7 @@ Respond ONLY with a JSON array. No explanations. Example:
             except (ValueError, TypeError) as exc:
                 logger.warning("Skipping invalid highlight: %s", exc)
 
-        logger.info("Gemini identified %d highlights (video_duration=%.1f)", len(validated), video_duration)
+        logger.info("Gemini identified %d highlights", len(validated))
         return validated[:clip_count]
 
     except json.JSONDecodeError as exc:
@@ -395,24 +396,6 @@ def _download_to_temp(video_url: str) -> str:
                 raise ValueError(f"Video exceeds max size of {Config.MAX_FILE_SIZE_MB}MB")
     logger.info("Downloaded %.1f MB to %s", downloaded / (1024 * 1024), local_path)
     return local_path
-
-
-def _get_video_duration(video_path: str) -> float:
-    """Get the duration of a video file using ffprobe. Returns 0.0 on failure."""
-    try:
-        cmd = [
-            "ffprobe", "-v", "quiet",
-            "-print_format", "json",
-            "-show_format",
-            video_path,
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        if result.returncode == 0:
-            data = json.loads(result.stdout)
-            return float(data.get("format", {}).get("duration", 0))
-    except Exception as exc:
-        logger.warning("Could not get video duration: %s", exc)
-    return 0.0
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -493,12 +476,6 @@ def _process_video(job: Job) -> None:
         job.progress = 15
         _save_job(job)
 
-        # Get video duration for better Gemini analysis
-        video_duration = 0.0
-        if local_source_path:
-            video_duration = _get_video_duration(local_source_path)
-            logger.info("[%s] Video duration: %.1f seconds", job.job_id, video_duration)
-
         # ── Step 2: Analyse with Gemini ───────────────────────────
         # Use local file for Gemini File API if available, otherwise fall back to URL
         analysis_url = job.video_url or ""
@@ -509,7 +486,6 @@ def _process_video(job: Job) -> None:
             try:
                 highlights = _analyze_local_video(
                     local_source_path, job.game or "", job.clip_count,
-                    video_duration=video_duration,
                 )
             except Exception as exc:
                 logger.warning("[%s] Gemini File API analysis failed, trying URL: %s", job.job_id, exc)
@@ -518,7 +494,6 @@ def _process_video(job: Job) -> None:
                         video_url=analysis_url,
                         game=job.game or "",
                         clip_count=job.clip_count,
-                        video_duration=video_duration,
                     )
                 except Exception as exc2:
                     logger.warning("[%s] Gemini URL analysis also failed: %s", job.job_id, exc2)
@@ -535,7 +510,6 @@ def _process_video(job: Job) -> None:
                     video_url=analysis_url,
                     game=job.game or "",
                     clip_count=job.clip_count,
-                    video_duration=video_duration,
                 )
             except Exception as exc:
                 logger.warning("[%s] Gemini analysis failed, generating fallback: %s", job.job_id, exc)
@@ -619,6 +593,11 @@ def _process_video(job: Job) -> None:
                 "thumbnail_url": clip.get("thumbnail_url", clip.get("thumbnail", "")),
                 "format": clip.get("format", "mp4"),
                 "resolution": clip.get("resolution", []),
+                "start_time": clip.get("start_time", ""),
+                "end_time": clip.get("end_time", ""),
+                "start_time_seconds": clip.get("start_time_seconds", 0),
+                "end_time_seconds": clip.get("end_time_seconds", 0),
+                "status": clip.get("status", "ready"),
                 "created_at": clip.get("created_at", datetime.now(timezone.utc).isoformat()),
             })
 
@@ -692,16 +671,11 @@ def _process_video_core(job: Job, local_source_path: str) -> None:
         job.progress = 10
         _save_job(job)
 
-        # Get video duration for better Gemini analysis
-        video_duration = _get_video_duration(local_source_path)
-        logger.info("[%s] Video duration: %.1f seconds", job.job_id, video_duration)
-
         # ── Step 1: Analyse with Gemini (using File API with local file) ──
         logger.info("[%s] Analysing local video with Gemini", job.job_id)
         try:
             highlights = _analyze_local_video(
                 local_source_path, job.game or "", job.clip_count,
-                video_duration=video_duration,
             )
         except Exception as exc:
             logger.warning("[%s] Gemini File API failed, trying URL: %s", job.job_id, exc)
@@ -716,7 +690,6 @@ def _process_video_core(job: Job, local_source_path: str) -> None:
                     video_url=analysis_url,
                     game=job.game or "",
                     clip_count=job.clip_count,
-                    video_duration=video_duration,
                 )
             except Exception as exc2:
                 logger.warning("[%s] All Gemini attempts failed: %s", job.job_id, exc2)
@@ -791,6 +764,11 @@ def _process_video_core(job: Job, local_source_path: str) -> None:
                 "thumbnail_url": clip.get("thumbnail_url", clip.get("thumbnail", "")),
                 "format": clip.get("format", "mp4"),
                 "resolution": clip.get("resolution", []),
+                "start_time": clip.get("start_time", ""),
+                "end_time": clip.get("end_time", ""),
+                "start_time_seconds": clip.get("start_time_seconds", 0),
+                "end_time_seconds": clip.get("end_time_seconds", 0),
+                "status": clip.get("status", "ready"),
                 "created_at": clip.get("created_at", datetime.now(timezone.utc).isoformat()),
             })
 
@@ -812,7 +790,7 @@ def _process_video_core(job: Job, local_source_path: str) -> None:
         _save_job(job)
 
 
-def _analyze_local_video(local_path: str, game: str, clip_count: int, video_duration: float = 0.0) -> list[dict[str, Any]]:
+def _analyze_local_video(local_path: str, game: str, clip_count: int) -> list[dict[str, Any]]:
     """Analyse a local video file using Gemini's File API.
 
     This is the most reliable way to get Gemini to actually watch the video,
@@ -823,14 +801,9 @@ def _analyze_local_video(local_path: str, game: str, clip_count: int, video_dura
 
     model = _get_gemini_model()
 
-    duration_hint = ""
-    if video_duration > 0:
-        duration_hint = f"\nIMPORTANT: This video is exactly {video_duration:.1f} seconds long. ALL timestamps must be between 0 and {video_duration:.1f}. Do NOT return any timestamp greater than {video_duration:.1f}."
-
     prompt = f"""You are a professional gaming highlight detector for {game or 'gaming content'}.
 
 Analyze this video and identify the top {clip_count} most exciting, viral-worthy moments.
-{duration_hint}
 
 For each highlight, provide:
 1. start_time - exact start time in seconds (e.g., 12.5)
@@ -844,8 +817,6 @@ Guidelines:
 - Ensure clips don't overlap
 - Labels should be hype-worthy and social-media friendly
 - Space clips at least 3 seconds apart
-- start_time must be >= 0 and end_time must be <= the video duration
-- If the video is very short, make clips shorter (3-10 seconds)
 
 Respond ONLY with a JSON array. No explanations. Example:
 [
@@ -899,15 +870,6 @@ Respond ONLY with a JSON array. No explanations. Example:
             end = float(hl.get("end_time", start + 10))
             if end <= start:
                 end = start + 10
-            # Clamp to video duration if known
-            if video_duration > 0:
-                if start >= video_duration:
-                    logger.warning("Skipping highlight with start_time %.1f >= video duration %.1f", start, video_duration)
-                    continue
-                if end > video_duration:
-                    end = video_duration
-                if start < 0:
-                    start = 0
             validated.append({
                 "start_time": round(start, 2),
                 "end_time": round(end, 2),
@@ -917,7 +879,7 @@ Respond ONLY with a JSON array. No explanations. Example:
         except (ValueError, TypeError) as exc:
             logger.warning("Skipping invalid highlight: %s", exc)
 
-    logger.info("Gemini identified %d highlights (video_duration=%.1f)", len(validated), video_duration)
+    logger.info("Gemini identified %d highlights", len(validated))
     return validated[:clip_count]
 
 
@@ -1002,23 +964,7 @@ def _render_with_ffmpeg(job: Job, highlights: list[dict], local_source_path: str
             except Exception as exc:
                 logger.warning("[%s] Could not generate presigned URL for FFmpeg: %s", job.job_id, exc)
 
-    # Detect source video resolution
-    source_width, source_height = 1920, 1080  # default horizontal
-    if local_source_path and os.path.isfile(local_source_path):
-        try:
-            info = processor.get_video_info(local_source_path)
-            if info.get("width") and info.get("height"):
-                source_width = info["width"]
-                source_height = info["height"]
-                logger.info("[%s] Source video: %dx%d", job.job_id, source_width, source_height)
-        except Exception:
-            pass
-
-    # Use source resolution - keep the original aspect ratio
-    opts = FFmpegOptions(
-        resolution=(source_width, source_height),
-        aspect_ratio="16:9" if source_width > source_height else "9:16",
-    )
+    opts = FFmpegOptions()
     clips: list[dict[str, Any]] = []
     total = len(highlights)
 
@@ -1042,16 +988,8 @@ def _render_with_ffmpeg(job: Job, highlights: list[dict], local_source_path: str
             if output_path and os.path.isfile(output_path):
                 output_key = f"clips/{job.user_id}/{job.job_id}/clip_{i}.mp4"
                 output_url = upload_to_r2(output_path, output_key)
-                # Check for corrupt/tiny clips (less than 10KB)
-                actual_size = os.path.getsize(output_path)
-                if actual_size < 10240:  # 10KB minimum
-                    logger.warning("[%s] Clip %d is too small (%d bytes), likely corrupt", job.job_id, i, actual_size)
-                    os.unlink(output_path)
-                    output_url = ""
-                    output_path = ""
-                else:
-                    # Clean up local file
-                    os.unlink(output_path)
+                # Clean up local file
+                os.unlink(output_path)
 
             # Compute a hype score from intensity
             intensity = hl.get("intensity", "medium")
@@ -1318,14 +1256,67 @@ def process_video():
 def get_status(job_id: str):
     """Get the current status of a processing job.
 
+    Checks in-memory store first, then falls back to Supabase.
+    This handles the case where the server restarted and in-memory
+    jobs were lost — we can reconstruct the job from Supabase clips.
+
     Returns:
         job_id, status, progress (0-100), clips (when completed), error (if failed)
     """
     job = _get_job(job_id)
-    if not job:
-        return jsonify({"error": "Job not found"}), 404
+    if job:
+        return jsonify(job.to_dict()), 200
 
-    return jsonify(job.to_dict()), 200
+    # ── Fallback: Try to reconstruct job from Supabase ──────────
+    # Server may have restarted, losing in-memory jobs.
+    # If clips were persisted to Supabase, we can reconstruct.
+    if Config.SUPABASE_URL and Config.SUPABASE_SERVICE_KEY:
+        db_result = _supabase_request(
+            "GET",
+            f"clips?job_id=eq.{job_id}&order=created_at.asc",
+        )
+        db_clips: list[dict] = []
+        if isinstance(db_result, list):
+            db_clips = db_result
+        elif isinstance(db_result, dict):
+            db_clips = db_result.get("data", [])
+
+        if db_clips:
+            # Reconstruct a completed job from Supabase data
+            user_id = db_clips[0].get("user_id", "unknown")
+            reconstructed_clips = []
+            for clip in db_clips:
+                reconstructed_clips.append({
+                    "id": clip.get("id", uuid.uuid4().hex[:12]),
+                    "title": clip.get("title", clip.get("label", "Highlight")),
+                    "label": clip.get("label", ""),
+                    "game": clip.get("game", ""),
+                    "hype_score": clip.get("hype_score", 70),
+                    "duration": clip.get("duration", "0s"),
+                    "thumbnail": clip.get("thumbnail_url", ""),
+                    "thumbnail_url": clip.get("thumbnail_url", ""),
+                    "video_url": clip.get("video_url", clip.get("clip_url", "")),
+                    "output_url": clip.get("clip_url", ""),
+                    "start_time": clip.get("start_time", ""),
+                    "end_time": clip.get("end_time", ""),
+                    "start_time_seconds": clip.get("start_time_seconds", 0),
+                    "end_time_seconds": clip.get("end_time_seconds", 0),
+                    "created_at": clip.get("created_at", ""),
+                    "status": clip.get("status", "ready"),
+                })
+            return jsonify({
+                "job_id": job_id,
+                "user_id": user_id,
+                "status": "completed",
+                "progress": 100,
+                "clips": reconstructed_clips,
+                "error": None,
+                "game": db_clips[0].get("game", ""),
+                "created_at": db_clips[0].get("created_at", ""),
+                "updated_at": db_clips[-1].get("created_at", ""),
+            }), 200
+
+    return jsonify({"error": "Job not found"}), 404
 
 
 # ── User Clips ────────────────────────────────────────────────────────

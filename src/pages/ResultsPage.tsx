@@ -105,11 +105,17 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
             }
           } catch {
             // Job ID might be stale or from a restarted server
-            localStorage.removeItem('clipai_recent_job');
+            // The backend now falls back to Supabase for job lookup,
+            // so if we still get 404, the job truly doesn't exist.
+            // Don't remove the job ID yet — fall through to user clips lookup
+            // which may find the clips via Supabase.
+            console.warn('[ClipAI] Recent job not found, falling back to user clips');
           }
         }
 
         // Fallback: load user's clips from the API
+        // This works even when the server restarted because the backend
+        // checks Supabase as well as in-memory store.
         if (authUser) {
           try {
             const response = await getUserClips(authUser.id);
@@ -128,6 +134,8 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
               }));
               setClips(mapped);
               setSelectedClip(mapped[0]);
+              // Clean up stale job ID since we found clips via user lookup
+              localStorage.removeItem('clipai_recent_job');
               setIsLoadingClips(false);
               return;
             }
@@ -136,7 +144,8 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
           }
         }
         
-        // No clips found anywhere
+        // No clips found anywhere — clean up stale job ID
+        localStorage.removeItem('clipai_recent_job');
         setIsLoadingClips(false);
       } catch {
         setLoadError('Failed to load clips. Please try again.');

@@ -170,7 +170,31 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
             const errorMsg = jobError || clipError || 'Video analysis failed. Please try again with a different video.';
             toast.error(errorMsg, { duration: 8000 });
           }
-        } catch {
+        } catch (pollError: unknown) {
+          // Check if this is a "Job not found" error — the server may have restarted
+          const errMsg = pollError instanceof Error ? pollError.message : String(pollError);
+          if (errMsg.includes('Job not found') || errMsg.includes('404')) {
+            // Server likely restarted. The backend now falls back to Supabase for job lookup,
+            // so a 404 means the job truly doesn't exist anywhere.
+            // Stop polling and show error.
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            if (pollTimeoutRef.current) {
+              clearTimeout(pollTimeoutRef.current);
+              pollTimeoutRef.current = null;
+            }
+            setIsAnalyzing(false);
+            setAnalysisProgress(0);
+            toast.error(
+              'The analysis job was lost (server may have restarted). Your clips may still be available on the dashboard.',
+              { duration: 8000 }
+            );
+            // Navigate to dashboard so user can check their clips
+            setTimeout(() => onNavigate('dashboard'), 2000);
+            return;
+          }
           // Continue polling on transient network errors
         }
       };
