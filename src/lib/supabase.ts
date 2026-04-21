@@ -31,6 +31,11 @@ export const supabase: SupabaseClient = (() => {
           'Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.',
         );
       },
+      signInWithOAuth: async () => {
+        throw new Error(
+          'Supabase is not configured. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.',
+        );
+      },
       signOut: async () => {
         // No-op: nothing to sign out from when not configured
       },

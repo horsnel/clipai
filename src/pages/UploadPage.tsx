@@ -37,15 +37,19 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisStep, setAnalysisStep] = useState('');
   
-  const { session } = useAuth();
+  const { session, user: authUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clean up polling interval on unmount
+  // Clean up polling interval and timeout on unmount
   useEffect(() => {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+      }
+      if (pollTimeoutRef.current) {
+        clearTimeout(pollTimeoutRef.current);
       }
     };
   }, []);
@@ -116,6 +120,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
         captions: captionsEnabled,
         beat_sync: beatSyncEnabled,
         format: 'tiktok',
+        user_id: authUser?.id,
       });
 
       // Store job_id so ResultsPage can pick up the clips
@@ -137,6 +142,10 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
               clearInterval(pollIntervalRef.current);
               pollIntervalRef.current = null;
             }
+            if (pollTimeoutRef.current) {
+              clearTimeout(pollTimeoutRef.current);
+              pollTimeoutRef.current = null;
+            }
             setAnalysisProgress(100);
             setAnalysisStep('✅ Analysis complete!');
             toast.success(`Analysis complete! Found ${status.clips?.length ?? 0} highlight clips.`);
@@ -149,9 +158,17 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
               clearInterval(pollIntervalRef.current);
               pollIntervalRef.current = null;
             }
+            if (pollTimeoutRef.current) {
+              clearTimeout(pollTimeoutRef.current);
+              pollTimeoutRef.current = null;
+            }
             setIsAnalyzing(false);
             setAnalysisProgress(0);
-            toast.error('Video analysis failed. Please try again.');
+            // Try to extract a meaningful error message from the job
+            const jobError = (status as unknown as Record<string, unknown>).error as string | undefined;
+            const clipError = (status.clips?.[0] as Record<string, unknown> | undefined)?.error as string | undefined;
+            const errorMsg = jobError || clipError || 'Video analysis failed. Please try again with a different video.';
+            toast.error(errorMsg, { duration: 8000 });
           }
         } catch {
           // Continue polling on transient network errors
@@ -162,10 +179,22 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
       pollIntervalRef.current = setInterval(poll, 3000);
       // Fire first poll immediately
       await poll();
-    } catch {
+
+      // Safety timeout: stop polling after 5 minutes
+      pollTimeoutRef.current = setTimeout(() => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        setIsAnalyzing(false);
+        setAnalysisProgress(0);
+        toast.error('Analysis timed out. The video may be too long or the server is busy. Please try again.');
+      }, 5 * 60 * 1000);
+    } catch (error: unknown) {
       setIsAnalyzing(false);
       setAnalysisProgress(0);
-      toast.error('Failed to start video analysis. Please try again.');
+      const message = error instanceof Error ? error.message : 'Failed to start video analysis. Please try again.';
+      toast.error(message);
     }
   };
 

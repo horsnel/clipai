@@ -26,7 +26,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function mapSupabaseUser(session: Session | null): AuthUser | null {
+function mapSupabaseUser(session: Session | null, profilePlan?: UserPlan): AuthUser | null {
   if (!session?.user) return null;
 
   const meta = session.user.user_metadata;
@@ -34,7 +34,7 @@ function mapSupabaseUser(session: Session | null): AuthUser | null {
     id: session.user.id,
     name: meta?.full_name ?? meta?.name ?? 'Gamer',
     email: session.user.email ?? '',
-    plan: (meta?.plan as UserPlan) ?? 'free',
+    plan: profilePlan ?? (meta?.plan as UserPlan) ?? 'free',
   };
 }
 
@@ -45,27 +45,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Sync user object whenever session changes
+  // Sync user object whenever session changes, fetching plan from profiles table
   useEffect(() => {
-    setUser(mapSupabaseUser(session));
+    if (!session?.user) {
+      setUser(null);
+      return;
+    }
+
+    // Fetch profile from database for the real plan value
+    (async () => {
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('plan, full_name')
+          .eq('id', session.user.id)
+          .single();
+
+        const plan = (profile?.plan as UserPlan) ?? undefined;
+        const name = profile?.full_name || undefined;
+        const meta = session.user.user_metadata;
+        setUser({
+          id: session.user.id,
+          name: name ?? meta?.full_name ?? meta?.name ?? 'Gamer',
+          email: session.user.email ?? '',
+          plan: plan ?? (meta?.plan as UserPlan) ?? 'free',
+        });
+      } catch {
+        // Fallback to metadata if profile fetch fails
+        setUser(mapSupabaseUser(session));
+      }
+    })();
   }, [session]);
 
-  // Check for existing session and listen for auth changes
+  // Check for existing session and listen for auth changes.
+  // IMPORTANT: We fetch the profile BEFORE setting isLoading=false
+  // to prevent a flash of the landing page for logged-in users.
   useEffect(() => {
     let mounted = true;
 
-    // Safety timeout: if getSession doesn't resolve in 5 seconds,
+    // Safety timeout: if session+profile fetch doesn't resolve in 8 seconds,
     // stop loading so the app doesn't hang forever on a black screen
     const safetyTimeout = setTimeout(() => {
       if (mounted) {
         setIsLoading(false);
       }
-    }, 5000);
+    }, 8000);
 
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
       if (mounted) {
         clearTimeout(safetyTimeout);
         setSession(existingSession);
+
+        // Fetch profile immediately so the user object is ready
+        // before we mark loading as complete. This prevents the
+        // landing-page flash for logged-in users.
+        if (existingSession?.user) {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('plan, full_name')
+              .eq('id', existingSession.user.id)
+              .single();
+
+            const meta = existingSession.user.user_metadata;
+            setUser({
+              id: existingSession.user.id,
+              name: profile?.full_name || meta?.full_name || meta?.name || 'Gamer',
+              email: existingSession.user.email ?? '',
+              plan: (profile?.plan as UserPlan) ?? (meta?.plan as UserPlan) ?? 'free',
+            });
+          } catch {
+            setUser(mapSupabaseUser(existingSession));
+          }
+        }
+
         setIsLoading(false);
       }
     }).catch(() => {

@@ -35,12 +35,16 @@ function AppContent() {
     }
   }, []);
 
-  // Navigate to dashboard once auth resolves with an active session
+  // Navigate to dashboard once auth resolves with an active session.
+  // With the AuthContext fix, `user` is always populated before
+  // isLoading becomes false, so this reliably redirects after login.
   useEffect(() => {
-    if (!isLoading && user && currentPage === 'auth') {
-      setCurrentPage('dashboard');
+    if (!isLoading && user) {
+      if (currentPage === 'auth' || currentPage === 'landing') {
+        setCurrentPage('dashboard');
+      }
     }
-  }, [isLoading, user, currentPage]);
+  }, [isLoading, user]); // intentionally omit currentPage to avoid stale closure
 
   const handleLogin = (_email: string, _name: string) => {
     setCurrentPage('dashboard');
