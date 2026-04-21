@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Page } from '@/App';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { 
   Play, Pause, Download, Share2, Scissors, 
-  Type, Music, Image, Check, ChevronLeft, Smartphone
+  Type, Music, Image, Check, ChevronLeft, Smartphone,
+  Loader2, AlertCircle, Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getJobStatus, getUserClips } from '@/api/clipai';
@@ -23,43 +24,16 @@ interface DetectedClip {
   hypeScore: number;
   duration: string;
   selected: boolean;
+  videoUrl?: string;
+  label?: string;
+  status?: string;
 }
-
-const mockDetectedClips: DetectedClip[] = [
-  {
-    id: '1',
-    thumbnail: '/gameplay-thumb-1.jpg',
-    startTime: '02:34',
-    endTime: '03:06',
-    hypeScore: 96,
-    duration: '0:32',
-    selected: true,
-  },
-  {
-    id: '2',
-    thumbnail: '/gameplay-thumb-2.jpg',
-    startTime: '08:12',
-    endTime: '08:57',
-    hypeScore: 88,
-    duration: '0:45',
-    selected: false,
-  },
-  {
-    id: '3',
-    thumbnail: '/gameplay-thumb-3.jpg',
-    startTime: '15:45',
-    endTime: '16:13',
-    hypeScore: 92,
-    duration: '0:28',
-    selected: false,
-  },
-];
 
 type Format = 'tiktok' | 'reels' | 'shorts';
 
 export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
-  const [clips, setClips] = useState<DetectedClip[]>(mockDetectedClips);
-  const [selectedClip, setSelectedClip] = useState<DetectedClip | null>(mockDetectedClips[0]);
+  const [clips, setClips] = useState<DetectedClip[]>([]);
+  const [selectedClip, setSelectedClip] = useState<DetectedClip | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [format, setFormat] = useState<Format>('tiktok');
   const [watermarkEnabled, setWatermarkEnabled] = useState(true);
@@ -70,62 +44,108 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportStep, setExportStep] = useState('');
   const [exportDone, setExportDone] = useState(false);
+  const [isLoadingClips, setIsLoadingClips] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const { user: authUser } = useAuth();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Try to load real clips from API, fall back to mock data
+  // Sync play/pause state with the video element
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (isPlaying) {
+      video.play().catch(() => setIsPlaying(false));
+    } else {
+      video.pause();
+    }
+  }, [isPlaying, selectedClip?.videoUrl]);
+
+  // Load real clips from API
   useEffect(() => {
     async function loadData() {
+      setIsLoadingClips(true);
+      setLoadError(null);
       try {
         // First, check if there's a recent job from the upload flow
         const recentJobId = localStorage.getItem('clipai_recent_job');
         if (recentJobId) {
-          const jobStatus = await getJobStatus(recentJobId);
-          if (jobStatus.status === 'completed' && jobStatus.clips?.length) {
-            const mapped: DetectedClip[] = jobStatus.clips.map(clip => ({
-              id: clip.id,
-              thumbnail: clip.thumbnail || '/gameplay-thumb-1.jpg',
-              startTime: clip.start_time,
-              endTime: clip.end_time,
-              hypeScore: clip.hype_score,
-              duration: clip.duration,
-              selected: false,
-            }));
-            setClips(mapped);
-            setSelectedClip(mapped[0]);
+          try {
+            const jobStatus = await getJobStatus(recentJobId);
+            if (jobStatus.status === 'completed' && jobStatus.clips?.length) {
+              const mapped: DetectedClip[] = jobStatus.clips.map(clip => ({
+                id: clip.id || Math.random().toString(36).slice(2),
+                thumbnail: clip.thumbnail || clip.thumbnail_url || '',
+                startTime: clip.start_time || '',
+                endTime: clip.end_time || '',
+                hypeScore: clip.hype_score || 70,
+                duration: clip.duration || '0s',
+                selected: false,
+                videoUrl: clip.video_url || clip.output_url || clip.clip_url || '',
+                label: clip.label || clip.title || '',
+                status: clip.status || 'ready',
+              }));
+              setClips(mapped);
+              setSelectedClip(mapped[0]);
+              localStorage.removeItem('clipai_recent_job');
+              setIsLoadingClips(false);
+              return;
+            } else if (jobStatus.status === 'failed') {
+              const jobError = (jobStatus as unknown as Record<string, unknown>).error as string | undefined;
+              setLoadError(jobError || 'Previous analysis failed. Please try uploading again.');
+              localStorage.removeItem('clipai_recent_job');
+              setIsLoadingClips(false);
+              return;
+            } else if (jobStatus.status === 'processing') {
+              // Job still processing — redirect back to upload page to show progress
+              toast('Analysis still in progress, redirecting...', { icon: '⏳' });
+              onNavigate('upload');
+              setIsLoadingClips(false);
+              return;
+            }
+          } catch {
+            // Job ID might be stale or from a restarted server
             localStorage.removeItem('clipai_recent_job');
-            return;
           }
         }
-      } catch {
-        // Fall through to getUserClips
-      }
 
-      // Fallback: load user's clips from the API
-      if (authUser) {
-        try {
-          const response = await getUserClips(authUser.id);
-          if (response.clips?.length) {
-            const mapped: DetectedClip[] = response.clips.map(clip => ({
-              id: clip.id,
-              thumbnail: clip.thumbnail || '/gameplay-thumb-1.jpg',
-              startTime: clip.start_time,
-              endTime: clip.end_time,
-              hypeScore: clip.hype_score,
-              duration: clip.duration,
-              selected: false,
-            }));
-            setClips(mapped);
-            setSelectedClip(mapped[0]);
+        // Fallback: load user's clips from the API
+        if (authUser) {
+          try {
+            const response = await getUserClips(authUser.id);
+            if (response.clips?.length) {
+              const mapped: DetectedClip[] = response.clips.map(clip => ({
+                id: clip.id || Math.random().toString(36).slice(2),
+                thumbnail: clip.thumbnail || clip.thumbnail_url || '',
+                startTime: clip.start_time || '',
+                endTime: clip.end_time || '',
+                hypeScore: clip.hype_score || 70,
+                duration: clip.duration || '0s',
+                selected: false,
+                videoUrl: clip.video_url || clip.output_url || clip.clip_url || '',
+                label: clip.label || clip.title || '',
+                status: clip.status || 'ready',
+              }));
+              setClips(mapped);
+              setSelectedClip(mapped[0]);
+              setIsLoadingClips(false);
+              return;
+            }
+          } catch {
+            // API unavailable — no clips to show
           }
-        } catch {
-          // Keep mock data from useState initializer
         }
+        
+        // No clips found anywhere
+        setIsLoadingClips(false);
+      } catch {
+        setLoadError('Failed to load clips. Please try again.');
+        setIsLoadingClips(false);
       }
     }
 
     loadData();
-  }, [authUser]);
+  }, [authUser, onNavigate]);
 
   const getHypeBadge = (score: number) => {
     if (score >= 90) return <span className="hype-badge-gold">{score} HYPE</span>;
@@ -139,27 +159,46 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
   };
 
   const handleExport = async () => {
-    if (exportDone) {
-      toast.success('Downloading your clip...');
+    if (exportDone && selectedClip?.videoUrl) {
+      // Actually download the clip
+      try {
+        const response = await fetch(selectedClip.videoUrl);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `clipai_${selectedClip.label || 'clip'}_${format}.mp4`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast.success('Download started!');
+      } catch {
+        // Fallback: open in new tab
+        window.open(selectedClip.videoUrl, '_blank');
+        toast.success('Opening clip in new tab...');
+      }
       return;
     }
+
+    if (!selectedClip?.videoUrl) {
+      toast.error('No video available for export. This clip may still be processing.');
+      return;
+    }
+
     setIsExporting(true);
     setExportDone(false);
 
-    // TODO: Replace with real API call when the processing worker is running
-    // Example: await processVideoExport({ clipId: selectedClip?.id, format, captions: captionsEnabled, beatSync: beatSyncEnabled });
-
     const steps = [
-      'Rendering your clip...',
-      'Adding captions...',
-      'Applying beat sync...',
+      'Preparing your clip...',
+      'Verifying format...',
       'Finalising export...',
     ];
     for (const step of steps) {
       setExportStep(step);
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 800));
     }
-    setExportStep('✅ Clip ready!');
+    setExportStep('Clip ready!');
     setExportDone(true);
     setIsExporting(false);
     toast.success('Your clip is ready to download!');
@@ -169,6 +208,65 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
     navigator.clipboard.writeText('https://clipai.io/c/' + selectedClip?.id);
     toast.success('Link copied to clipboard!');
   };
+
+  // Loading state
+  if (isLoadingClips) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-clip-cyan animate-spin mx-auto mb-4" />
+          <h2 className="font-display font-bold text-xl text-clip-text mb-2">
+            Loading Your Clips
+          </h2>
+          <p className="text-clip-muted">Retrieving analysis results...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="card-glass p-8 text-center max-w-md">
+          <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="font-display font-bold text-xl text-clip-text mb-2">
+            Analysis Error
+          </h2>
+          <p className="text-clip-muted mb-6">{loadError}</p>
+          <Button onClick={() => onNavigate('upload')} className="btn-primary">
+            <Upload className="w-5 h-5 mr-2" />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // No clips state
+  if (clips.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="card-glass p-8 text-center max-w-md">
+          <div className="w-16 h-16 rounded-2xl bg-clip-cyan/10 flex items-center justify-center mx-auto mb-4">
+            <Scissors className="w-8 h-8 text-clip-cyan" />
+          </div>
+          <h2 className="font-display font-bold text-xl text-clip-text mb-2">
+            No Clips Yet
+          </h2>
+          <p className="text-clip-muted mb-6">
+            Upload a video and let AI detect the most exciting moments automatically.
+          </p>
+          <Button onClick={() => onNavigate('upload')} className="btn-primary">
+            <Upload className="w-5 h-5 mr-2" />
+            Upload Video
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
@@ -211,12 +309,21 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
                     : 'hover:border-white/[0.12]'
                 }`}
               >
-                <div className="relative aspect-video">
-                  <img
-                    src={clip.thumbnail}
-                    alt={`Clip ${clip.id}`}
-                    className="w-full h-full object-cover"
-                  />
+                <div className="relative aspect-video bg-clip-surface">
+                  {clip.thumbnail ? (
+                    <img
+                      src={clip.thumbnail}
+                      alt={`Clip ${clip.id}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-clip-surface">
+                      <Play className="w-8 h-8 text-clip-muted" />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/80 via-transparent to-transparent" />
                   
                   {/* Hype score */}
@@ -240,7 +347,7 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
                 <div className="p-3">
                   <div className="flex items-center justify-between">
                     <span className="text-clip-muted text-sm font-mono">
-                      {clip.startTime} - {clip.endTime}
+                      {clip.label || `${clip.startTime} - ${clip.endTime}`}
                     </span>
                     <Play className="w-4 h-4 text-clip-muted" />
                   </div>
@@ -256,11 +363,23 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
                 {/* Video Preview */}
                 <div className="card-glass overflow-hidden">
                   <div className="relative aspect-video bg-clip-surface">
-                    <img
-                      src={selectedClip.thumbnail}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
+                    {selectedClip.videoUrl ? (
+                      <video
+                        ref={videoRef}
+                        key={selectedClip.videoUrl}
+                        src={selectedClip.videoUrl}
+                        className="w-full h-full object-cover"
+                        playsInline
+                        onEnded={() => setIsPlaying(false)}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-clip-surface">
+                        <div className="text-center">
+                          <Scissors className="w-12 h-12 text-clip-muted mx-auto mb-2" />
+                          <p className="text-clip-muted text-sm">Clip processing...</p>
+                        </div>
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/60 via-transparent to-transparent" />
                     
                     {/* Play button */}
@@ -413,7 +532,7 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button
                     onClick={handleExport}
-                    disabled={isExporting}
+                    disabled={isExporting || !selectedClip.videoUrl}
                     className="flex-1 btn-primary py-4 flex items-center justify-center gap-2"
                   >
                     {isExporting ? (
@@ -424,7 +543,7 @@ export function ResultsPage({ user, onNavigate }: ResultsPageProps) {
                     ) : exportDone ? (
                       <>
                         <Download className="w-5 h-5" />
-                        ⬇️ Download MP4
+                        Download MP4
                       </>
                     ) : (
                       <>

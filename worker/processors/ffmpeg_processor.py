@@ -23,6 +23,58 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 
+# ── Font Discovery ────────────────────────────────────────────────────
+
+# Cached font path once discovered
+_font_path: str | None = None
+
+
+def _find_font() -> str | None:
+    """Find a usable font file for FFmpeg's drawtext filter.
+
+    FFmpeg on minimal Docker containers (python:3.12-slim) does not ship
+    with fonts or fontconfig by default.  We search common paths and
+    cache the result for the process lifetime.
+    """
+    global _font_path
+    if _font_path is not None:
+        return _font_path
+
+    # Common font paths on Debian/Ubuntu based containers
+    candidate_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+    ]
+
+    for path in candidate_paths:
+        if os.path.isfile(path):
+            _font_path = path
+            logger.info("Found font for drawtext: %s", path)
+            return path
+
+    # Try to discover via fontconfig if available
+    try:
+        result = subprocess.run(
+            ["fc-match", "-f", "%{file}", "DejaVu Sans:style=Bold"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip() and os.path.isfile(result.stdout.strip()):
+            _font_path = result.stdout.strip()
+            logger.info("Found font via fontconfig: %s", _font_path)
+            return _font_path
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # No font found — captions/watermarks will be skipped
+    logger.warning("No font file found — FFmpeg drawtext will be unavailable")
+    _font_path = ""  # empty string means "searched but not found"
+    return None
+
+
 @dataclass
 class FFmpegOptions:
     """Options controlling FFmpeg clip generation."""
@@ -335,13 +387,17 @@ class FFmpegProcessor:
         filters.append(f"fade=t=in:st=0:d={fade_dur:.2f}")
         filters.append(f"fade=t=out:st={duration - fade_dur:.2f}:d={fade_dur:.2f}")
 
-        # Caption / text overlay
-        if caption_text:
+        # Caption / text overlay (skip if no font available)
+        if caption_text and _find_font():
             filters.append(self._build_text_filter(caption_text, duration, opts))
+        elif caption_text:
+            logger.warning("Skipping caption overlay — no font available")
 
-        # Watermark
-        if opts.add_watermark:
+        # Watermark (skip if no font available)
+        if opts.add_watermark and _find_font():
             filters.append(self._build_watermark_filter(opts))
+        elif opts.add_watermark:
+            logger.warning("Skipping watermark overlay — no font available")
 
         cmd.extend(["-vf", ",".join(filters)])
         cmd.extend([
@@ -399,13 +455,19 @@ class FFmpegProcessor:
         }
         font_size = font_sizes.get(opts.caption_style, 36)
 
+        # Determine font file path — DejaVu Sans is commonly available on Linux.
+        # FFmpeg drawtext requires an explicit fontfile on minimal containers.
+        font_path = _find_font()
+
         # Caption at bottom center with background box
         box_color = "#000000@0.6"
         border_color = "#000000@0.8"
         border_w = 3
 
+        font_part = f":fontfile={font_path}" if font_path else ""
         return (
             f"drawtext=text='{safe_text}'"
+            f"{font_part}"
             f":fontsize={font_size}"
             f":fontcolor=white"
             f":borderw={border_w}"
@@ -422,8 +484,11 @@ class FFmpegProcessor:
     def _build_watermark_filter(opts: FFmpegOptions) -> str:
         """Build drawtext filter for watermark."""
         safe_text = opts.watermark_text.replace("'", "'\\''").replace(":", "\\:")
+        font_path = _find_font()
+        font_part = f":fontfile={font_path}" if font_path else ""
         return (
             f"drawtext=text='{safe_text}'"
+            f"{font_part}"
             f":fontsize=16"
             f":fontcolor=white@0.5"
             f":x=w-tw-16"

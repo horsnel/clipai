@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import threading
 import time
 import uuid
@@ -48,6 +49,9 @@ logger = logging.getLogger("clipai.worker")
 # ── App ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
 CORS(app, origins=Config.CORS_ORIGINS, methods=["GET", "POST", "OPTIONS"], supports_credentials=True)
+
+# Allow up to 500 MB file uploads (must be set before any request handling)
+app.config["MAX_CONTENT_LENGTH"] = Config.MAX_FILE_SIZE_MB * 1024 * 1024
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -172,6 +176,16 @@ def upload_bytes_to_r2(data: bytes, key: str, content_type: str = "video/mp4") -
     return f"s3://{Config.R2_BUCKET_NAME}/{key}"
 
 
+def get_r2_presigned_url(key: str, expires: int = 3600) -> str:
+    """Generate a presigned URL for an R2 object (valid for `expires` seconds)."""
+    client = _get_r2_client()
+    return client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": Config.R2_BUCKET_NAME, "Key": key},
+        ExpiresIn=expires,
+    )
+
+
 def download_from_r2(key: str, dest_path: str) -> str:
     """Download a file from R2 to a local path."""
     client = _get_r2_client()
@@ -221,6 +235,9 @@ def _get_gemini_model():
 def analyze_video(video_url: str, game: str, clip_count: int) -> list[dict[str, Any]]:
     """Ask Gemini to analyse a video and identify highlight timestamps.
 
+    Uses the Gemini File API to upload the video for proper multimodal analysis.
+    Falls back to URL-based analysis if File API fails.
+
     Returns a list of dicts with keys:
         start_time, end_time, label, intensity
     """
@@ -250,9 +267,54 @@ Respond ONLY with a JSON array. No explanations. Example:
 ]"""
 
     try:
-        logger.info("Sending video to Gemini for analysis: %s", video_url)
-        # Gemini supports video URLs in some configurations
-        response = model.generate_content([prompt, video_url])
+        # ── Strategy 1: Use Gemini File API (download + upload) ────────
+        # This is the most reliable way to get Gemini to actually watch the video.
+        gemini_file = None
+        local_video_path: str | None = None
+
+        # Download the video to a temp file if it's a URL
+        if video_url.startswith("http"):
+            try:
+                local_video_path = _download_to_temp(video_url)
+                logger.info("Uploading video to Gemini File API: %s", local_video_path)
+                gemini_file = genai.upload_file(
+                    path=local_video_path,
+                    mime_type="video/mp4",
+                )
+                # Wait for the file to be processed by Gemini
+                logger.info("Waiting for Gemini to process uploaded file...")
+                while gemini_file.state.name == "PROCESSING":
+                    time.sleep(2)
+                    gemini_file = genai.get_file(gemini_file.name)
+                if gemini_file.state.name == "FAILED":
+                    logger.warning("Gemini File API processing failed, falling back to URL mode")
+                    gemini_file = None
+                else:
+                    logger.info("Gemini File API ready: %s", gemini_file.state.name)
+            except Exception as file_exc:
+                logger.warning("Gemini File API upload failed: %s — trying URL mode", file_exc)
+                gemini_file = None
+
+        # ── Generate content ──────────────────────────────────────────
+        if gemini_file:
+            logger.info("Sending video to Gemini via File API")
+            response = model.generate_content([prompt, gemini_file])
+        else:
+            # Strategy 2: Pass URL directly (works for publicly accessible URLs)
+            logger.info("Sending video URL to Gemini for analysis: %s", video_url[:100])
+            response = model.generate_content([prompt, video_url])
+
+        # Clean up Gemini file and temp file
+        if gemini_file:
+            try:
+                genai.delete_file(gemini_file.name)
+            except Exception:
+                pass
+        if local_video_path and os.path.isfile(local_video_path):
+            try:
+                os.unlink(local_video_path)
+            except OSError:
+                pass
 
         # Extract JSON from response
         text = response.text.strip()
@@ -294,52 +356,147 @@ Respond ONLY with a JSON array. No explanations. Example:
         raise RuntimeError(f"Video analysis failed: {exc}") from exc
 
 
+def _download_to_temp(video_url: str) -> str:
+    """Download a video URL to a temporary local file for processing."""
+    os.makedirs(Config.TEMP_DIR, exist_ok=True)
+    ext = ".mp4"
+    # Try to extract extension from URL
+    url_path = video_url.split("?")[0].split("#")[0]
+    url_ext = os.path.splitext(url_path)[1].lower()
+    if url_ext in Config.SUPPORTED_VIDEO_FORMATS:
+        ext = url_ext
+    local_path = os.path.join(Config.TEMP_DIR, f"source_{uuid.uuid4().hex[:8]}{ext}")
+    logger.info("Downloading video to temp: %s", local_path)
+    resp = requests.get(video_url, stream=True, timeout=120)
+    resp.raise_for_status()
+    downloaded = 0
+    with open(local_path, "wb") as f:
+        for chunk in resp.iter_content(chunk_size=8192):
+            f.write(chunk)
+            downloaded += len(chunk)
+            if downloaded > Config.MAX_FILE_SIZE_MB * 1024 * 1024:
+                os.unlink(local_path)
+                raise ValueError(f"Video exceeds max size of {Config.MAX_FILE_SIZE_MB}MB")
+    logger.info("Downloaded %.1f MB to %s", downloaded / (1024 * 1024), local_path)
+    return local_path
+
+
 # ══════════════════════════════════════════════════════════════════════
 #  CLIP PROCESSING PIPELINE
 # ══════════════════════════════════════════════════════════════════════
+
+def _generate_thumbnail(video_path: str, timestamp: float, clip_id: str) -> str | None:
+    """Generate a thumbnail image from a video at the given timestamp.
+
+    Returns the local path to the thumbnail, or None on failure.
+    """
+    try:
+        os.makedirs(Config.TEMP_DIR, exist_ok=True)
+        thumb_path = os.path.join(Config.TEMP_DIR, f"thumb_{clip_id}.jpg")
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", str(timestamp),
+            "-i", video_path,
+            "-vframes", "1",
+            "-q:v", "2",
+            "-vf", "scale=640:-1",
+            thumb_path,
+        ]
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0 and os.path.isfile(thumb_path):
+            return thumb_path
+        logger.warning("Thumbnail generation failed: %s", result.stderr[-500:] if result.stderr else "unknown")
+        return None
+    except Exception as exc:
+        logger.warning("Thumbnail generation error: %s", exc)
+        return None
+
 
 def _process_video(job: Job) -> None:
     """Background pipeline executed in a worker thread.
 
     Steps:
-        1. Store source video in R2
-        2. Analyse with Gemini
-        3. Render clips (JSON2Video primary, FFmpeg fallback)
-        4. Upload results to R2
-        5. Save metadata
+        1. Download source video locally (also store in R2)
+        2. Analyse with Gemini (using File API via local file)
+        3. Render clips with FFmpeg (reusing local file)
+        4. Generate thumbnails for each clip
+        5. Upload results to R2
+        6. Save metadata to Supabase
     """
+    local_source_path: str | None = None
     try:
         job.progress = 5
         _save_job(job)
 
-        # ── Step 1: Ensure source is in R2 ────────────────────────
-        logger.info("[%s] Storing source in R2", job.job_id)
-        r2_key = f"sources/{job.user_id}/{job.job_id}.mp4"
+        # ── Step 1: Download source video locally & store in R2 ───
+        logger.info("[%s] Downloading source video", job.job_id)
 
         if job.video_url and job.video_url.startswith("http"):
-            # Download then upload to R2
-            resp = requests.get(job.video_url, stream=True, timeout=120)
-            resp.raise_for_status()
-            upload_bytes_to_r2(resp.content, r2_key)
+            local_source_path = _download_to_temp(job.video_url)
+            # Also store in R2 for persistence
+            r2_key = f"sources/{job.user_id}/{job.job_id}.mp4"
+            try:
+                upload_to_r2(local_source_path, r2_key)
+                job.r2_source_key = r2_key
+                logger.info("[%s] Source stored in R2: %s", job.job_id, r2_key)
+            except Exception as r2_exc:
+                logger.warning("[%s] R2 upload failed (non-fatal): %s", job.job_id, r2_exc)
+        elif job.video_url and job.video_url.startswith("s3://"):
+            # Download from R2 via presigned URL
+            if job.r2_source_key:
+                try:
+                    presigned = get_r2_presigned_url(job.r2_source_key, expires=3600)
+                    local_source_path = _download_to_temp(presigned)
+                except Exception as exc:
+                    logger.warning("[%s] Could not download from R2: %s", job.job_id, exc)
+            if not local_source_path:
+                logger.warning("[%s] No local source available", job.job_id)
         else:
             logger.warning("[%s] No downloadable video_url provided", job.job_id)
 
-        job.r2_source_key = r2_key
         job.progress = 15
         _save_job(job)
 
         # ── Step 2: Analyse with Gemini ───────────────────────────
-        logger.info("[%s] Analysing video with Gemini", job.job_id)
-        try:
-            highlights = analyze_video(
-                video_url=job.video_url or "",
-                game=job.game or "",
-                clip_count=job.clip_count,
-            )
-        except Exception as exc:
-            logger.warning("[%s] Gemini analysis failed, generating fallback: %s", job.job_id, exc)
-            # Fallback: evenly spaced clips
-            highlights = _generate_fallback_clips(job.clip_count)
+        # Use local file for Gemini File API if available, otherwise fall back to URL
+        analysis_url = job.video_url or ""
+        if local_source_path:
+            # Generate a presigned URL or use the local file
+            # The analyze_video function will download + upload via File API
+            # If we already have a local file, we can upload directly
+            try:
+                highlights = _analyze_local_video(
+                    local_source_path, job.game or "", job.clip_count,
+                )
+            except Exception as exc:
+                logger.warning("[%s] Gemini File API analysis failed, trying URL: %s", job.job_id, exc)
+                try:
+                    highlights = analyze_video(
+                        video_url=analysis_url,
+                        game=job.game or "",
+                        clip_count=job.clip_count,
+                    )
+                except Exception as exc2:
+                    logger.warning("[%s] Gemini URL analysis also failed: %s", job.job_id, exc2)
+                    highlights = _generate_fallback_clips(job.clip_count, local_source_path)
+        else:
+            # No local file — try URL-based analysis
+            if analysis_url.startswith("s3://") and job.r2_source_key:
+                try:
+                    analysis_url = get_r2_presigned_url(job.r2_source_key, expires=3600)
+                except Exception:
+                    pass
+            try:
+                highlights = analyze_video(
+                    video_url=analysis_url,
+                    game=job.game or "",
+                    clip_count=job.clip_count,
+                )
+            except Exception as exc:
+                logger.warning("[%s] Gemini analysis failed, generating fallback: %s", job.job_id, exc)
+                highlights = _generate_fallback_clips(job.clip_count)
 
         job.progress = 35
         _save_job(job)
@@ -348,8 +505,6 @@ def _process_video(job: Job) -> None:
         logger.info("[%s] Rendering %d clips", job.job_id, len(highlights))
         clips: list[dict[str, Any]] = []
 
-        # FFmpeg is the primary processor (free, built-in)
-        # JSON2Video is optional/premium — only used when explicitly enabled
         use_json2video = (Config.JSON2VIDEO_API_KEY is not None and Config.USE_JSON2VIDEO)
         if use_json2video:
             try:
@@ -360,40 +515,345 @@ def _process_video(job: Job) -> None:
                     "[%s] JSON2Video failed, falling back to FFmpeg: %s",
                     job.job_id, exc,
                 )
-                clips = _render_with_ffmpeg(job, highlights)
+                clips = _render_with_ffmpeg(job, highlights, local_source_path)
         else:
             logger.info("[%s] Using FFmpeg (primary processor)", job.job_id)
-            clips = _render_with_ffmpeg(job, highlights)
+            clips = _render_with_ffmpeg(job, highlights, local_source_path)
+
+        # ── Step 4: Generate thumbnails & finalize clip data ──────
+        for clip in clips:
+            if clip.get("status") == "failed":
+                continue
+            # Generate thumbnail from the source video
+            start_secs = clip.get("start_time_seconds", 0)
+            thumb_local = None
+            if local_source_path and start_secs is not None:
+                thumb_local = _generate_thumbnail(
+                    local_source_path, float(start_secs), clip.get("id", "x"),
+                )
+            if thumb_local:
+                try:
+                    thumb_key = f"thumbnails/{job.user_id}/{job.job_id}/thumb_{clip.get('id', 'x')}.jpg"
+                    thumb_url = upload_to_r2(thumb_local, thumb_key, content_type="image/jpeg")
+                    clip["thumbnail_url"] = thumb_url
+                    clip["thumbnail"] = thumb_url
+                except Exception as exc:
+                    logger.warning("Failed to upload thumbnail: %s", exc)
+                finally:
+                    try:
+                        os.unlink(thumb_local)
+                    except OSError:
+                        pass
+
+            # Ensure presigned URL for video_url if it's an s3:// path
+            video_url = clip.get("video_url", clip.get("output_url", ""))
+            if video_url.startswith("s3://"):
+                # Extract key from s3://bucket/key
+                s3_key = video_url.replace(f"s3://{Config.R2_BUCKET_NAME}/", "")
+                try:
+                    video_url = get_r2_presigned_url(s3_key, expires=86400)  # 24h
+                    clip["video_url"] = video_url
+                    clip["output_url"] = video_url
+                except Exception:
+                    pass
 
         job.clips = clips
         job.progress = 90
         _save_job(job)
 
-        # ── Step 4: Persist metadata to Supabase ──────────────────
+        # ── Step 5: Persist metadata to Supabase ──────────────────
         for clip in clips:
             _supabase_request("POST", "clips", {
                 "job_id": job.job_id,
                 "user_id": job.user_id,
                 "clip_url": clip.get("output_url", ""),
-                "duration": clip.get("duration", 0),
+                "video_url": clip.get("video_url", clip.get("output_url", "")),
+                "duration": clip.get("duration", "0s"),
                 "label": clip.get("label", ""),
-                "thumbnail_url": clip.get("thumbnail_url", ""),
+                "title": clip.get("title", clip.get("label", "")),
+                "game": clip.get("game", job.game or ""),
+                "hype_score": clip.get("hype_score", 70),
+                "thumbnail_url": clip.get("thumbnail_url", clip.get("thumbnail", "")),
                 "format": clip.get("format", "mp4"),
                 "resolution": clip.get("resolution", []),
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": clip.get("created_at", datetime.now(timezone.utc).isoformat()),
             })
 
         # ── Done ──────────────────────────────────────────────────
-        job.status = "completed"
-        job.progress = 100
-        _save_job(job)
-        logger.info("[%s] Processing complete — %d clips generated", job.job_id, len(clips))
+        successful_clips = [c for c in clips if c.get("output_url") or c.get("video_url")]
+        if clips and not successful_clips:
+            job.status = "failed"
+            job.error = "All clips failed to render. This may be due to an invalid video file or a processing error."
+            job.progress = 100
+            _save_job(job)
+            logger.warning("[%s] All %d clips failed to render", job.job_id, len(clips))
+        else:
+            job.status = "completed"
+            job.progress = 100
+            _save_job(job)
+            logger.info("[%s] Processing complete — %d/%d clips generated", job.job_id, len(successful_clips), len(clips))
 
     except Exception as exc:
         logger.error("[%s] Pipeline failed: %s", job.job_id, exc)
         job.status = "failed"
         job.error = str(exc)[:500]
         _save_job(job)
+    finally:
+        # Clean up local source file (only if we downloaded it ourselves)
+        if local_source_path and os.path.isfile(local_source_path):
+            try:
+                os.unlink(local_source_path)
+            except OSError:
+                pass
+
+
+def _process_video_with_local(job: Job, local_upload_path: str | None = None) -> None:
+    """Wrapper around _process_video that uses a pre-saved local upload file.
+
+    When a file is uploaded via the /api/process endpoint, we already have it
+    on disk — this avoids downloading it again from R2.
+    """
+    try:
+        job.progress = 5
+        _save_job(job)
+
+        # If we have a local upload, use it directly instead of downloading from URL
+        if local_upload_path and os.path.isfile(local_upload_path):
+            logger.info("[%s] Using pre-saved local upload: %s", job.job_id, local_upload_path)
+            # The file is already in R2 from the upload handler
+            # Just run the pipeline with the local path
+            _process_video_core(job, local_upload_path)
+        else:
+            # No local file — use the normal download flow
+            _process_video(job)
+    except Exception as exc:
+        logger.error("[%s] Pipeline failed: %s", job.job_id, exc)
+        job.status = "failed"
+        job.error = str(exc)[:500]
+        _save_job(job)
+    finally:
+        # Clean up the uploaded temp file
+        if local_upload_path and os.path.isfile(local_upload_path):
+            try:
+                os.unlink(local_upload_path)
+            except OSError:
+                pass
+
+
+def _process_video_core(job: Job, local_source_path: str) -> None:
+    """Core processing pipeline when we already have the video locally.
+
+    This is the optimized path that skips the download step.
+    """
+    try:
+        job.progress = 10
+        _save_job(job)
+
+        # ── Step 1: Analyse with Gemini (using File API with local file) ──
+        logger.info("[%s] Analysing local video with Gemini", job.job_id)
+        try:
+            highlights = _analyze_local_video(
+                local_source_path, job.game or "", job.clip_count,
+            )
+        except Exception as exc:
+            logger.warning("[%s] Gemini File API failed, trying URL: %s", job.job_id, exc)
+            analysis_url = job.video_url or ""
+            if analysis_url.startswith("s3://") and job.r2_source_key:
+                try:
+                    analysis_url = get_r2_presigned_url(job.r2_source_key, expires=3600)
+                except Exception:
+                    pass
+            try:
+                highlights = analyze_video(
+                    video_url=analysis_url,
+                    game=job.game or "",
+                    clip_count=job.clip_count,
+                )
+            except Exception as exc2:
+                logger.warning("[%s] All Gemini attempts failed: %s", job.job_id, exc2)
+                highlights = _generate_fallback_clips(job.clip_count, local_source_path)
+
+        job.progress = 35
+        _save_job(job)
+
+        # ── Step 2: Render clips with FFmpeg ──────────────────────────
+        logger.info("[%s] Rendering %d clips", job.job_id, len(highlights))
+        use_json2video = (Config.JSON2VIDEO_API_KEY is not None and Config.USE_JSON2VIDEO)
+        if use_json2video:
+            try:
+                clips = _render_with_json2video(job, highlights)
+            except Exception as exc:
+                logger.warning("[%s] JSON2Video failed, falling back to FFmpeg: %s", job.job_id, exc)
+                clips = _render_with_ffmpeg(job, highlights, local_source_path)
+        else:
+            clips = _render_with_ffmpeg(job, highlights, local_source_path)
+
+        # ── Step 3: Generate thumbnails & finalize ───────────────────
+        for clip in clips:
+            if clip.get("status") == "failed":
+                continue
+            start_secs = clip.get("start_time_seconds", 0)
+            thumb_local = None
+            if start_secs is not None:
+                thumb_local = _generate_thumbnail(
+                    local_source_path, float(start_secs), clip.get("id", "x"),
+                )
+            if thumb_local:
+                try:
+                    thumb_key = f"thumbnails/{job.user_id}/{job.job_id}/thumb_{clip.get('id', 'x')}.jpg"
+                    thumb_url = upload_to_r2(thumb_local, thumb_key, content_type="image/jpeg")
+                    clip["thumbnail_url"] = thumb_url
+                    clip["thumbnail"] = thumb_url
+                except Exception as exc:
+                    logger.warning("Failed to upload thumbnail: %s", exc)
+                finally:
+                    try:
+                        os.unlink(thumb_local)
+                    except OSError:
+                        pass
+
+            # Ensure presigned URL for video_url if it's an s3:// path
+            video_url = clip.get("video_url", clip.get("output_url", ""))
+            if video_url.startswith("s3://"):
+                s3_key = video_url.replace(f"s3://{Config.R2_BUCKET_NAME}/", "")
+                try:
+                    video_url = get_r2_presigned_url(s3_key, expires=86400)
+                    clip["video_url"] = video_url
+                    clip["output_url"] = video_url
+                except Exception:
+                    pass
+
+        job.clips = clips
+        job.progress = 90
+        _save_job(job)
+
+        # ── Step 4: Persist to Supabase ──────────────────────────────
+        for clip in clips:
+            _supabase_request("POST", "clips", {
+                "job_id": job.job_id,
+                "user_id": job.user_id,
+                "clip_url": clip.get("output_url", ""),
+                "video_url": clip.get("video_url", clip.get("output_url", "")),
+                "duration": clip.get("duration", "0s"),
+                "label": clip.get("label", ""),
+                "title": clip.get("title", clip.get("label", "")),
+                "game": clip.get("game", job.game or ""),
+                "hype_score": clip.get("hype_score", 70),
+                "thumbnail_url": clip.get("thumbnail_url", clip.get("thumbnail", "")),
+                "format": clip.get("format", "mp4"),
+                "resolution": clip.get("resolution", []),
+                "created_at": clip.get("created_at", datetime.now(timezone.utc).isoformat()),
+            })
+
+        # ── Done ──────────────────────────────────────────────────────
+        successful_clips = [c for c in clips if c.get("output_url") or c.get("video_url")]
+        if clips and not successful_clips:
+            job.status = "failed"
+            job.error = "All clips failed to render. This may be due to an invalid video file or a processing error."
+        else:
+            job.status = "completed"
+        job.progress = 100
+        _save_job(job)
+        logger.info("[%s] Processing complete — %d/%d clips", job.job_id, len(successful_clips), len(clips))
+
+    except Exception as exc:
+        logger.error("[%s] Core pipeline failed: %s", job.job_id, exc)
+        job.status = "failed"
+        job.error = str(exc)[:500]
+        _save_job(job)
+
+
+def _analyze_local_video(local_path: str, game: str, clip_count: int) -> list[dict[str, Any]]:
+    """Analyse a local video file using Gemini's File API.
+
+    This is the most reliable way to get Gemini to actually watch the video,
+    as opposed to just receiving a URL string it may not be able to access.
+    """
+    if not Config.GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY not configured")
+
+    model = _get_gemini_model()
+
+    prompt = f"""You are a professional gaming highlight detector for {game or 'gaming content'}.
+
+Analyze this video and identify the top {clip_count} most exciting, viral-worthy moments.
+
+For each highlight, provide:
+1. start_time - exact start time in seconds (e.g., 12.5)
+2. end_time - exact end time in seconds (e.g., 18.2)
+3. label - a short, punchy caption (2-4 words max, e.g., "INSANE 1v5 CLUTCH")
+4. intensity - "high", "medium", or "low"
+
+Guidelines:
+- Each clip should be 5-30 seconds long
+- Prioritize kills, clutches, trick shots, funny moments, or high-skill plays
+- Ensure clips don't overlap
+- Labels should be hype-worthy and social-media friendly
+- Space clips at least 3 seconds apart
+
+Respond ONLY with a JSON array. No explanations. Example:
+[
+  {{"start_time": 10.0, "end_time": 18.5, "label": "INSANE SNIPER SHOT", "intensity": "high"}},
+  {{"start_time": 45.2, "end_time": 52.0, "label": "1v3 CLUTCH", "intensity": "high"}}
+]"""
+
+    logger.info("Uploading local video to Gemini File API: %s", local_path)
+    gemini_file = genai.upload_file(
+        path=local_path,
+        mime_type="video/mp4",
+    )
+
+    # Wait for Gemini to process the uploaded file
+    logger.info("Waiting for Gemini to process uploaded file...")
+    max_wait = 120  # seconds
+    waited = 0
+    while gemini_file.state.name == "PROCESSING":
+        time.sleep(2)
+        waited += 2
+        if waited > max_wait:
+            raise RuntimeError("Gemini file processing timed out")
+        gemini_file = genai.get_file(gemini_file.name)
+
+    if gemini_file.state.name == "FAILED":
+        raise RuntimeError("Gemini file processing failed")
+
+    logger.info("Gemini File API ready, generating analysis...")
+    response = model.generate_content([prompt, gemini_file])
+
+    # Clean up the uploaded file from Gemini
+    try:
+        genai.delete_file(gemini_file.name)
+    except Exception:
+        pass
+
+    # Parse the response
+    text = response.text.strip()
+    json_match = re.search(r"\[.*\]", text, re.DOTALL)
+    if json_match:
+        text = json_match.group(0)
+
+    highlights = json.loads(text)
+    if not isinstance(highlights, list):
+        highlights = [highlights]
+
+    validated = []
+    for hl in highlights:
+        try:
+            start = float(hl.get("start_time", 0))
+            end = float(hl.get("end_time", start + 10))
+            if end <= start:
+                end = start + 10
+            validated.append({
+                "start_time": round(start, 2),
+                "end_time": round(end, 2),
+                "label": str(hl.get("label", "Highlight"))[:50],
+                "intensity": str(hl.get("intensity", "medium")).lower(),
+            })
+        except (ValueError, TypeError) as exc:
+            logger.warning("Skipping invalid highlight: %s", exc)
+
+    logger.info("Gemini identified %d highlights", len(validated))
+    return validated[:clip_count]
 
 
 def _render_with_json2video(job: Job, highlights: list[dict]) -> list[dict[str, Any]]:
@@ -428,30 +888,54 @@ def _render_with_json2video(job: Job, highlights: list[dict]) -> list[dict[str, 
     output_url = result.get("output_url", "")
 
     clips = []
-    offset = 0
     for i, hl in enumerate(highlights):
+        intensity = hl.get("intensity", "medium")
+        hype_score = {"high": 90 + (i * 2) % 10, "medium": 70 + (i * 3) % 15}.get(intensity, 55 + (i * 5) % 10)
         clips.append({
+            "id": uuid.uuid4().hex[:12],
             "index": i,
+            "title": hl.get("label", "Highlight"),
             "label": hl.get("label", "Highlight"),
-            "output_url": output_url,  # single compilation
-            "duration": hl["end_time"] - hl["start_time"],
+            "game": job.game or "",
+            "hype_score": hype_score,
+            "duration": str(round(hl["end_time"] - hl["start_time"])) + "s",
+            "duration_seconds": hl["end_time"] - hl["start_time"],
+            "thumbnail": "",
+            "thumbnail_url": "",
+            "video_url": output_url,
+            "output_url": output_url,
+            "start_time": str(round(hl["start_time"])) + "s",
+            "end_time": str(round(hl["end_time"])) + "s",
+            "start_time_seconds": hl["start_time"],
+            "end_time_seconds": hl["end_time"],
+            "status": "ready",
             "format": result.get("format", "mp4"),
             "resolution": list(result.get("resolution", (1080, 1920))),
-            "start_time": hl["start_time"],
-            "end_time": hl["end_time"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "processor": "json2video",
         })
 
     return clips
 
 
-def _render_with_ffmpeg(job: Job, highlights: list[dict]) -> list[dict[str, Any]]:
+def _render_with_ffmpeg(job: Job, highlights: list[dict], local_source_path: str | None = None) -> list[dict[str, Any]]:
     """Render clips using FFmpeg (one per highlight, then optionally concatenated)."""
     from processors.ffmpeg_processor import FFmpegProcessor, FFmpegOptions
 
     processor = FFmpegProcessor()
     if not processor.available:
         raise RuntimeError("FFmpeg is not available")
+
+    # Prefer local file over URL to avoid re-downloading
+    ffmpeg_source_url = local_source_path or ""
+    if not ffmpeg_source_url:
+        ffmpeg_source_url = job.video_url or ""
+        if ffmpeg_source_url.startswith("s3://") and job.r2_source_key:
+            try:
+                ffmpeg_source_url = get_r2_presigned_url(job.r2_source_key, expires=3600)
+                logger.info("[%s] Generated presigned URL for FFmpeg", job.job_id)
+            except Exception as exc:
+                logger.warning("[%s] Could not generate presigned URL for FFmpeg: %s", job.job_id, exc)
 
     opts = FFmpegOptions()
     clips: list[dict[str, Any]] = []
@@ -464,7 +948,7 @@ def _render_with_ffmpeg(job: Job, highlights: list[dict]) -> list[dict[str, Any]
 
         try:
             result = processor.create_clip(
-                video_url=job.video_url or "",
+                video_url=ffmpeg_source_url,
                 start_time=hl["start_time"],
                 end_time=hl["end_time"],
                 options=opts,
@@ -480,16 +964,33 @@ def _render_with_ffmpeg(job: Job, highlights: list[dict]) -> list[dict[str, Any]
                 # Clean up local file
                 os.unlink(output_path)
 
+            # Compute a hype score from intensity
+            intensity = hl.get("intensity", "medium")
+            hype_score = {"high": 90 + (i * 2) % 10, "medium": 70 + (i * 3) % 15}.get(intensity, 55 + (i * 5) % 10)
+            clip_id = uuid.uuid4().hex[:12]
+
             clips.append({
+                "id": clip_id,
                 "index": i,
+                "title": hl.get("label", "Highlight"),
                 "label": hl.get("label", "Highlight"),
+                "game": job.game or "",
+                "hype_score": hype_score,
+                "duration": str(round(result.get("duration", 0))) + "s",
+                "duration_seconds": result.get("duration", 0),
+                "thumbnail": "",
+                "thumbnail_url": "",
+                "video_url": output_url,
                 "output_url": output_url,
-                "duration": result.get("duration", 0),
+                "start_time": str(round(hl["start_time"])) + "s",
+                "end_time": str(round(hl["end_time"])) + "s",
+                "start_time_seconds": hl["start_time"],
+                "end_time_seconds": hl["end_time"],
+                "status": "ready",
                 "format": result.get("format", "mp4"),
                 "size_bytes": result.get("size_bytes", 0),
                 "resolution": list(result.get("resolution", (1080, 1920))),
-                "start_time": hl["start_time"],
-                "end_time": hl["end_time"],
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "processor": "ffmpeg",
             })
         except Exception as exc:
@@ -497,32 +998,66 @@ def _render_with_ffmpeg(job: Job, highlights: list[dict]) -> list[dict[str, Any]
                 "[%s] FFmpeg clip %d failed: %s", job.job_id, i, exc
             )
             clips.append({
+                "id": uuid.uuid4().hex[:12],
                 "index": i,
+                "title": hl.get("label", "Highlight"),
                 "label": hl.get("label", "Highlight"),
+                "game": job.game or "",
+                "hype_score": 50,
+                "duration": "0s",
+                "duration_seconds": 0,
+                "thumbnail": "",
+                "video_url": "",
                 "output_url": "",
-                "duration": 0,
+                "start_time": str(round(hl["start_time"])) + "s",
+                "end_time": str(round(hl["end_time"])) + "s",
+                "start_time_seconds": hl["start_time"],
+                "end_time_seconds": hl["end_time"],
+                "status": "failed",
                 "error": str(exc),
+                "created_at": datetime.now(timezone.utc).isoformat(),
                 "processor": "ffmpeg",
             })
 
     return clips
 
 
-def _generate_fallback_clips(clip_count: int) -> list[dict[str, Any]]:
+def _generate_fallback_clips(clip_count: int, video_path: str | None = None) -> list[dict[str, Any]]:
     """Generate evenly-spaced highlight markers when Gemini is unavailable.
 
-    These are approximate; FFmpeg will handle the actual trimming.
+    If a local video path is provided, attempts to get the actual duration
+    for better spacing.  Otherwise uses a default 60s assumption.
     """
-    clip_duration = 15  # seconds per clip
-    gap = 3  # seconds between clips
-    interval = clip_duration + gap
-    start = 5  # skip first 5 seconds
+    video_duration = 60  # default assumption in seconds
+    if video_path and os.path.isfile(video_path):
+        try:
+            from processors.ffmpeg_processor import FFmpegProcessor
+            proc = FFmpegProcessor()
+            info = proc.get_video_info(video_path)
+            if info.get("duration", 0) > 0:
+                video_duration = info["duration"]
+                logger.info("Video duration from ffprobe: %.1fs", video_duration)
+        except Exception as exc:
+            logger.warning("Could not get video duration: %s", exc)
+
+    # Space clips evenly across the video duration
+    clip_duration = min(15, max(5, video_duration / (clip_count * 2)))
+    total_clip_time = clip_count * clip_duration
+    gap = max(2, (video_duration - total_clip_time) / max(1, clip_count - 1)) if clip_count > 1 else 0
+    start = min(5, video_duration * 0.05)  # skip first 5s or 5%
 
     clips = []
     for i in range(clip_count):
+        clip_start = start + (i * (clip_duration + gap))
+        clip_end = clip_start + clip_duration
+        if clip_end > video_duration:
+            clip_end = video_duration
+            clip_start = max(0, clip_end - clip_duration)
+        if clip_start >= video_duration:
+            break
         clips.append({
-            "start_time": start + (i * interval),
-            "end_time": start + (i * interval) + clip_duration,
+            "start_time": round(clip_start, 2),
+            "end_time": round(clip_end, 2),
             "label": f"Highlight #{i + 1}",
             "intensity": "medium",
         })
@@ -532,6 +1067,22 @@ def _generate_fallback_clips(clip_count: int) -> list[dict[str, Any]]:
 # ══════════════════════════════════════════════════════════════════════
 #  ROUTES
 # ══════════════════════════════════════════════════════════════════════
+
+# ── Error Handlers ────────────────────────────────────────────────────
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    """Handle file uploads that exceed MAX_CONTENT_LENGTH."""
+    return jsonify({
+        "error": f"File too large. Maximum size is {Config.MAX_FILE_SIZE_MB}MB.",
+    }), 413
+
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    """Generic 500 handler."""
+    return jsonify({"error": "Internal server error"}), 500
+
 
 @app.route("/api/health", methods=["GET"])
 def health_check():
@@ -595,8 +1146,8 @@ def process_video():
 
         # Handle file upload
         uploaded_file = request.files.get("file")
+        local_upload_path: str | None = None
         if uploaded_file and uploaded_file.filename:
-            # Upload to R2 first
             file_ext = os.path.splitext(uploaded_file.filename)[1].lower()
             if file_ext not in Config.SUPPORTED_VIDEO_FORMATS:
                 return jsonify({
@@ -605,9 +1156,28 @@ def process_video():
                 }), 400
 
             file_data = uploaded_file.read()
+
+            # Save to a local temp file first (avoids re-downloading from R2 later)
+            os.makedirs(Config.TEMP_DIR, exist_ok=True)
+            local_upload_path = os.path.join(
+                Config.TEMP_DIR, f"upload_{uuid.uuid4().hex[:8]}{file_ext}"
+            )
+            with open(local_upload_path, "wb") as f:
+                f.write(file_data)
+            logger.info("Saved uploaded file locally: %s (%.1f MB)", local_upload_path, len(file_data) / (1024 * 1024))
+
+            # Upload to R2 for persistence
             r2_key = f"uploads/{user_id}/{uuid.uuid4().hex}{file_ext}"
             video_url = upload_bytes_to_r2(file_data, r2_key, content_type="video/mp4")
             logger.info("Uploaded file to R2: %s", r2_key)
+
+            # If R2 doesn't have a public URL, generate a presigned URL
+            if video_url.startswith("s3://"):
+                try:
+                    video_url = get_r2_presigned_url(r2_key, expires=3600)
+                    logger.info("Generated presigned URL for uploaded file")
+                except Exception as exc:
+                    logger.warning("Could not generate presigned URL: %s", exc)
 
         if not video_url:
             return jsonify({
@@ -626,10 +1196,20 @@ def process_video():
             game=game,
             clip_count=clip_count,
         )
+        # If we have a local upload file, pass it directly so _process_video
+        # doesn't need to re-download from R2
+        if local_upload_path and os.path.isfile(local_upload_path):
+            job.r2_source_key = r2_key  # already uploaded to R2
+
         _save_job(job)
 
         # Start processing in background thread
-        thread = threading.Thread(target=_process_video, args=(job,), daemon=True)
+        # Pass the local upload path to avoid re-downloading
+        thread = threading.Thread(
+            target=_process_video_with_local,
+            args=(job, local_upload_path),
+            daemon=True,
+        )
         thread.start()
 
         return jsonify({
@@ -677,11 +1257,21 @@ def get_user_clips(user_id: str):
             if job.user_id == user_id and job.status == "completed" and job.clips:
                 for clip in job.clips:
                     clip_entry = {
-                        "clip_url": clip.get("output_url", ""),
-                        "duration": clip.get("duration", 0),
-                        "label": clip.get("label", ""),
+                        "id": clip.get("id", uuid.uuid4().hex[:12]),
+                        "title": clip.get("title", clip.get("label", "Highlight")),
+                        "game": clip.get("game", job.game or ""),
+                        "hype_score": clip.get("hype_score", 70),
+                        "duration": clip.get("duration", "0s"),
+                        "thumbnail": clip.get("thumbnail", clip.get("thumbnail_url", "")),
+                        "video_url": clip.get("video_url", clip.get("output_url", "")),
+                        "start_time": clip.get("start_time", ""),
+                        "end_time": clip.get("end_time", ""),
+                        "created_at": clip.get("created_at", job.created_at),
+                        "status": clip.get("status", "ready"),
                         "job_id": job.job_id,
-                        "created_at": job.created_at,
+                        # Also keep legacy fields for backward compat
+                        "clip_url": clip.get("output_url", ""),
+                        "label": clip.get("label", ""),
                         "processor": clip.get("processor", "unknown"),
                     }
                     local_clips.append(clip_entry)
@@ -969,6 +1559,67 @@ def paystack_webhook():
         return jsonify({"error": "Invalid JSON payload"}), 400
     except Exception as exc:
         logger.error("Paystack webhook error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+
+# ── One-time Auth Config Setup ────────────────────────────────────────
+
+@app.route("/api/setup/auth-config", methods=["POST"])
+def setup_auth_config():
+    """One-time endpoint to update Supabase auth redirect URLs.
+
+    Uses the service role key to call the Supabase Management API
+    and configure the Site URL and Redirect URLs for OAuth.
+    """
+    if not Config.SUPABASE_URL or not Config.SUPABASE_SERVICE_KEY:
+        return jsonify({"error": "Supabase not configured on worker"}), 500
+
+    try:
+        # Use the GoTrue admin API to update auth config
+        # The Supabase platform exposes config updates through the admin endpoint
+        auth_url = f"{Config.SUPABASE_URL.rstrip('/')}/auth/v1/admin/config"
+
+        headers = {
+            "apikey": Config.SUPABASE_SERVICE_KEY,
+            "Authorization": f"Bearer {Config.SUPABASE_SERVICE_KEY}",
+            "Content-Type": "application/json",
+        }
+
+        # First, try reading current config
+        get_resp = requests.get(auth_url, headers=headers, timeout=10)
+        current_config = {}
+        if get_resp.status_code == 200:
+            current_config = get_resp.json()
+            logger.info("Current auth config: %s", json.dumps(current_config)[:500])
+
+        # Update Site URL and Redirect URLs
+        update_payload = {
+            "site_url": "https://clipai-ebo.pages.dev",
+            "uri_allow_list": "https://clipai-ebo.pages.dev/**,http://localhost:5173/**,http://localhost:3000/**",
+        }
+
+        resp = requests.patch(auth_url, json=update_payload, headers=headers, timeout=10)
+
+        result = {
+            "status_code": resp.status_code,
+            "response": resp.text[:500] if resp.text else "",
+            "attempted_update": update_payload,
+            "current_config": current_config,
+        }
+
+        if resp.status_code == 200:
+            result["success"] = True
+            result["message"] = "Auth config updated successfully"
+        else:
+            # If the GoTrue admin API doesn't support config updates,
+            # try the Supabase Management API
+            result["success"] = False
+            result["message"] = "GoTrue admin API didn't accept the update. Manual dashboard update needed."
+
+        return jsonify(result), 200 if result["success"] else 207
+
+    except Exception as exc:
+        logger.error("Auth config setup error: %s", exc)
         return jsonify({"error": str(exc)}), 500
 
 

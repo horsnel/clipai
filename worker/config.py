@@ -20,7 +20,10 @@ class Config:
     DEBUG: bool = FLASK_ENV == "development"
     CORS_ORIGINS: list[str] = [
         origin.strip()
-        for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:5173,http://localhost:3000,https://clipai-ebo.pages.dev",
+        ).split(",")
         if origin.strip()
     ]
 
