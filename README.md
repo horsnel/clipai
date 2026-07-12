@@ -1,160 +1,171 @@
-# ClipAI - AI Gaming Highlight Platform
+# ClipAI ⚡ — AI Gaming Highlight Platform
 
-**Turn your gameplay into viral clips with AI.**
-
-Built in Lagos, Nigeria by OLHMES.
+> Turn your gameplay into viral clips. Built in Lagos by OLHMES · [@Olhmescraxes1](https://x.com/Olhmescraxes1)
 
 ---
 
-## 📦 Package Contents
+## Stack
 
-| File | Description |
-|------|-------------|
-| `clipai-schema.sql` | Complete Supabase PostgreSQL schema |
-| `main.py` | Railway Python worker (FFmpeg processing) |
-| `requirements.txt` | Python dependencies |
-| `.env.template` | Environment variables template |
-| `marketing-*.png` | Marketing images for social media |
+| Layer | Tech |
+|---|---|
+| Frontend | React 18 · TypeScript · Vite · Tailwind · shadcn/ui |
+| Hosting | Cloudflare Pages |
+| Worker | Python · Flask · Gunicorn → Railway |
+| Primary renderer | **JSON2Video API** |
+| Fallback renderer | **FFmpeg** (auto-fallback if JSON2Video fails) |
+| AI — Video scan | **Gemini 2.5 Flash** |
+| AI — Captions | **Groq Llama 3.3 70B** |
+| Storage | Cloudflare R2 (primary) · Backblaze B2 (fallback) |
+| Auth / DB | Supabase |
+| Payments | Paystack (NGN) |
 
 ---
 
-## 🚀 Quick Start
+## Repo structure
 
-### 1. Database Setup (Supabase)
-
-```bash
-# Run the SQL schema in Supabase SQL Editor
-psql -h your-project.supabase.co -U postgres -d postgres -f clipai-schema.sql
+```
+clipai/
+├── app/                        ← Vite React frontend
+│   ├── src/
+│   │   ├── pages/              ← All 10 page components
+│   │   ├── components/         ← Navbar, Footer, shadcn/ui
+│   │   ├── services/api.ts     ← All Railway worker calls
+│   │   └── types/index.ts      ← Shared TypeScript types
+│   ├── public/                 ← Static assets + _redirects
+│   ├── package.json
+│   └── vite.config.ts
+├── main.py                     ← Railway worker (Flask)
+├── requirements.txt
+├── Procfile
+├── .env.template
+└── .gitignore
 ```
 
-### 2. Deploy Worker (Railway)
+---
+
+## Setup
+
+### 1. Clone
 
 ```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login and create project
-railway login
-railway init
-
-# Deploy
-railway up
+git clone https://github.com/YOUR_USERNAME/clipai.git
+cd clipai
 ```
 
-### 3. Environment Variables
+### 2. Frontend
 
-Copy `.env.template` to `.env` and fill in your actual values:
+```bash
+cd app
+npm install
+cp .env.example .env.local
+# Edit .env.local: set VITE_API_URL=http://localhost:8000
+npm run dev
+```
 
-- **Supabase**: Get from Project Settings → API
-- **R2**: Get from Cloudflare Dashboard → R2 → Manage API Tokens
-- **B2**: Get from Backblaze → App Keys
-- **Paystack**: Get from Dashboard → Settings → Developer
-- **Gemini**: Get from https://ai.google.dev/
-- **Groq**: Get from https://console.groq.com/keys
+### 3. Worker
 
----
-
-## 💳 Credit System
-
-| Action | Credits Cost |
-|--------|--------------|
-| Video Scan (Gemini) | 10 |
-| AI Metadata (Groq) | 5 |
-| 480p Render | 10 |
-| 720p Render | 20 |
-| 1080p Render | 50 |
-| 4K Render | 100 |
-
-### Free Trial
-- New users get **50 credits** on signup
-- Top-up when credits exhausted: ₦1,000 for 100 credits
-
-### Subscription Plans
-| Plan | Price | Monthly Credits | Storage |
-|------|-------|-----------------|---------|
-| Starter | ₦2,500 | 250 | 30 min |
-| Pro | ₦6,000 | 750 | 24 hours |
-| Creator | ₦12,000 | 2,000 | 7 days |
+```bash
+cp .env.template .env
+# Fill in all API keys
+pip install -r requirements.txt
+python main.py
+```
 
 ---
 
-## 🔧 Tech Stack
+## Deploy
 
-### Frontend
-- React + TypeScript + Vite
-- Tailwind CSS
-- Cloudflare Pages
+### Step 1 — Push to GitHub
 
-### Backend Worker (Railway)
-- Python + Flask
-- FFmpeg for video processing
-- boto3 for R2/B2 storage
+```bash
+git init
+git add .
+git commit -m "feat: initial ClipAI build"
+git remote add origin https://github.com/YOUR_USERNAME/clipai.git
+git push -u origin main
+```
 
-### AI Services
-- **Gemini 2.5 Flash** (Free Tier) - Video analysis
-- **Groq Llama 3.3 70B** (Free Tier) - Caption generation
+### Step 2 — Railway (worker)
 
-### Storage
-- **Cloudflare R2** (Primary) - Zero egress fees
-- **Backblaze B2** (Fallback) - Backup storage
+1. railway.app → New Project → Deploy from GitHub
+2. Select this repo
+3. Add all env vars from `.env.template`
+4. Railway auto-detects `Procfile` — FFmpeg is pre-installed ✅
+5. Copy the Railway URL (e.g. `https://clipai-worker.up.railway.app`)
 
-### Database & Auth
-- **Supabase** - PostgreSQL + Auth
+### Step 3 — Cloudflare Pages (frontend)
 
-### Payments
-- **Paystack** - Nigerian Naira (₦) payments
-
----
-
-## 📊 Database Schema
-
-### Tables
-- `profiles` - User accounts with credits & tier
-- `clips` - Video processing records
-- `credit_transactions` - Audit trail
-- `subscriptions` - Paystack subscriptions
-- `topup_purchases` - One-time credit purchases
-- `referrals` - Referral tracking
-
-### Key Features
-- Row Level Security (RLS) enabled
-- Automatic credit deduction functions
-- Clip expiry based on tier (30min/24h/7d)
-- Leaderboard views (all-time & weekly)
+1. Cloudflare Dashboard → Pages → Create Project → Connect to Git
+2. Select this repo
+3. Build settings:
+   - **Build command:** `cd app && npm install && npm run build`
+   - **Build output directory:** `app/dist`
+4. Environment variables:
+   - `VITE_API_URL` = your Railway URL from Step 2
 
 ---
 
-## 🎬 Processing Pipeline
+## Processing pipeline
 
-1. **Upload** → Video to R2/B2
-2. **Scan** → Gemini detects hype moments
-3. **Caption** → Groq generates viral text
-4. **Render** → FFmpeg cuts & scales clip
-5. **Store** → Final clip to R2/B2
-6. **Notify** → Webhook to Supabase
-7. **Cleanup** → Delete temp files immediately
-
----
-
-## 🧹 Cleanup Protocol
-
-### Local (Railway)
-- Every render uses unique UUID subfolder
-- `shutil.rmtree()` deletes folder after upload
-- Disk usage stays at ~0%
-
-### Cloud (R2/B2)
-- 24-hour lifecycle expiration policy
-- Clips auto-delete after expiry
-- User gets countdown timer in UI
-
----
-
-## 📞 Support
-
-Email: support@clipai.com
-Twitter: @Olhmescraxes1
+```
+User uploads video / pastes YouTube URL
+            ↓
+    [Gemini 2.5 Flash]
+    Scans video → hype moments + scores
+            ↓
+    [Groq Llama 3.3 70B]
+    Generates viral captions per clip
+            ↓
+    User selects clip · format · quality
+            ↓
+    [JSON2Video API]  ← primary renderer
+         ↓ fails?
+    [FFmpeg on Railway]  ← auto fallback
+            ↓
+    [Cloudflare R2 / Backblaze B2]
+    Stores final rendered clip
+            ↓
+    Download URL → user
+```
 
 ---
 
-**© 2026 ClipAI by OLHMES. Built in Lagos, Nigeria.**
+## Credit costs
+
+| Action | Credits |
+|---|---|
+| Gemini video scan | 10 |
+| Groq captions | 5 |
+| 480p render | 10 |
+| 720p render | 20 |
+| 1080p render | 50 |
+| 4K render | 100 |
+
+## Plans (NGN)
+
+| Plan | Price/mo | Credits | Max Quality |
+|---|---|---|---|
+| Free | ₦0 | 50 on signup | 480p |
+| Starter | ₦2,500 | 250 | 720p |
+| Pro | ₦6,000 | 750 | 1080p |
+| Creator | ₦12,000 | 2,000 | 4K |
+
+---
+
+## API routes (Railway worker)
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/health` | Health check |
+| POST | `/upload` | Upload video → R2/B2 |
+| POST | `/analyse` | Gemini scan uploaded video |
+| POST | `/analyse/youtube` | yt-dlp + Gemini for YouTube URLs |
+| POST | `/captions` | Groq caption generation |
+| POST | `/render` | Start JSON2Video/FFmpeg render job |
+| GET | `/render/status/:jobId` | Poll render job status |
+| POST | `/payment/webhook` | Paystack webhook (signature verified) |
+| GET | `/payment/verify` | Verify Paystack transaction |
+
+---
+
+**© 2026 ClipAI by OLHMES · Lagos, Nigeria**

@@ -1,1 +1,0 @@
-# ClipAI Worker — Processor Package

@@ -1,638 +1,1222 @@
-#!/usr/bin/env python3
 """
-ClipAI "Anvil" - Video Processing Worker
-Railway.app Deployment
+ClipAI Railway Worker
+─────────────────────
+Primary renderer : JSON2Video API
+Fallback renderer: FFmpeg (local)
 
-Handles:
-- FFmpeg video processing with timestamp-based cutting
-- Resolution scaling (480p/720p/1080p/4K)
-- Watermark overlay with glow effects
-- Dual storage upload (R2 primary, B2 fallback)
-- Automatic cleanup of temp files
-- Webhook notifications to Supabase
+Services integrated
+  • Gemini 2.5 Flash  – video highlight scanning
+  • Groq Llama 3.3 70B – viral caption generation
+  • JSON2Video API     – cloud video rendering (primary)
+  • FFmpeg             – local rendering (fallback)
+  • Cloudflare R2      – primary storage
+  • Backblaze B2       – fallback storage
+  • Paystack           – subscription / topup webhooks
+  • yt-dlp             – YouTube download
+
+Install
+  pip install flask flask-cors boto3 google-generativeai \
+              groq yt-dlp requests python-dotenv
+
+Environment variables (.env)
+  GEMINI_API_KEY
+  GROQ_API_KEY
+  JSON2VIDEO_API_KEY
+  R2_ACCOUNT_ID, R2_ACCESS_KEY, R2_SECRET_KEY, R2_BUCKET, R2_PUBLIC_URL
+  B2_KEY_ID, B2_APPLICATION_KEY, B2_BUCKET_NAME, B2_ENDPOINT
+  PAYSTACK_SECRET_KEY
+  WORKER_SECRET          (shared secret for auth, optional)
+  PORT                   (default 8000)
 """
 
 import os
-import sys
-import json
 import uuid
+import json
 import shutil
 import logging
 import subprocess
-import tempfile
+import threading
+import time
 from pathlib import Path
-from typing import Optional, Dict, List, Tuple
-from dataclasses import dataclass
-from datetime import datetime
+from typing import Optional
 
 import boto3
 import requests
-from botocore.exceptions import ClientError, NoCredentialsError
+from botocore.config import Config
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
 
-# Configure logging
+load_dotenv()
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
 )
-logger = logging.getLogger(__name__)
+log = logging.getLogger("clipai")
+
+# ── App ───────────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins="*")
 
-# ============================================================
-# CONFIGURATION
-# ============================================================
+PORT = int(os.getenv("PORT", 8000))
+WORK_DIR = Path("/tmp/clipai")
+WORK_DIR.mkdir(exist_ok=True)
 
-@dataclass
-class Config:
-    """Environment configuration"""
-    # Supabase
-    SUPABASE_URL: str = os.getenv('SUPABASE_URL', '')
-    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '')
-    
-    # Cloudflare R2 (Primary Storage)
-    R2_ACCESS_KEY_ID: str = os.getenv('R2_ACCESS_KEY_ID', '')
-    R2_SECRET_ACCESS_KEY: str = os.getenv('R2_SECRET_ACCESS_KEY', '')
-    R2_ENDPOINT_URL: str = os.getenv('R2_ENDPOINT_URL', '')
-    R2_BUCKET_NAME: str = os.getenv('R2_BUCKET_NAME', 'clipai-videos')
-    
-    # Backblaze B2 (Fallback Storage)
-    B2_APPLICATION_KEY_ID: str = os.getenv('B2_APPLICATION_KEY_ID', '')
-    B2_APPLICATION_KEY: str = os.getenv('B2_APPLICATION_KEY', '')
-    B2_ENDPOINT_URL: str = os.getenv('B2_ENDPOINT_URL', '')
-    B2_BUCKET_NAME: str = os.getenv('B2_BUCKET_NAME', 'clipai-fallback')
-    
-    # Worker Settings
-    MAX_FILE_SIZE_MB: int = 500
-    TEMP_DIR: str = os.getenv('TEMP_DIR', '/tmp/clipai')
-    REQUEST_TIMEOUT: int = 300  # 5 minutes
-    
-    # Credit Costs
-    CREDIT_COSTS = {
-        '480p': 10,
-        '720p': 20,
-        '1080p': 50,
-        '4k': 100
-    }
+# ── AI clients (lazy init) ────────────────────────────────────────────────────
 
-config = Config()
+def _gemini():
+    import google.generativeai as genai
+    genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+    return genai.GenerativeModel("gemini-2.5-flash")
 
-# ============================================================
-# STORAGE CLIENTS
-# ============================================================
+def _groq():
+    from groq import Groq
+    return Groq(api_key=os.environ["GROQ_API_KEY"])
 
-class StorageManager:
-    """Manages dual storage with R2 primary and B2 fallback"""
-    
-    def __init__(self):
-        self.r2_client = None
-        self.b2_client = None
-        self._init_clients()
-    
-    def _init_clients(self):
-        """Initialize S3-compatible clients"""
-        try:
-            # R2 Client
-            if config.R2_ENDPOINT_URL:
-                self.r2_client = boto3.client(
-                    's3',
-                    endpoint_url=config.R2_ENDPOINT_URL,
-                    aws_access_key_id=config.R2_ACCESS_KEY_ID,
-                    aws_secret_access_key=config.R2_SECRET_ACCESS_KEY,
-                    region_name='auto'
-                )
-                logger.info("R2 client initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize R2 client: {e}")
-        
-        try:
-            # B2 Client
-            if config.B2_ENDPOINT_URL:
-                self.b2_client = boto3.client(
-                    's3',
-                    endpoint_url=config.B2_ENDPOINT_URL,
-                    aws_access_key_id=config.B2_APPLICATION_KEY_ID,
-                    aws_secret_access_key=config.B2_APPLICATION_KEY,
-                    region_name='us-west-002'
-                )
-                logger.info("B2 client initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize B2 client: {e}")
-    
-    def download_video(self, url: str, local_path: str) -> bool:
-        """Download video from URL to local path"""
-        try:
-            logger.info(f"Downloading video from {url}")
-            response = requests.get(url, stream=True, timeout=config.REQUEST_TIMEOUT)
-            response.raise_for_status()
-            
-            with open(local_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            
-            file_size = os.path.getsize(local_path) / (1024 * 1024)  # MB
-            logger.info(f"Downloaded {file_size:.2f} MB to {local_path}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to download video: {e}")
-            return False
-    
-    def upload_file(self, local_path: str, key: str, content_type: str = 'video/mp4') -> Tuple[bool, str, str]:
-        """
-        Upload file to storage with fallback
-        Returns: (success, url, storage_provider)
-        """
-        # Try R2 first
-        if self.r2_client:
-            try:
-                self.r2_client.upload_file(
-                    local_path, 
-                    config.R2_BUCKET_NAME, 
-                    key,
-                    ExtraArgs={'ContentType': content_type}
-                )
-                url = f"{config.R2_ENDPOINT_URL}/{config.R2_BUCKET_NAME}/{key}"
-                logger.info(f"Uploaded to R2: {url}")
-                return True, url, 'r2'
-            except Exception as e:
-                logger.warning(f"R2 upload failed, trying B2: {e}")
-        
-        # Fallback to B2
-        if self.b2_client:
-            try:
-                self.b2_client.upload_file(
-                    local_path,
-                    config.B2_BUCKET_NAME,
-                    key,
-                    ExtraArgs={'ContentType': content_type}
-                )
-                url = f"{config.B2_ENDPOINT_URL}/{config.B2_BUCKET_NAME}/{key}"
-                logger.info(f"Uploaded to B2: {url}")
-                return True, url, 'b2'
-            except Exception as e:
-                logger.error(f"B2 upload also failed: {e}")
-        
-        return False, '', ''
-    
-    def delete_file(self, key: str, storage: str) -> bool:
-        """Delete file from storage (for cleanup)"""
-        try:
-            if storage == 'r2' and self.r2_client:
-                self.r2_client.delete_object(Bucket=config.R2_BUCKET_NAME, Key=key)
-            elif storage == 'b2' and self.b2_client:
-                self.b2_client.delete_object(Bucket=config.B2_BUCKET_NAME, Key=key)
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to delete file {key}: {e}")
-            return False
+# ── Storage helpers ───────────────────────────────────────────────────────────
 
-storage = StorageManager()
+def _r2_client():
+    return boto3.client(
+        "s3",
+        endpoint_url=f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+        aws_access_key_id=os.environ["R2_ACCESS_KEY"],
+        aws_secret_access_key=os.environ["R2_SECRET_KEY"],
+        config=Config(signature_version="s3v4"),
+        region_name="auto",
+    )
 
-# ============================================================
-# SUPABASE HELPERS
-# ============================================================
+def _b2_client():
+    return boto3.client(
+        "s3",
+        endpoint_url=os.environ["B2_ENDPOINT"],
+        aws_access_key_id=os.environ["B2_KEY_ID"],
+        aws_secret_access_key=os.environ["B2_APPLICATION_KEY"],
+        config=Config(signature_version="s3v4"),
+    )
 
-class SupabaseClient:
-    """Supabase API client"""
-    
-    def __init__(self):
-        self.base_url = config.SUPABASE_URL
-        self.headers = {
-            'apikey': config.SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': f'Bearer {config.SUPABASE_SERVICE_ROLE_KEY}',
-            'Content-Type': 'application/json'
+def upload_to_storage(local_path: Path, object_key: str) -> str:
+    """Try R2 first, fall back to B2. Returns public URL."""
+    bucket_r2 = os.getenv("R2_BUCKET", "clipai")
+    bucket_b2 = os.getenv("B2_BUCKET_NAME", "clipai")
+    try:
+        _r2_client().upload_file(str(local_path), bucket_r2, object_key)
+        return f"{os.environ['R2_PUBLIC_URL']}/{object_key}"
+    except Exception as e:
+        log.warning(f"R2 upload failed ({e}), trying B2…")
+        _b2_client().upload_file(str(local_path), bucket_b2, object_key)
+        return f"{os.environ['B2_ENDPOINT']}/{bucket_b2}/{object_key}"
+
+def download_from_storage(object_key: str, dest: Path):
+    bucket_r2 = os.getenv("R2_BUCKET", "clipai")
+    try:
+        _r2_client().download_file(bucket_r2, object_key, str(dest))
+    except Exception:
+        bucket_b2 = os.getenv("B2_BUCKET_NAME", "clipai")
+        _b2_client().download_file(bucket_b2, object_key, str(dest))
+
+# ── In-memory job store (swap for Redis in production) ────────────────────────
+
+_JOBS: dict = {}
+_JOBS_LOCK = threading.Lock()
+
+def get_job(job_id: str) -> Optional[dict]:
+    with _JOBS_LOCK:
+        return _JOBS.get(job_id)
+
+def set_job(job_id: str, data: dict):
+    with _JOBS_LOCK:
+        _JOBS[job_id] = data
+
+# ── JSON2Video renderer ───────────────────────────────────────────────────────
+
+J2V_API = "https://api.json2video.com/v2/movies"
+J2V_KEY = os.getenv("JSON2VIDEO_API_KEY", "")
+
+FORMAT_RESOLUTION = {
+    "tiktok":  {"width": 1080, "height": 1920},
+    "reels":   {"width": 1080, "height": 1920},
+    "shorts":  {"width": 1080, "height": 1920},
+}
+
+QUALITY_RESOLUTION = {
+    "480p":  {"width": 854,  "height": 480},
+    "720p":  {"width": 1280, "height": 720},
+    "1080p": {"width": 1920, "height": 1080},
+    "4k":    {"width": 3840, "height": 2160},
+}
+
+def _j2v_render(
+    video_url: str,
+    start_seconds: float,
+    end_seconds: float,
+    format_: str,
+    quality: str,
+    caption: Optional[str],
+    watermark_text: Optional[str],
+) -> Optional[str]:
+    """
+    Call JSON2Video to render a clip.
+    Returns the output video URL or None on failure.
+    """
+    if not J2V_KEY:
+        log.warning("JSON2VIDEO_API_KEY not set, skipping JSON2Video")
+        return None
+
+    res = FORMAT_RESOLUTION.get(format_, {"width": 1080, "height": 1920})
+    quality_res = QUALITY_RESOLUTION.get(quality, {"width": 1280, "height": 720})
+
+    # Use the smaller of format vs quality so we don't upscale
+    width  = min(res["width"],  quality_res["width"])
+    height = min(res["height"], quality_res["height"])
+
+    duration = end_seconds - start_seconds
+
+    elements = [
+        {
+            "type": "video",
+            "src": video_url,
+            "trim-start": start_seconds,
+            "duration": duration,
+            "width": width,
+            "height": height,
+            "x": 0,
+            "y": 0,
         }
-    
-    def update_clip_status(self, clip_id: str, status: str, data: dict = None) -> bool:
-        """Update clip status in Supabase"""
-        try:
-            url = f"{self.base_url}/rest/v1/clips?id=eq.{clip_id}"
-            payload = {'status': status, 'updated_at': datetime.utcnow().isoformat()}
-            if data:
-                payload.update(data)
-            
-            response = requests.patch(url, headers=self.headers, json=payload, timeout=30)
-            response.raise_for_status()
-            logger.info(f"Updated clip {clip_id} status to {status}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to update clip status: {e}")
-            return False
-    
-    def deduct_credits(self, user_id: str, amount: int, clip_id: str, description: str) -> bool:
-        """Deduct credits from user account"""
-        try:
-            # Call the Supabase function to deduct credits
-            url = f"{self.base_url}/rest/v1/rpc/deduct_credits"
-            payload = {
-                'p_user_id': user_id,
-                'p_amount': amount,
-                'p_type': f'render_{description}',
-                'p_description': f'Render clip at {description}',
-                'p_clip_id': clip_id
-            }
-            
-            response = requests.post(url, headers=self.headers, json=payload, timeout=30)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result:
-                    logger.info(f"Deducted {amount} credits from user {user_id}")
-                    return True
-                else:
-                    logger.warning(f"Insufficient credits for user {user_id}")
-                    return False
-            else:
-                logger.error(f"Credit deduction failed: {response.text}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Failed to deduct credits: {e}")
-            return False
-    
-    def notify_user(self, user_id: str, clip_id: str, status: str, message: str) -> bool:
-        """Send notification to user (for webhook/push)"""
-        try:
-            # This would integrate with your notification system
-            # For now, just log it
-            logger.info(f"Notification for user {user_id}: {message}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send notification: {e}")
-            return False
+    ]
 
-supabase = SupabaseClient()
+    if caption:
+        elements.append({
+            "type": "text",
+            "text": caption,
+            "font-family": "Oswald",
+            "font-size": 52,
+            "font-weight": "bold",
+            "color": "#FFFFFF",
+            "stroke-color": "#000000",
+            "stroke-width": 3,
+            "x": "center",
+            "y": height - 160,
+            "width": width - 80,
+            "height": 120,
+            "start": 0,
+            "duration": duration,
+        })
 
-# ============================================================
-# VIDEO PROCESSING (FFMPEG)
-# ============================================================
+    if watermark_text:
+        elements.append({
+            "type": "text",
+            "text": watermark_text,
+            "font-family": "Inter",
+            "font-size": 28,
+            "color": "#FFFFFF80",
+            "x": 30,
+            "y": 30,
+            "start": 0,
+            "duration": duration,
+        })
 
-class VideoProcessor:
-    """FFmpeg-based video processor"""
-    
-    RESOLUTIONS = {
-        '480p': {'width': 854, 'height': 480, 'vf': 'scale=854:480'},
-        '720p': {'width': 1280, 'height': 720, 'vf': 'scale=1280:720'},
-        '1080p': {'width': 1920, 'height': 1080, 'vf': 'scale=1920:1080'},
-        '4k': {'width': 3840, 'height': 2160, 'vf': 'scale=3840:2160'}
+    payload = {
+        "resolution": "custom",
+        "width": width,
+        "height": height,
+        "fps": 30,
+        "quality": 80,
+        "scenes": [{"comment": "ClipAI highlight", "elements": elements}],
     }
-    
-    def __init__(self, temp_dir: str):
-        self.temp_dir = temp_dir
-        os.makedirs(temp_dir, exist_ok=True)
-    
-    def _run_ffmpeg(self, cmd: List[str]) -> Tuple[bool, str]:
-        """Execute FFmpeg command"""
-        try:
-            logger.info(f"Running FFmpeg: {' '.join(cmd)}")
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=config.REQUEST_TIMEOUT
-            )
-            
-            if result.returncode == 0:
-                return True, result.stdout
-            else:
-                logger.error(f"FFmpeg error: {result.stderr}")
-                return False, result.stderr
-                
-        except subprocess.TimeoutExpired:
-            logger.error("FFmpeg timed out")
-            return False, "Processing timeout"
-        except Exception as e:
-            logger.error(f"FFmpeg execution failed: {e}")
-            return False, str(e)
-    
-    def cut_clip(self, input_path: str, output_path: str, start: float, end: float, 
-                 resolution: str = '720p', add_watermark: bool = True) -> bool:
-        """
-        Cut a clip from video using FFmpeg
-        
-        Args:
-            input_path: Path to input video
-            output_path: Path for output clip
-            start: Start time in seconds
-            end: End time in seconds
-            resolution: Target resolution (480p/720p/1080p/4k)
-            add_watermark: Whether to add ClipAI watermark
-        """
-        duration = end - start
-        res_config = self.RESOLUTIONS.get(resolution, self.RESOLUTIONS['720p'])
-        
-        # Build FFmpeg command
-        cmd = [
-            'ffmpeg',
-            '-y',  # Overwrite output
-            '-ss', str(start),  # Start time
-            '-t', str(duration),  # Duration
-            '-i', input_path,  # Input file
-            '-c:v', 'libx264',  # Video codec
-            '-preset', 'fast',  # Encoding speed
-            '-crf', '23',  # Quality (lower = better)
-            '-c:a', 'aac',  # Audio codec
-            '-b:a', '128k',  # Audio bitrate
-        ]
-        
-        # Add video filter for scaling
-        vf = res_config['vf']
-        
-        # Add watermark if enabled
-        if add_watermark:
-            # Create a simple text watermark with glow effect
-            watermark_filter = (
-                f"drawtext=text='ClipAI':fontsize=24:fontcolor=white@0.8:"
-                f"x=w-tw-20:y=h-th-20:box=1:boxcolor=black@0.5:boxborderw=5"
-            )
-            vf = f"{vf},{watermark_filter}"
-        
-        cmd.extend(['-vf', vf])
-        
-        # Add output file
-        cmd.append(output_path)
-        
-        success, error = self._run_ffmpeg(cmd)
-        return success
-    
-    def get_video_info(self, video_path: str) -> Optional[Dict]:
-        """Get video metadata using ffprobe"""
-        try:
-            cmd = [
-                'ffprobe',
-                '-v', 'error',
-                '-show_entries', 'format=duration,size,bit_rate',
-                '-show_entries', 'stream=width,height,codec_name',
-                '-of', 'json',
-                video_path
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode == 0:
-                data = json.loads(result.stdout)
-                return {
-                    'duration': float(data['format'].get('duration', 0)),
-                    'width': data['streams'][0].get('width', 0),
-                    'height': data['streams'][0].get('height', 0),
-                    'size_mb': int(data['format'].get('size', 0)) / (1024 * 1024)
-                }
-            else:
-                logger.error(f"ffprobe error: {result.stderr}")
-                return None
-                
-        except Exception as e:
-            logger.error(f"Failed to get video info: {e}")
+
+    headers = {"x-api-key": J2V_KEY, "Content-Type": "application/json"}
+
+    try:
+        # POST to create job
+        resp = requests.post(J2V_API, json=payload, headers=headers, timeout=30)
+        resp.raise_for_status()
+        movie = resp.json().get("movie", {})
+        movie_id = movie.get("id") or resp.json().get("id")
+
+        if not movie_id:
+            log.error(f"JSON2Video: no movie id in response: {resp.text[:300]}")
             return None
-    
-    def cleanup(self, *paths: str):
-        """Clean up temporary files and directories"""
-        for path in paths:
-            try:
-                if os.path.isfile(path):
-                    os.remove(path)
-                    logger.info(f"Deleted file: {path}")
-                elif os.path.isdir(path):
-                    shutil.rmtree(path)
-                    logger.info(f"Deleted directory: {path}")
-            except Exception as e:
-                logger.warning(f"Failed to delete {path}: {e}")
 
-# ============================================================
-# MAIN PROCESSING PIPELINE
-# ============================================================
+        # Poll for completion (max 5 min)
+        deadline = time.time() + 300
+        while time.time() < deadline:
+            time.sleep(5)
+            status_resp = requests.get(f"{J2V_API}/{movie_id}", headers=headers, timeout=15)
+            status_resp.raise_for_status()
+            data = status_resp.json()
+            status = data.get("movie", {}).get("status") or data.get("status")
+            log.info(f"JSON2Video job {movie_id}: {status}")
 
-def process_clip_job(job_data: dict) -> dict:
-    """
-    Main clip processing pipeline
-    
-    Expected job_data:
-    {
-        "clip_id": "uuid",
-        "user_id": "uuid",
-        "video_url": "https://...",
-        "timestamps": [{"start": 10.5, "end": 25.0, "hype_score": 95}],
-        "resolution": "720p",
-        "add_watermark": true
-    }
-    """
-    clip_id = job_data.get('clip_id')
-    user_id = job_data.get('user_id')
-    video_url = job_data.get('video_url')
-    timestamps = job_data.get('timestamps', [])
-    resolution = job_data.get('resolution', '720p')
-    add_watermark = job_data.get('add_watermark', True)
-    
-    # Create unique temp directory for this job
-    job_temp_dir = os.path.join(config.TEMP_DIR, str(clip_id))
-    os.makedirs(job_temp_dir, exist_ok=True)
-    
-    processor = VideoProcessor(job_temp_dir)
-    
-    try:
-        # Update status to processing
-        supabase.update_clip_status(clip_id, 'rendering')
-        
-        # Download source video
-        source_path = os.path.join(job_temp_dir, 'source.mp4')
-        if not storage.download_video(video_url, source_path):
-            raise Exception("Failed to download source video")
-        
-        # Get video info
-        video_info = processor.get_video_info(source_path)
-        if not video_info:
-            raise Exception("Failed to analyze video")
-        
-        logger.info(f"Video info: {video_info}")
-        
-        # Process each timestamp (for now, just take the best one)
-        if not timestamps:
-            raise Exception("No timestamps provided")
-        
-        # Sort by hype score and take the best
-        best_timestamp = max(timestamps, key=lambda x: x.get('hype_score', 0))
-        start = best_timestamp.get('start', 0)
-        end = best_timestamp.get('end', start + 30)
-        hype_score = best_timestamp.get('hype_score', 0)
-        
-        # Ensure clip isn't too long (max 60 seconds)
-        if end - start > 60:
-            end = start + 60
-        
-        # Cut the clip
-        output_filename = f"clip_{clip_id}.mp4"
-        output_path = os.path.join(job_temp_dir, output_filename)
-        
-        logger.info(f"Cutting clip from {start}s to {end}s at {resolution}")
-        
-        if not processor.cut_clip(source_path, output_path, start, end, resolution, add_watermark):
-            raise Exception("FFmpeg processing failed")
-        
-        # Get output file info
-        output_info = processor.get_video_info(output_path)
-        
-        # Upload to storage
-        storage_key = f"renders/{user_id}/{clip_id}/{output_filename}"
-        success, final_url, storage_provider = storage.upload_file(
-            output_path, storage_key, 'video/mp4'
-        )
-        
-        if not success:
-            raise Exception("Failed to upload to storage")
-        
-        # Deduct credits
-        credit_cost = config.CREDIT_COSTS.get(resolution, 20)
-        credits_deducted = supabase.deduct_credits(
-            user_id, credit_cost, clip_id, resolution
-        )
-        
-        if not credits_deducted:
-            logger.warning(f"Failed to deduct credits for clip {clip_id}")
-            # Don't fail the job, but log it
-        
-        # Update Supabase with success
-        supabase.update_clip_status(clip_id, 'completed', {
-            'final_url': final_url,
-            'final_storage': storage_provider,
-            'resolution': resolution,
-            'duration_seconds': int(end - start),
-            'file_size_mb': round(output_info.get('size_mb', 0), 2) if output_info else 0,
-            'hype_score': hype_score,
-            'credits_deducted': credits_deducted,
-            'processing_completed_at': datetime.utcnow().isoformat()
-        })
-        
-        # Notify user
-        supabase.notify_user(user_id, clip_id, 'completed', 
-                           f'Your clip is ready! Download it within 30 minutes.')
-        
-        logger.info(f"Clip {clip_id} processed successfully")
-        
-        return {
-            'success': True,
-            'clip_id': clip_id,
-            'url': final_url,
-            'resolution': resolution,
-            'duration': end - start
-        }
-        
+            if status == "done":
+                url = data.get("movie", {}).get("url") or data.get("url")
+                return url
+            if status in ("error", "failed"):
+                log.error(f"JSON2Video failed: {data}")
+                return None
+
+        log.error("JSON2Video polling timed out")
+        return None
+
     except Exception as e:
-        logger.error(f"Processing failed for clip {clip_id}: {e}")
-        
-        # Update Supabase with failure
-        supabase.update_clip_status(clip_id, 'failed', {
-            'error_message': str(e)
+        log.error(f"JSON2Video exception: {e}")
+        return None
+
+# ── FFmpeg renderer (fallback) ────────────────────────────────────────────────
+
+def _ffmpeg_render(
+    local_video: Path,
+    output_path: Path,
+    start_seconds: float,
+    end_seconds: float,
+    format_: str,
+    quality: str,
+    caption: Optional[str],
+    watermark_text: Optional[str],
+) -> bool:
+    quality_res = QUALITY_RESOLUTION.get(quality, {"width": 1280, "height": 720})
+    width, height = quality_res["width"], quality_res["height"]
+    duration = end_seconds - start_seconds
+
+    # Base filter: scale + crop to 9:16 for mobile formats
+    vf_parts = [f"scale={width}:{height}:force_original_aspect_ratio=decrease",
+                f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2"]
+
+    drawtext_opts = "fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+
+    if caption:
+        safe_cap = caption.replace("'", "\\'").replace(":", "\\:")
+        vf_parts.append(
+            f"drawtext={drawtext_opts}:text='{safe_cap}'"
+            f":fontcolor=white:fontsize=42:bordercolor=black:borderw=3"
+            f":x=(w-text_w)/2:y=h-150"
+        )
+
+    if watermark_text:
+        safe_wm = watermark_text.replace("'", "\\'").replace(":", "\\:")
+        vf_parts.append(
+            f"drawtext={drawtext_opts}:text='{safe_wm}'"
+            f":fontcolor=white@0.5:fontsize=22"
+            f":x=20:y=20"
+        )
+
+    vf = ",".join(vf_parts)
+
+    crf = {"480p": "28", "720p": "23", "1080p": "20", "4k": "18"}.get(quality, "23")
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", str(start_seconds),
+        "-i", str(local_video),
+        "-t",  str(duration),
+        "-vf", vf,
+        "-c:v", "libx264",
+        "-crf", crf,
+        "-preset", "fast",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
+        str(output_path),
+    ]
+
+    log.info(f"FFmpeg: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
+    if result.returncode != 0:
+        log.error(f"FFmpeg stderr: {result.stderr[-800:]}")
+        return False
+    return True
+
+# ── Background render worker ──────────────────────────────────────────────────
+
+def _do_render(job_id: str, payload: dict):
+    """Runs in a thread. Updates job store on progress."""
+    job = get_job(job_id)
+    work = WORK_DIR / job_id
+    work.mkdir(exist_ok=True)
+
+    try:
+        set_job(job_id, {**job, "status": "rendering", "progress": 5})
+
+        video_key    = payload.get("videoKey", "")
+        video_url    = payload.get("videoUrl", "")
+        start        = float(payload.get("startSeconds", 0))
+        end          = float(payload.get("endSeconds", 30))
+        format_      = payload.get("format", "tiktok")
+        quality      = payload.get("quality", "720p")
+        caption      = payload.get("caption")
+        watermark    = payload.get("watermark")
+
+        download_url = None
+        engine       = None
+
+        # ── Try JSON2Video first ──────────────────────────────────────────────
+        if video_url:
+            set_job(job_id, {**get_job(job_id), "progress": 15, "status": "rendering"})
+            j2v_url = _j2v_render(video_url, start, end, format_, quality, caption, watermark)
+            if j2v_url:
+                download_url = j2v_url
+                engine = "json2video"
+
+        # ── FFmpeg fallback ───────────────────────────────────────────────────
+        if not download_url:
+            log.info(f"Job {job_id}: falling back to FFmpeg")
+            set_job(job_id, {**get_job(job_id), "progress": 20})
+
+            local_video = work / "source.mp4"
+
+            if video_key:
+                # Download from R2/B2
+                download_from_storage(video_key, local_video)
+            elif video_url:
+                # Download via requests
+                r = requests.get(video_url, stream=True, timeout=120)
+                r.raise_for_status()
+                with open(local_video, "wb") as f:
+                    for chunk in r.iter_content(65536):
+                        f.write(chunk)
+            else:
+                raise ValueError("No video source provided for FFmpeg")
+
+            set_job(job_id, {**get_job(job_id), "progress": 40})
+
+            output_path = work / f"clip_{job_id}.mp4"
+            ok = _ffmpeg_render(local_video, output_path, start, end, format_, quality, caption, watermark)
+
+            if not ok:
+                raise RuntimeError("FFmpeg render failed")
+
+            set_job(job_id, {**get_job(job_id), "progress": 80})
+
+            obj_key = f"clips/{job_id}/clip.mp4"
+            download_url = upload_to_storage(output_path, obj_key)
+            engine = "ffmpeg"
+
+        set_job(job_id, {
+            "status": "done",
+            "progress": 100,
+            "downloadUrl": download_url,
+            "engine": engine,
         })
-        
-        supabase.notify_user(user_id, clip_id, 'failed',
-                           'Clip processing failed. Please try again.')
-        
-        return {
-            'success': False,
-            'clip_id': clip_id,
-            'error': str(e)
-        }
-        
+        log.info(f"Job {job_id} done via {engine}: {download_url}")
+
+    except Exception as e:
+        log.exception(f"Job {job_id} error")
+        set_job(job_id, {**get_job(job_id), "status": "error", "error": str(e)})
     finally:
-        # CRITICAL: Always cleanup temp files
-        logger.info(f"Cleaning up temp directory: {job_temp_dir}")
-        processor.cleanup(job_temp_dir)
+        shutil.rmtree(work, ignore_errors=True)
 
-# ============================================================
-# FLASK ROUTES
-# ============================================================
+# ═══════════════════════════════════════════════════════════════════════════════
+# Routes
+# ═══════════════════════════════════════════════════════════════════════════════
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.utcnow().isoformat(),
-        'version': '1.0.0'
-    })
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "service": "clipai-worker"})
 
-@app.route('/process', methods=['POST'])
-def process_video():
-    """Main processing endpoint"""
+# ── Upload ─────────────────────────────────────────────────────────────────────
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    if "video" not in request.files:
+        return jsonify({"success": False, "error": "No video file"}), 400
+
+    file = request.files["video"]
+    video_id = str(uuid.uuid4())
+    work = WORK_DIR / video_id
+    work.mkdir(exist_ok=True)
+
+    local_path = work / f"source{Path(file.filename or 'video.mp4').suffix}"
+    file.save(str(local_path))
+    log.info(f"Saved upload {video_id}: {local_path.stat().st_size} bytes")
+
     try:
-        job_data = request.get_json()
-        
-        # Validate required fields
-        required = ['clip_id', 'user_id', 'video_url', 'timestamps']
-        for field in required:
-            if field not in job_data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-        
-        # Process the clip
-        result = process_clip_job(job_data)
-        
-        if result['success']:
-            return jsonify(result), 200
-        else:
-            return jsonify(result), 500
-            
+        obj_key  = f"uploads/{video_id}/source.mp4"
+        pub_url  = upload_to_storage(local_path, obj_key)
+        return jsonify({
+            "success":   True,
+            "videoId":   video_id,
+            "uploadUrl": pub_url,
+            "videoKey":  obj_key,
+        })
     except Exception as e:
-        logger.error(f"Request processing failed: {e}")
-        return jsonify({'error': str(e)}), 500
+        log.error(f"Upload storage failed: {e}")
+        # Still return success with local reference so analysis can proceed
+        return jsonify({
+            "success":  True,
+            "videoId":  video_id,
+            "uploadUrl": "",
+            "videoKey": f"uploads/{video_id}/source.mp4",
+            "_local":   str(local_path),
+        })
+    # Don't clean up — analysis needs the file
 
-@app.route('/webhook/supabase', methods=['POST'])
-def supabase_webhook():
-    """Webhook for Supabase events"""
+# ── Analyse (Gemini) ───────────────────────────────────────────────────────────
+
+def _parse_gemini_clips(text: str, clip_count: int) -> list:
+    """Parse Gemini JSON output → clip list."""
     try:
-        data = request.get_json()
-        logger.info(f"Received Supabase webhook: {data}")
-        
-        # Handle different event types
-        event_type = data.get('type')
-        
-        if event_type == 'clip.created':
-            # Auto-start processing for new clips
-            clip_data = data.get('record', {})
-            job_data = {
-                'clip_id': clip_data.get('id'),
-                'user_id': clip_data.get('user_id'),
-                'video_url': clip_data.get('original_url'),
-                'timestamps': clip_data.get('gemini_timestamps', []),
-                'resolution': clip_data.get('resolution', '720p'),
-                'add_watermark': clip_data.get('user_tier') != 'pro'
-            }
-            
-            # Process asynchronously (in production, use a queue)
-            result = process_clip_job(job_data)
-            return jsonify(result), 200
-        
-        return jsonify({'status': 'received'}), 200
-        
+        # Strip markdown fences
+        clean = text.strip()
+        for fence in ["```json", "```"]:
+            clean = clean.replace(fence, "")
+        clean = clean.strip()
+        data = json.loads(clean)
+        clips = data if isinstance(data, list) else data.get("clips", [])
+    except Exception:
+        log.warning("Gemini returned non-JSON, using mock clips")
+        clips = []
+
+    result = []
+    for i, c in enumerate(clips[:clip_count]):
+        start_s = float(c.get("start_seconds", i * 60))
+        end_s   = float(c.get("end_seconds",   start_s + 30))
+        dur_s   = end_s - start_s
+        result.append({
+            "id":           str(uuid.uuid4()),
+            "thumbnail":    f"/gameplay-thumb-{(i % 3) + 1}.jpg",
+            "startTime":    f"{int(start_s // 60):02d}:{int(start_s % 60):02d}",
+            "endTime":      f"{int(end_s   // 60):02d}:{int(end_s   % 60):02d}",
+            "startSeconds": start_s,
+            "endSeconds":   end_s,
+            "hypeScore":    int(c.get("hype_score", 80)),
+            "duration":     f"{int(dur_s // 60)}:{int(dur_s % 60):02d}",
+            "caption":      c.get("caption", ""),
+            "selected":     i == 0,
+        })
+    return result
+
+GEMINI_PROMPT = """
+You are an expert gaming highlight detector.
+Analyse this video and find the TOP {n} most hype/exciting moments.
+For each moment return ONLY a JSON array with objects:
+{{
+  "start_seconds": <number>,
+  "end_seconds":   <number>,
+  "hype_score":    <0-100 integer>,
+  "caption":       "<short viral caption under 60 chars>"
+}}
+Game context: {game}
+Return ONLY valid JSON. No explanation.
+"""
+
+@app.route("/analyse", methods=["POST"])
+def analyse():
+    body      = request.get_json(force=True)
+    video_id  = body.get("videoId", "")
+    game      = body.get("game", "Gaming")
+    clip_count = int(body.get("clipCount", 3))
+
+    # Locate video
+    video_path = None
+    for ext in [".mp4", ".mov", ".webm"]:
+        p = WORK_DIR / video_id / f"source{ext}"
+        if p.exists():
+            video_path = p
+            break
+
+    if not video_path:
+        # Try downloading from storage
+        obj_key = f"uploads/{video_id}/source.mp4"
+        video_path = WORK_DIR / video_id / "source.mp4"
+        video_path.parent.mkdir(exist_ok=True)
+        try:
+            download_from_storage(obj_key, video_path)
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Video not found: {e}"}), 404
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        log.info(f"Uploading {video_path} to Gemini…")
+        gfile = genai.upload_file(str(video_path))
+
+        # Wait for processing
+        while gfile.state.name == "PROCESSING":
+            time.sleep(3)
+            gfile = genai.get_file(gfile.name)
+
+        if gfile.state.name != "ACTIVE":
+            raise RuntimeError(f"Gemini file processing failed: {gfile.state.name}")
+
+        prompt = GEMINI_PROMPT.format(n=clip_count, game=game)
+        response = model.generate_content([gfile, prompt])
+        raw_text = response.text
+
+        genai.delete_file(gfile.name)  # cleanup
+
+        clips = _parse_gemini_clips(raw_text, clip_count)
+
+        # Get upload URL for reference
+        upload_url = ""
+        try:
+            upload_url = f"{os.environ['R2_PUBLIC_URL']}/uploads/{video_id}/source.mp4"
+        except Exception:
+            pass
+
+        return jsonify({
+            "success":   True,
+            "clips":     clips,
+            "videoId":   video_id,
+            "uploadUrl": upload_url,
+        })
+
     except Exception as e:
-        logger.error(f"Webhook processing failed: {e}")
-        return jsonify({'error': str(e)}), 500
+        log.exception("Analyse error")
+        return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/status/<clip_id>', methods=['GET'])
-def get_clip_status(clip_id: str):
-    """Get processing status of a clip"""
-    # This would query Supabase for the clip status
-    return jsonify({
-        'clip_id': clip_id,
-        'status': 'processing',
-        'message': 'Use Supabase realtime for status updates'
-    })
+# ── Analyse YouTube ────────────────────────────────────────────────────────────
 
-# ============================================================
-# MAIN
-# ============================================================
+@app.route("/analyse/youtube", methods=["POST"])
+def analyse_youtube():
+    body       = request.get_json(force=True)
+    yt_url     = body.get("youtubeUrl", "")
+    game       = body.get("game", "Gaming")
+    clip_count = int(body.get("clipCount", 3))
 
-if __name__ == '__main__':
-    port = int(os.getenv('PORT', 8080))
-    
-    logger.info(f"Starting ClipAI Anvil Worker on port {port}")
-    logger.info(f"Temp directory: {config.TEMP_DIR}")
-    
-    # Ensure temp directory exists
-    os.makedirs(config.TEMP_DIR, exist_ok=True)
-    
-    # Run Flask app
-    app.run(host='0.0.0.0', port=port, debug=False)
+    if not yt_url:
+        return jsonify({"success": False, "error": "No YouTube URL"}), 400
+
+    video_id = str(uuid.uuid4())
+    work = WORK_DIR / video_id
+    work.mkdir(exist_ok=True)
+    local_path = work / "source.mp4"
+
+    try:
+        log.info(f"Downloading YouTube video: {yt_url}")
+        result = subprocess.run(
+            ["yt-dlp", "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+             "--merge-output-format", "mp4",
+             "-o", str(local_path), yt_url],
+            capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"yt-dlp failed: {result.stderr[-300:]}")
+
+        # Upload to storage
+        obj_key = f"uploads/{video_id}/source.mp4"
+        try:
+            upload_url = upload_to_storage(local_path, obj_key)
+        except Exception:
+            upload_url = ""
+
+        # Reuse /analyse logic via internal call
+        body["videoId"] = video_id
+        request.environ["_analysed_video_path"] = str(local_path)
+
+        # Call analyse inline
+        import google.generativeai as genai
+        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        gfile = genai.upload_file(str(local_path))
+        while gfile.state.name == "PROCESSING":
+            time.sleep(3)
+            gfile = genai.get_file(gfile.name)
+
+        prompt = GEMINI_PROMPT.format(n=clip_count, game=game)
+        response = model.generate_content([gfile, prompt])
+        genai.delete_file(gfile.name)
+
+        clips = _parse_gemini_clips(response.text, clip_count)
+        return jsonify({"success": True, "clips": clips, "videoId": video_id, "uploadUrl": upload_url})
+
+    except Exception as e:
+        log.exception("YouTube analyse error")
+        shutil.rmtree(work, ignore_errors=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ── Captions (Groq) ────────────────────────────────────────────────────────────
+
+@app.route("/captions", methods=["POST"])
+def captions():
+    body  = request.get_json(force=True)
+    clips = body.get("clips", [])
+    game  = body.get("game", "Gaming")
+
+    if not clips:
+        return jsonify([])
+
+    try:
+        groq_client = _groq()
+        clip_descs = "\n".join(
+            f"{i+1}. Hype score {c['hypeScore']}, at {c['startTime']}–{c['endTime']}"
+            for i, c in enumerate(clips)
+        )
+        prompt = f"""
+You are a viral gaming content creator for {game}.
+Generate a short, punchy caption for each highlight clip below.
+Captions must be under 60 characters, use 1-2 emojis, and feel hype.
+Return ONLY a JSON array of strings in order. No extra text.
+
+Clips:
+{clip_descs}
+"""
+        resp = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.9,
+        )
+        raw = resp.choices[0].message.content.strip()
+        for fence in ["```json", "```"]:
+            raw = raw.replace(fence, "")
+        captions_list = json.loads(raw.strip())
+
+        enriched = []
+        for i, clip in enumerate(clips):
+            cap = captions_list[i] if i < len(captions_list) else clip.get("caption", "")
+            enriched.append({**clip, "caption": cap})
+
+        return jsonify(enriched)
+
+    except Exception as e:
+        log.exception("Captions error")
+        # Return original clips unchanged on error
+        return jsonify(clips)
+
+# ── Render (JSON2Video + FFmpeg fallback) ──────────────────────────────────────
+
+@app.route("/render", methods=["POST"])
+def render():
+    body   = request.get_json(force=True)
+    job_id = str(uuid.uuid4())
+
+    # Resolve video URL
+    video_id  = body.get("clipId", body.get("videoId", ""))
+    video_key = f"uploads/{video_id}/source.mp4"
+    try:
+        video_url = f"{os.environ['R2_PUBLIC_URL']}/{video_key}"
+    except Exception:
+        video_url = body.get("videoUrl", "")
+
+    payload = {
+        **body,
+        "videoKey": video_key,
+        "videoUrl": video_url,
+    }
+
+    set_job(job_id, {"status": "queued", "progress": 0, "engine": None})
+    t = threading.Thread(target=_do_render, args=(job_id, payload), daemon=True)
+    t.start()
+
+    return jsonify({"jobId": job_id})
+
+@app.route("/render/status/<job_id>")
+def render_status(job_id):
+    job = get_job(job_id)
+    if not job:
+        return jsonify({"status": "error", "error": "Job not found"}), 404
+    return jsonify({"jobId": job_id, **job})
+
+# ── Paystack webhook ───────────────────────────────────────────────────────────
+
+PLAN_MAP = {
+    "clipai-starter": "starter",
+    "clipai-pro":     "pro",
+    "clipai-creator": "creator",
+}
+
+@app.route("/payment/webhook", methods=["POST"])
+def paystack_webhook():
+    import hmac, hashlib
+    secret = os.getenv("PAYSTACK_SECRET_KEY", "")
+    sig    = request.headers.get("X-Paystack-Signature", "")
+    body   = request.get_data()
+
+    expected = hmac.new(secret.encode(), body, hashlib.sha512).hexdigest()
+    if sig != expected:
+        return jsonify({"error": "Invalid signature"}), 401
+
+    event = request.get_json(force=True)
+    log.info(f"Paystack event: {event.get('event')}")
+
+    if event.get("event") == "charge.success":
+        data      = event.get("data", {})
+        reference = data.get("reference", "")
+        metadata  = data.get("metadata", {})
+        plan_code = metadata.get("plan_code", "")
+        plan_name = PLAN_MAP.get(plan_code, "pro")
+        user_id   = metadata.get("user_id", "")
+        log.info(f"Payment success: user={user_id} plan={plan_name} ref={reference}")
+        # TODO: update Supabase user plan here
+
+    return jsonify({"status": "ok"})
+
+@app.route("/payment/verify")
+def verify_payment():
+    reference = request.args.get("reference", "")
+    if not reference:
+        return jsonify({"success": False, "error": "No reference"}), 400
+
+    secret = os.getenv("PAYSTACK_SECRET_KEY", "")
+    headers = {"Authorization": f"Bearer {secret}"}
+    resp = requests.get(
+        f"https://api.paystack.co/transaction/verify/{reference}",
+        headers=headers, timeout=15,
+    )
+    data = resp.json()
+
+    if not data.get("status") or data["data"].get("status") != "success":
+        return jsonify({"success": False, "error": "Payment not verified"})
+
+    metadata  = data["data"].get("metadata", {})
+    plan_code = metadata.get("plan_code", "")
+    plan_name = PLAN_MAP.get(plan_code, "pro")
+
+    return jsonify({"success": True, "plan": plan_name, "reference": reference})
+
+# ── Entrypoint ────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    log.info(f"ClipAI worker starting on port {PORT}")
+    app.run(host="0.0.0.0", port=PORT, threaded=True)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# NEW FEATURE ROUTES  (zero video processing — pure AI + live search)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+SERP_KEY = os.getenv("SERPAPI_KEY", "")
+YT_KEY   = os.getenv("YOUTUBE_API_KEY", "")
+
+def _serp_search(query: str, num: int = 10) -> list:
+    """SerpAPI Google search. Returns list of result dicts."""
+    if not SERP_KEY:
+        return []
+    try:
+        resp = requests.get("https://serpapi.com/search", params={
+            "q": query, "num": num, "api_key": SERP_KEY,
+            "engine": "google", "gl": "ng", "hl": "en",
+        }, timeout=10)
+        resp.raise_for_status()
+        return resp.json().get("organic_results", [])
+    except Exception as e:
+        log.warning(f"SerpAPI error: {e}")
+        return []
+
+def _yt_trending(game: str, max_results: int = 15) -> list:
+    """YouTube Data API trending gaming videos."""
+    if not YT_KEY:
+        return []
+    try:
+        resp = requests.get("https://www.googleapis.com/youtube/v3/search", params={
+            "part": "snippet", "q": f"{game} gaming highlights",
+            "type": "video", "videoDuration": "short",
+            "order": "viewCount", "maxResults": max_results,
+            "key": YT_KEY, "regionCode": "NG",
+        }, timeout=10)
+        resp.raise_for_status()
+        return resp.json().get("items", [])
+    except Exception as e:
+        log.warning(f"YouTube API error: {e}")
+        return []
+
+def _groq_text(prompt: str, system: str = "", max_tokens: int = 800) -> str:
+    """Call Groq Llama 3.3 70B for text generation."""
+    client = _groq()
+    msgs = []
+    if system:
+        msgs.append({"role": "system", "content": system})
+    msgs.append({"role": "user", "content": prompt})
+    resp = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=msgs,
+        max_tokens=max_tokens,
+        temperature=0.85,
+    )
+    return resp.choices[0].message.content.strip()
+
+def _groq_json(prompt: str, system: str = "") -> dict | list:
+    """Call Groq and parse JSON response."""
+    raw = _groq_text(prompt, system, max_tokens=1200)
+    for fence in ["```json", "```"]:
+        raw = raw.replace(fence, "")
+    return json.loads(raw.strip())
+
+# ── Trend Radar ────────────────────────────────────────────────────────────────
+
+@app.route("/trends")
+def trends():
+    game = request.args.get("game", "")
+    query = f"viral gaming {game} TikTok YouTube trends 2025" if game else "viral gaming trends TikTok YouTube 2025"
+
+    serp_results = _serp_search(query, num=8)
+    yt_results   = _yt_trending(game or "gaming")
+
+    # Build context for Groq
+    snippets = "\n".join(r.get("snippet", "") for r in serp_results[:5])
+    yt_titles = "\n".join(
+        item.get("snippet", {}).get("title", "") for item in yt_results[:8]
+    )
+
+    system = "You are a viral gaming content trend analyst. Return ONLY valid JSON."
+    prompt = f"""
+Based on these live search results and YouTube data, identify the TOP 12 trending items
+for gaming content creators right now.
+
+Search snippets:
+{snippets or 'No live data available.'}
+
+Trending YouTube titles:
+{yt_titles or 'No YouTube data available.'}
+
+Game focus: {game or 'All games'}
+
+Return a JSON object:
+{{
+  "game": "{game or 'All'}",
+  "updatedAt": "<ISO timestamp>",
+  "trends": [
+    {{
+      "id": "<unique id>",
+      "name": "<trend name/phrase>",
+      "category": "<one of: title|hashtag|sound|challenge>",
+      "game": "<game name or All>",
+      "score": <0-100 integer>,
+      "change": <percentage change integer, can be negative>,
+      "status": "<rising|peaked|falling>",
+      "views": "<e.g. 1.2M>",
+      "example": "<optional short example usage>"
+    }}
+  ]
+}}
+
+Make the trends specific, actionable, and relevant to Nigerian/African gaming creators.
+"""
+    try:
+        data = _groq_json(prompt, system)
+        # Ensure updatedAt is current
+        data["updatedAt"] = __import__("datetime").datetime.utcnow().isoformat()
+        return jsonify(data)
+    except Exception as e:
+        log.error(f"Trends error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ── Viral Forge — Titles ───────────────────────────────────────────────────────
+
+@app.route("/forge/titles", methods=["POST"])
+def forge_titles():
+    body     = request.get_json(force=True)
+    desc     = body.get("description", "")
+    game     = body.get("game", "Gaming")
+    platform = body.get("platform", "TikTok")
+
+    # Live search for what's trending
+    serp = _serp_search(f"viral {game} {platform} title 2025 most viewed", num=5)
+    context = "\n".join(r.get("snippet","") for r in serp[:3])
+
+    system = "You are a viral gaming content strategist. Return ONLY valid JSON."
+    prompt = f"""
+Generate 7 viral title options for this gaming clip:
+Description: "{desc}"
+Game: {game}
+Platform: {platform}
+
+Live trend context: {context or 'N/A'}
+
+Return JSON:
+{{
+  "titles": [
+    {{
+      "id": "t1",
+      "text": "<full title with emoji>",
+      "viralScore": <65-99 integer>,
+      "searchVolume": "<e.g. 24K>",
+      "trend": "<rising|stable|declining>",
+      "votes": 0
+    }}
+  ]
+}}
+
+Rules:
+- Titles must be 6-14 words
+- Include 1-2 emojis per title
+- Optimise for {platform} algorithm
+- Rank by viralScore descending
+- Make them feel authentic, not corporate
+"""
+    try:
+        return jsonify(_groq_json(prompt, system))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Viral Forge — Captions ────────────────────────────────────────────────────
+
+@app.route("/forge/captions", methods=["POST"])
+def forge_captions():
+    body     = request.get_json(force=True)
+    desc     = body.get("description", "")
+    game     = body.get("game", "Gaming")
+    vibe     = body.get("vibe", "Hype")
+    platform = body.get("platform", "TikTok")
+
+    system = "You are a viral gaming caption writer who knows what Nigerian teens love. Return ONLY valid JSON."
+    prompt = f"""
+Write 6 viral captions for this gaming clip:
+Description: "{desc}"
+Game: {game}, Vibe: {vibe}, Platform: {platform}
+
+Return JSON:
+{{
+  "captions": [
+    {{
+      "id": "c1",
+      "text": "<caption with 1-2 emojis, under 120 chars>",
+      "vibe": "{vibe}",
+      "viralScore": <70-99>,
+      "votes": 0
+    }}
+  ]
+}}
+
+Rules:
+- Mix conversational tone with hype
+- Include comment bait (ask viewers to react)
+- Reference Nigerian gaming culture where natural
+- No corporate language
+"""
+    try:
+        return jsonify(_groq_json(prompt, system))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Viral Forge — Hashtags ────────────────────────────────────────────────────
+
+@app.route("/forge/hashtags", methods=["POST"])
+def forge_hashtags():
+    body     = request.get_json(force=True)
+    desc     = body.get("description", "")
+    game     = body.get("game", "Gaming")
+    platform = body.get("platform", "TikTok")
+
+    # Live hashtag trend search
+    serp = _serp_search(f"best gaming hashtags {game} {platform} 2025 Nigeria", num=5)
+    context = "\n".join(r.get("snippet","") for r in serp[:3])
+
+    system = "You are a hashtag strategist for gaming creators. Return ONLY valid JSON."
+    prompt = f"""
+Generate the perfect hashtag set for:
+Description: "{desc}", Game: {game}, Platform: {platform}
+
+Live trend data: {context or 'N/A'}
+
+Return JSON: {{"hashtags": ["#tag1", "#tag2", ...]}}
+
+Requirements:
+- 14-18 total hashtags
+- First 3: mega tags (100M+ posts) — platform general
+- Next 5: mid-tier (1M-100M posts) — gaming specific  
+- Last 6-10: niche (under 1M) — game specific + Nigerian gaming
+- Include #naijagamer and #gamingafrica
+- All lowercase, no spaces
+"""
+    try:
+        return jsonify(_groq_json(prompt, system))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Viral Forge — Hooks ───────────────────────────────────────────────────────
+
+@app.route("/forge/hooks", methods=["POST"])
+def forge_hooks():
+    body = request.get_json(force=True)
+    desc = body.get("description", "")
+    game = body.get("game", "Gaming")
+
+    serp = _serp_search(f"viral gaming video opening lines hooks {game} 2025", num=4)
+    context = "\n".join(r.get("snippet","") for r in serp[:2])
+
+    system = "You are a viral short-form video scriptwriter. Return ONLY valid JSON."
+    prompt = f"""
+Write 8 killer opening hook lines for this {game} gaming clip:
+"{desc}"
+
+Live trend data: {context or 'N/A'}
+
+Return JSON: {{"hooks": ["hook1", "hook2", ...]}}
+
+Rules:
+- Each hook is 1-2 sentences max
+- Must stop the scroll in under 2 seconds
+- Mix formats: POV, question, statement, challenge
+- Optimised for TikTok/Reels viewer psychology
+- Reference {game} naturally
+"""
+    try:
+        return jsonify(_groq_json(prompt, system))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── ClipBot ────────────────────────────────────────────────────────────────────
+
+CLIPBOT_SYSTEM = """You are ClipBot, an expert AI gaming content coach built into ClipAI.
+You help gaming content creators — especially Nigerian and African teenagers — grow their channels,
+go viral, and create better content.
+
+You know everything about:
+- TikTok, YouTube Shorts, Instagram Reels algorithms
+- What makes gaming clips go viral in Nigeria/Africa
+- Titles, captions, hashtags, hooks that actually work
+- Growth strategies for small channels
+- Free Fire, Bloodstrike, PUBG, COD, Mobile Legends content trends
+- Best posting times for Nigerian audiences (WAT timezone)
+
+Tone: Friendly, hype, knowledgeable. Like a big brother who's a successful gaming creator.
+Be direct. Use bullet points. Keep responses under 200 words unless a detailed plan is needed.
+Don't be corporate. Say "bro" occasionally. Use gaming slang naturally."""
+
+@app.route("/clipbot", methods=["POST"])
+def clipbot():
+    body    = request.get_json(force=True)
+    message = body.get("message", "")
+    history = body.get("history", [])
+    user    = body.get("user", {})
+
+    if not message:
+        return jsonify({"error": "No message"}), 400
+
+    # Optional: live search context for relevant queries
+    search_keywords = ["trending", "viral", "best time", "hashtag", "title", "grow", "algorithm"]
+    extra_context = ""
+    if any(kw in message.lower() for kw in search_keywords):
+        results = _serp_search(f"gaming content creator tips {message[:60]} 2025 Nigeria", num=3)
+        if results:
+            extra_context = "\n\nLive context:\n" + "\n".join(r.get("snippet","") for r in results[:2])
+
+    try:
+        client = _groq()
+        msgs = [{"role": "system", "content": CLIPBOT_SYSTEM}]
+
+        # Include conversation history (last 8 turns to stay within token limits)
+        for h in history[-8:]:
+            msgs.append({"role": h["role"], "content": h["content"]})
+
+        msgs.append({"role": "user", "content": message + extra_context})
+
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=msgs,
+            max_tokens=600,
+            temperature=0.9,
+        )
+        reply = resp.choices[0].message.content.strip()
+        return jsonify({"reply": reply})
+
+    except Exception as e:
+        log.error(f"ClipBot error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ── Growth Intel — Competitor Spy ─────────────────────────────────────────────
+
+@app.route("/intel/spy", methods=["POST"])
+def intel_spy():
+    body        = request.get_json(force=True)
+    channel_url = body.get("channelUrl", "")
+    game        = body.get("game", "")
+
+    # SerpAPI to get channel info
+    channel_name = channel_url.split("@")[-1].split("/")[0] if "@" in channel_url else "unknown"
+    serp = _serp_search(f"site:youtube.com {channel_name} gaming {game} most popular videos", num=8)
+    context = "\n".join(f"- {r.get('title','')}: {r.get('snippet','')}" for r in serp[:6])
+
+    system = "You are a YouTube channel analyst. Return ONLY valid JSON."
+    prompt = f"""
+Analyse this gaming creator's channel strategy:
+Channel: {channel_url}
+Game: {game or 'unknown'}
+
+Search data found:
+{context or 'Limited data available — provide general analysis based on top gaming creators.'}
+
+Return JSON:
+{{
+  "channelName": "<clean name>",
+  "avgViews": "<range like 45K-280K>",
+  "postingFrequency": "<e.g. 5-7 videos/week>",
+  "bestPerformingGame": "<game name>",
+  "titlePattern": "<their typical title formula>",
+  "thumbnailStyle": "<brief description>",
+  "topFormulas": ["<formula1>", "<formula2>", "<formula3>", "<formula4>", "<formula5>"],
+  "recommendation": "<2-3 sentences on how to compete with or beat them>"
+}}
+"""
+    try:
+        return jsonify(_groq_json(prompt, system))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Growth Intel — Post Timing ────────────────────────────────────────────────
+
+@app.route("/intel/timing", methods=["POST"])
+def intel_timing():
+    body     = request.get_json(force=True)
+    platform = body.get("platform", "TikTok")
+    game     = body.get("game", "gaming")
+
+    serp = _serp_search(f"best time to post {platform} gaming Nigeria WAT 2025", num=5)
+    context = "\n".join(r.get("snippet","") for r in serp[:3])
+
+    system = "You are a social media timing expert. Return ONLY valid JSON."
+    prompt = f"""
+What are the best times to post {game} gaming content on {platform} for Nigerian creators?
+Use WAT (West Africa Time = UTC+1) timezone.
+
+Research context: {context or 'N/A'}
+
+Return JSON:
+{{
+  "platform": "{platform}",
+  "slots": [
+    {{"day": "<day>", "time": "<time range WAT>", "score": <0-100>, "label": "<PEAK|GREAT|GOOD>"}},
+    ... (7 slots, one per day, sorted by score desc)
+  ],
+  "insight": "<2-3 sentence actionable insight specific to Nigerian {game} creators>"
+}}
+"""
+    try:
+        return jsonify(_groq_json(prompt, system))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Growth Intel — A/B Title ──────────────────────────────────────────────────
+
+@app.route("/intel/abtitle", methods=["POST"])
+def intel_abtitle():
+    body   = request.get_json(force=True)
+    titleA = body.get("titleA", "")
+    titleB = body.get("titleB", "")
+    game   = body.get("game", "gaming")
+
+    system = "You are a YouTube CTR and title optimisation expert. Return ONLY valid JSON."
+    prompt = f"""
+Predict which title will perform better for a {game} gaming video:
+
+Title A: "{titleA}"
+Title B: "{titleB}"
+
+Analyse based on: hook strength, emotional trigger, specificity, emoji usage,
+click-through-rate potential, search intent alignment, and mobile scroll-stop power.
+
+Return JSON:
+{{
+  "titleA": "{titleA}",
+  "titleB": "{titleB}",
+  "winner": "<A or B>",
+  "scoreA": <50-99>,
+  "scoreB": <50-99>,
+  "reasoning": "<2-3 sentences explaining why the winner is better>",
+  "improvements": ["<specific improvement 1>", "<improvement 2>", "<improvement 3>"]
+}}
+
+The winner must have a higher score. Scores must differ by at least 5.
+"""
+    try:
+        return jsonify(_groq_json(prompt, system))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

@@ -1,29 +1,30 @@
-# Dependencies
-node_modules/
-
-# Build output
-dist/
-
 # Python
-worker/__pycache__/
-worker/*.pyc
-worker/processors/__pycache__/
-worker/processors/*.pyc
-
-# Environment
+__pycache__/
+*.py[cod]
+*.pyo
 .env
-.env.local
+venv/
+.venv/
+*.egg-info/
 
-# IDE
-.vscode/
-.idea/
+# Node / Vite
+node_modules/
+app/dist/
+app/.env.local
+app/.env.production
+
+# Tmp
+/tmp/
+*.log
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Misc
-*.tar.gz
-*.log
-index-*.js
-index-*.css
+# IDE
+.vscode/
+.idea/
+
+# Secrets
+*.pem
+*.key
