@@ -148,17 +148,23 @@ create or replace view public.leaderboard_alltime as
   order by rank asc;
 
 -- Weekly leaderboard: ranked by XP earned in the last 7 days.
+-- Wrapped in a subquery because PostgreSQL forbids referencing a SELECT alias
+-- (weekly_xp) inside the same SELECT's window function.
 create or replace view public.leaderboard_weekly as
   select
     row_number() over (order by weekly_xp desc) as rank,
-    p.id, p.email, p.full_name, p.avatar_url, p.plan,
-    coalesce(sum(xe.xp_delta), 0) as weekly_xp
-  from public.profiles p
-  left join public.xp_events xe
-    on xe.user_id = p.id
-   and xe.created_at >= now() - interval '7 days'
-  group by p.id, p.email, p.full_name, p.avatar_url, p.plan
-  having coalesce(sum(xe.xp_delta), 0) > 0
+    id, email, full_name, avatar_url, plan, weekly_xp
+  from (
+    select
+      p.id, p.email, p.full_name, p.avatar_url, p.plan,
+      coalesce(sum(xe.xp_delta), 0) as weekly_xp
+    from public.profiles p
+    left join public.xp_events xe
+      on xe.user_id = p.id
+     and xe.created_at >= now() - interval '7 days'
+    group by p.id, p.email, p.full_name, p.avatar_url, p.plan
+  ) q
+  where weekly_xp > 0
   order by rank asc;
 
 -- ─── Row Level Security ──────────────────────────────────────────────────────
@@ -177,32 +183,45 @@ alter table public.referrals           enable row level security;
 alter table public.settings            enable row level security;
 
 -- Users can read their own profile
+drop policy if exists profiles_select_own on public.profiles;
 create policy "profiles_select_own" on public.profiles
   for select using (auth.uid() = id);
+drop policy if exists profiles_update_own on public.profiles;
 create policy "profiles_update_own" on public.profiles
   for update using (auth.uid() = id);
 
 -- Users can read their own credit transactions, xp events, clips, etc.
+drop policy if exists credit_tx_select_own on public.credit_transactions;
 create policy "credit_tx_select_own" on public.credit_transactions
   for select using (auth.uid() = user_id);
+drop policy if exists xp_events_select_own on public.xp_events;
 create policy "xp_events_select_own" on public.xp_events
   for select using (auth.uid() = user_id);
+drop policy if exists clips_select_own on public.clips;
 create policy "clips_select_own" on public.clips
   for select using (auth.uid() = user_id);
+drop policy if exists subs_select_own on public.subscriptions;
 create policy "subs_select_own" on public.subscriptions
   for select using (auth.uid() = user_id);
+drop policy if exists caption_votes_select_own on public.caption_votes;
 create policy "caption_votes_select_own" on public.caption_votes
   for select using (auth.uid() = user_id);
+drop policy if exists caption_votes_insert_own on public.caption_votes;
 create policy "caption_votes_insert_own" on public.caption_votes
   for insert with check (auth.uid() = user_id);
+drop policy if exists clipbot_history_select_own on public.clipbot_history;
 create policy "clipbot_history_select_own" on public.clipbot_history
   for select using (auth.uid() = user_id);
+drop policy if exists clipbot_history_insert_own on public.clipbot_history;
 create policy "clipbot_history_insert_own" on public.clipbot_history
   for insert with check (auth.uid() = user_id);
+drop policy if exists referrals_select_own on public.referrals;
 create policy "referrals_select_own" on public.referrals
   for select using (auth.uid() = referrer_id or auth.uid() = referred_id);
+drop policy if exists settings_select_own on public.settings;
 create policy "settings_select_own" on public.settings
   for select using (auth.uid() = user_id);
+drop policy if exists settings_update_own on public.settings;
 create policy "settings_update_own" on public.settings
   for update using (auth.uid() = user_id);
 
@@ -218,8 +237,10 @@ as $$
 declare
   new_code text;
 begin
-  -- Generate a unique 8-char referral code from the user's UUID
-  new_code := upper(substr(replace(uuid_generate_v4()::text, '-', ''), 1, 8));
+  -- Generate a unique 8-char referral code from a random UUID.
+  -- Use gen_random_uuid() (built-in to Postgres 13+) instead of uuid_generate_v4()
+  -- because the latter fails when invoked from the auth trigger context in Supabase.
+  new_code := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
   insert into public.profiles (id, email, full_name, referral_code, credits)
   values (
     new.id,
@@ -233,7 +254,7 @@ begin
 end;
 $$;
 
--- Required extension for uuid_generate_v4()
+-- Required for gen_random_uuid() in older Postgres; modern Supabase has it built-in.
 create extension if not exists "pgcrypto";
 
 -- Drop existing trigger if any, then create
