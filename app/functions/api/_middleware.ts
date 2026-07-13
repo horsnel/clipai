@@ -346,8 +346,22 @@ async function llmJson<T = any>(env: Env, prompt: string, system = '', maxTokens
   if (system) msgs.push({ role: 'system', content: system });
   msgs.push({ role: 'user', content: prompt });
   let raw = await llmChat(env, msgs, { max_tokens: maxTokens });
+  // Strip code fences
   for (const fence of ['```json', '```']) raw = raw.replace(fence, '');
-  return JSON.parse(raw.trim()) as T;
+  // If the model wrapped JSON in prose, extract the outermost {...} or [...]
+  raw = raw.trim();
+  const firstBrace = raw.search(/[{[]/);
+  if (firstBrace > 0) raw = raw.slice(firstBrace);
+  // Find matching closing brace/bracket (last one wins — simple heuristic)
+  const lastClose = Math.max(raw.lastIndexOf('}'), raw.lastIndexOf(']'));
+  if (lastClose > 0 && lastClose < raw.length - 1) raw = raw.slice(0, lastClose + 1);
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    // If still failing, try aggressive repair: trim trailing commas before } or ]
+    const repaired = raw.replace(/,\s*([}\]])/g, '$1');
+    return JSON.parse(repaired) as T;
+  }
 }
 
 // ─── Paystack webhook HMAC ───────────────────────────────────────────────────
@@ -1463,7 +1477,7 @@ Rules:
 - Prefer rising trends over peaked ones (>=60% should be 'rising').`;
 
   try {
-    const data: any = await llmJson(env, prompt, system);
+    const data: any = await llmJson(env, prompt, system, 4000);
     data.updatedAt = new Date().toISOString();
     data.sources = data.sources || {
       youtube: ytResults.length,
