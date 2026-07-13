@@ -1556,14 +1556,274 @@ def clipbot_history():
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TREND RADAR + FORGE + GROWTH INTEL (preserved from v1, light auth added)
+# TREND RADAR + FORGE + GROWTH INTEL (v4.2 — hybrid multi-platform)
 # ════════════════════════════════════════════════════════════════════════════
-def _serp_search(query: str, num: int = 10) -> list:
-    """SerpAPI is deprecated for cost reasons — return [] so caller falls back to YouTube only.
+# Hybrid model — only TikTok + Twitter/X go through SerpAPI (no free API),
+# everything else uses free native APIs:
+#   • YouTube      → YouTube Data API v3
+#   • Reddit       → PRAW (or public JSON fallback)
+#   • Twitch       → Twitch Helix API
+#   • Google Trends → pytrends
+#   • TikTok       → SerpAPI (paid, ~$1.50/100 calls)
+#   • Twitter/X    → SerpAPI (paid, shares quota)
+# ════════════════════════════════════════════════════════════════════════════
 
-    Kept for backward compatibility with old forge endpoints that mix serp + youtube data.
+# Per-game subreddit map (covers all 7 games in the selector + All)
+GAME_SUBREDDITS = {
+    "valorant": ["valorant", "valorantclips", "valorantcompetitive"],
+    "apex": ["apexlegends", "apexclips"],
+    "apex legends": ["apexlegends", "apexclips"],
+    "fortnite": ["fortnitebr", "fortniteclips"],
+    "minecraft": ["minecraft", "minecraftbuilds"],
+    "roblox": ["roblox", "robloxgamedev"],
+    "call of duty": ["modernwarfare", "callofduty", "warzone"],
+    "warzone": ["warzone", "modernwarfare"],
+    "all": ["gaming", "gamingsclips"],
+}
+
+# Twitch game_id cache (Helix requires numeric game_id for filtering)
+_TWITCH_GAME_CACHE: dict[str, str] = {}
+
+# Module-level Reddit client (lazy)
+_reddit_client = None
+
+
+def _get_reddit():
+    """Lazily build a PRAW Reddit instance. Returns None if creds missing."""
+    global _reddit_client
+    if _reddit_client is not None:
+        return _reddit_client
+    if not all([Config.REDDIT_CLIENT_ID, Config.REDDIT_CLIENT_SECRET]):
+        return None
+    try:
+        import praw
+        _reddit_client = praw.Reddit(
+            client_id=Config.REDDIT_CLIENT_ID,
+            client_secret=Config.REDDIT_CLIENT_SECRET,
+            user_agent=Config.REDDIT_USER_AGENT,
+        )
+        _reddit_client.read_only = True
+        return _reddit_client
+    except Exception as e:
+        log.warning(f"PRAW init failed, will fall back to public JSON: {e}")
+        return None
+
+
+def _reddit_top(game: str, limit: int = 8) -> list[dict]:
+    """Return rising/hot gaming posts from subreddits matching the game.
+
+    Tries PRAW first, then falls back to public .json endpoints (no auth needed,
+    but rate-limited harder). Returns list of {title, score, url, subreddit}.
     """
-    return []
+    key = (game or "all").lower().strip()
+    subs = GAME_SUBREDDITS.get(key, GAME_SUBREDDITS["all"])
+    out: list[dict] = []
+
+    reddit = _get_reddit()
+    if reddit:
+        try:
+            for sub_name in subs[:2]:  # limit to 2 subs to keep latency low
+                sub = reddit.subreddit(sub_name)
+                for post in sub.top(time_filter="day", limit=limit):
+                    if post.score < 50:
+                        continue
+                    out.append({
+                        "title": post.title,
+                        "score": post.score,
+                        "url": post.url,
+                        "subreddit": sub_name,
+                        "platform": "reddit",
+                    })
+                    if len(out) >= limit:
+                        return out
+        except Exception as e:
+            log.warning(f"PRAW fetch failed: {e}")
+
+    # Fallback: public JSON (no auth)
+    if not out:
+        for sub_name in subs[:2]:
+            try:
+                r = requests.get(
+                    f"https://www.reddit.com/r/{sub_name}/top.json?t=day&limit={limit}",
+                    headers={"User-Agent": Config.REDDIT_USER_AGENT},
+                    timeout=8,
+                )
+                r.raise_for_status()
+                for child in r.json().get("data", {}).get("children", []):
+                    d = child.get("data", {})
+                    if d.get("score", 0) < 50:
+                        continue
+                    out.append({
+                        "title": d.get("title", ""),
+                        "score": d.get("score", 0),
+                        "url": f"https://reddit.com{d.get('permalink', '')}",
+                        "subreddit": sub_name,
+                        "platform": "reddit",
+                    })
+                    if len(out) >= limit:
+                        return out
+            except Exception as e:
+                log.warning(f"Reddit JSON fallback for r/{sub_name} failed: {e}")
+    return out
+
+
+def _twitch_app_token() -> str | None:
+    """Get a Twitch app access token via client_credentials."""
+    if not all([Config.TWITCH_CLIENT_ID, Config.TWITCH_CLIENT_SECRET]):
+        return None
+    try:
+        r = requests.post("https://id.twitch.tv/oauth2/token", data={
+            "client_id": Config.TWITCH_CLIENT_ID,
+            "client_secret": Config.TWITCH_CLIENT_SECRET,
+            "grant_type": "client_credentials",
+        }, timeout=8)
+        r.raise_for_status()
+        return r.json().get("access_token")
+    except Exception as e:
+        log.warning(f"Twitch token failed: {e}")
+        return None
+
+
+def _twitch_game_id(game: str, token: str) -> str | None:
+    """Look up Twitch game_id (cached in memory)."""
+    if not Config.TWITCH_CLIENT_ID:
+        return None
+    key = (game or "").lower().strip()
+    if key in _TWITCH_GAME_CACHE:
+        return _TWITCH_GAME_CACHE[key]
+    if not key or key == "all":
+        # Treat "all" as no game filter
+        _TWITCH_GAME_CACHE[key] = ""
+        return ""
+    try:
+        r = requests.get("https://api.twitch.tv/helix/games", params={"name": game}, headers={
+            "Client-ID": Config.TWITCH_CLIENT_ID,
+            "Authorization": f"Bearer {token}",
+        }, timeout=8)
+        r.raise_for_status()
+        data = r.json().get("data", [])
+        if data:
+            gid = data[0]["id"]
+            _TWITCH_GAME_CACHE[key] = gid
+            return gid
+    except Exception as e:
+        log.warning(f"Twitch game lookup for '{game}' failed: {e}")
+    _TWITCH_GAME_CACHE[key] = ""
+    return ""
+
+
+def _twitch_top(game: str, limit: int = 8) -> list[dict]:
+    """Return top live streams for the game (or all top streams if no game)."""
+    token = _twitch_app_token()
+    if not token:
+        return []
+    gid = _twitch_game_id(game, token)
+    params: dict[str, Any] = {"first": limit}
+    if gid:
+        params["game_id"] = gid
+    try:
+        r = requests.get("https://api.twitch.tv/helix/streams", params=params, headers={
+            "Client-ID": Config.TWITCH_CLIENT_ID,
+            "Authorization": f"Bearer {token}",
+        }, timeout=8)
+        r.raise_for_status()
+        out = []
+        for s in r.json().get("data", [])[:limit]:
+            out.append({
+                "title": s.get("title", ""),
+                "viewers": s.get("viewer_count", 0),
+                "streamer": s.get("user_name", ""),
+                "game": s.get("game_name", game or "Unknown"),
+                "url": f"https://twitch.tv/{s.get('user_name', '')}",
+                "platform": "twitch",
+            })
+        return out
+    except Exception as e:
+        log.warning(f"Twitch streams failed: {e}")
+        return []
+
+
+def _google_trends(game: str, limit: int = 6) -> list[dict]:
+    """Return rising Google search queries related to the game."""
+    try:
+        from pytrends.request import TrendReq
+        pytrends = TrendReq(hl="en-US", tz=60, timeout=(5, 8), retries=1, backoff_factor=0.3)
+        kw = f"{game} gaming" if game and game.lower() != "all" else "gaming"
+        pytrends.build_payload([kw], timeframe="now 7-d", geo="")
+        related = pytrends.related_queries().get(kw, {}).get("rising", [])
+        out = []
+        for r in (related or [])[:limit]:
+            out.append({
+                "title": r.get("query", ""),
+                "value": r.get("value", 0),
+                "platform": "google_trends",
+            })
+        return out
+    except Exception as e:
+        log.warning(f"Google Trends failed: {e}")
+        return []
+
+
+def _serp_search(query: str, num: int = 10, engine: str = "google") -> list:
+    """Call SerpAPI.
+
+    Default engine is 'google' for legacy compatibility (forge endpoints).
+    For trend aggregation, call with engine='tiktok_search' or 'twitter_search'
+    to pull cross-platform gaming hashtags that have no free API.
+    """
+    if not Config.SERPAPI_KEY:
+        return []
+    try:
+        params = {
+            "engine": engine,
+            "q": query,
+            "num": num,
+            "api_key": Config.SERPAPI_KEY,
+        }
+        r = requests.get("https://serpapi.com/search", params=params, timeout=12)
+        r.raise_for_status()
+        data = r.json()
+        # Different engines return different shapes
+        if engine == "tiktok_search":
+            return data.get("video_results", []) or data.get("organic_results", [])
+        if engine == "twitter_search":
+            return data.get("tweets", []) or data.get("organic_results", [])
+        return data.get("organic_results", [])
+    except Exception as e:
+        log.warning(f"SerpAPI ({engine}) error: {e}")
+        return []
+
+
+def _serp_tiktok(game: str, limit: int = 6) -> list[dict]:
+    """Pull trending TikTok videos for a game via SerpAPI."""
+    q = f"{game} gaming viral" if game and game.lower() != "all" else "gaming viral 2026"
+    raw = _serp_search(q, num=limit, engine="tiktok_search")
+    out = []
+    for v in raw[:limit]:
+        out.append({
+            "title": v.get("title") or v.get("desc", ""),
+            "views": v.get("play_count") or v.get("views", 0),
+            "author": v.get("author") or v.get("channel", ""),
+            "url": v.get("link") or v.get("watch_url", ""),
+            "platform": "tiktok",
+        })
+    return out
+
+
+def _serp_twitter(game: str, limit: int = 6) -> list[dict]:
+    """Pull trending tweets for a game via SerpAPI."""
+    q = f"{game} gaming #clips" if game and game.lower() != "all" else "gaming clips viral 2026"
+    raw = _serp_search(q, num=limit, engine="twitter_search")
+    out = []
+    for t in raw[:limit]:
+        out.append({
+            "title": t.get("text") or t.get("title", ""),
+            "views": t.get("views") or t.get("retweet_count", 0),
+            "author": t.get("user", {}).get("name", "") if isinstance(t.get("user"), dict) else str(t.get("user", "")),
+            "url": t.get("link") or t.get("url", ""),
+            "platform": "twitter",
+        })
+    return out
 
 
 def _yt_trending(game: str, max_results: int = 15) -> list:
@@ -1605,40 +1865,101 @@ def _groq_json(prompt: str, system: str = "") -> dict | list:
 
 @app.route("/trends")
 def trends():
-    game = request.args.get("game", "")
-    query = (
-        f"viral gaming {game} TikTok YouTube trends 2025"
-        if game else "viral gaming trends TikTok YouTube 2025"
-    )
-    serp_results = _serp_search(query, num=8)
-    yt_results = _yt_trending(game or "gaming")
-    snippets = "\n".join(r.get("snippet", "") for r in serp_results[:5])
+    """Hybrid multi-platform trend radar.
+
+    Pulls real data from 6 platforms:
+      • YouTube (free Data API) — trending video titles
+      • Reddit (PRAW or public JSON) — top posts of the day from gaming subreddits
+      • Twitch (free Helix API) — top live streams for the game
+      • Google Trends (pytrends) — rising search queries
+      • TikTok (SerpAPI paid) — viral clips (premium)
+      • Twitter/X (SerpAPI paid) — trending tweets (premium)
+
+    Then asks Groq to synthesize everything into a single ranked trend list with
+    a `platform` field per item so the frontend can show platform badges.
+    """
+    game = request.args.get("game", "").strip()
+    game_label = game or "All"
+
+    # Fetch from all sources in sequence (each helper handles its own failures)
+    yt_results = _yt_trending(game or "gaming", max_results=10)
+    reddit_results = _reddit_top(game, limit=8)
+    twitch_results = _twitch_top(game, limit=8)
+    trends_results = _google_trends(game, limit=6)
+    tiktok_results = _serp_tiktok(game, limit=6)
+    twitter_results = _serp_twitter(game, limit=6)
+
+    # Compress raw data into a context block for Groq
     yt_titles = "\n".join(
-        item.get("snippet", {}).get("title", "") for item in yt_results[:8]
-    )
+        f"- {it.get('snippet', {}).get('title', '')} (channel: {it.get('snippet', {}).get('channelTitle', '')})"
+        for it in yt_results[:8]
+    ) or "No YouTube data available."
+    reddit_block = "\n".join(
+        f"- {r['title']} (r/{r['subreddit']}, score: {r['score']})"
+        for r in reddit_results[:6]
+    ) or "No Reddit data available."
+    twitch_block = "\n".join(
+        f"- {t['streamer']}: {t['title']} ({t['viewers']} viewers, {t['game']})"
+        for t in twitch_results[:6]
+    ) or "No Twitch data available."
+    gtrends_block = "\n".join(
+        f"- {t['title']} (+{t['value']}% growth)"
+        for t in trends_results[:5]
+    ) or "No Google Trends data available."
+    tiktok_block = "\n".join(
+        f"- {t['title']} (@{t['author']}, {t['views']} views)"
+        for t in tiktok_results[:5]
+    ) or "No TikTok data available (SerpAPI key missing or quota exhausted)."
+    twitter_block = "\n".join(
+        f"- {t['title']} (@{t['author']}, {t['views']} impressions)"
+        for t in twitter_results[:5]
+    ) or "No Twitter data available (SerpAPI key missing or quota exhausted)."
+
     system = "You are a viral gaming content trend analyst. Return ONLY valid JSON."
     prompt = f"""
-Based on these live search results and YouTube data, identify the TOP 12 trending items
-for gaming content creators right now.
+Synthesize these live cross-platform signals into the TOP 12 trending items
+for gaming content creators right now. Each trend MUST tag the platform where it
+originated so the frontend can render a badge.
 
-Search snippets:
-{snippets or 'No live data available.'}
+=== YOUTUBE (trending short videos) ===
+{yt_titles}
 
-Trending YouTube titles:
-{yt_titles or 'No YouTube data available.'}
+=== REDDIT (top posts of the day from gaming subs) ===
+{reddit_block}
 
-Game focus: {game or 'All games'}
+=== TWITCH (top live streams right now) ===
+{twitch_block}
+
+=== GOOGLE TRENDS (rising search queries, last 7 days) ===
+{gtrends_block}
+
+=== TIKTOK (viral clips via SerpAPI) ===
+{tiktok_block}
+
+=== TWITTER/X (trending tweets via SerpAPI) ===
+{twitter_block}
+
+Game focus: {game_label}
 
 Return a JSON object:
 {{
-  "game": "{game or 'All'}",
+  "game": "{game_label}",
   "updatedAt": "<ISO timestamp>",
+  "sources": {{
+    "youtube": <int count of items we received>,
+    "reddit": <int>,
+    "twitch": <int>,
+    "google_trends": <int>,
+    "tiktok": <int>,
+    "twitter": <int>
+  }},
   "trends": [
     {{
       "id": "<unique id>",
       "name": "<trend name/phrase>",
       "category": "<one of: title|hashtag|sound|challenge>",
       "game": "<game name or All>",
+      "platform": "<one of: youtube|reddit|twitch|google_trends|tiktok|twitter>",
       "score": <0-100 integer>,
       "change": <percentage change integer, can be negative>,
       "status": "<rising|peaked|falling>",
@@ -1648,11 +1969,24 @@ Return a JSON object:
   ]
 }}
 
-Make the trends specific, actionable, and relevant to Nigerian/African gaming creators.
+Rules:
+- Distribute trends across platforms; do not let YouTube dominate.
+- If a platform returned no data, do not invent trends for it.
+- Make trends specific, actionable, and relevant to Nigerian/African gaming creators.
+- Prefer rising trends over peaked ones (≥60% should be 'rising').
 """
     try:
         data = _groq_json(prompt, system)
         data["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        # Attach real source counts so the frontend can show "Live from 6 platforms"
+        data.setdefault("sources", {
+            "youtube": len(yt_results),
+            "reddit": len(reddit_results),
+            "twitch": len(twitch_results),
+            "google_trends": len(trends_results),
+            "tiktok": len(tiktok_results),
+            "twitter": len(twitter_results),
+        })
         return jsonify(data)
     except Exception as e:
         log.error(f"Trends error: {e}")

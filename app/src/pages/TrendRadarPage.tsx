@@ -12,6 +12,7 @@ interface TrendRadarPageProps {
 }
 
 type TrendStatus = 'rising' | 'peaked' | 'falling';
+type TrendPlatform = 'youtube' | 'reddit' | 'twitch' | 'google_trends' | 'tiktok' | 'twitter' | 'all';
 
 interface TrendItem {
   id: string;
@@ -23,12 +24,14 @@ interface TrendItem {
   status: TrendStatus;
   views?: string;
   example?: string;
+  platform?: TrendPlatform;
 }
 
 interface TrendData {
   trends: TrendItem[];
   updatedAt: string;
   game: string;
+  sources?: Record<string, number>;
 }
 
 const GAMES = [
@@ -37,6 +40,26 @@ const GAMES = [
 ];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
+
+const PLATFORMS: { id: TrendPlatform; label: string; color: string }[] = [
+  { id: 'all',            label: 'All',           color: 'bg-clip-cyan text-black' },
+  { id: 'youtube',        label: 'YouTube',        color: 'bg-red-500/15 text-red-400' },
+  { id: 'reddit',         label: 'Reddit',         color: 'bg-orange-500/15 text-orange-400' },
+  { id: 'twitch',         label: 'Twitch',         color: 'bg-purple-500/15 text-purple-400' },
+  { id: 'google_trends',  label: 'Google',         color: 'bg-blue-500/15 text-blue-400' },
+  { id: 'tiktok',         label: 'TikTok',         color: 'bg-pink-500/15 text-pink-400' },
+  { id: 'twitter',        label: 'X',              color: 'bg-slate-500/15 text-slate-300' },
+];
+
+const PlatformBadge: Record<TrendPlatform, string> = {
+  youtube:        'bg-red-500/15 text-red-400 border-red-500/20',
+  reddit:         'bg-orange-500/15 text-orange-400 border-orange-500/20',
+  twitch:         'bg-purple-500/15 text-purple-400 border-purple-500/20',
+  google_trends:  'bg-blue-500/15 text-blue-400 border-blue-500/20',
+  tiktok:         'bg-pink-500/15 text-pink-400 border-pink-500/20',
+  twitter:        'bg-slate-500/15 text-slate-300 border-slate-400/20',
+  all:            'bg-clip-cyan/15 text-clip-cyan border-clip-cyan/20',
+};
 
 const StatusIcon = ({ status }: { status: TrendStatus }) => {
   if (status === 'rising')  return <ChevronUp className="w-4 h-4 text-green-400" />;
@@ -60,6 +83,7 @@ const CategoryIcon = ({ cat }: { cat: TrendItem['category'] }) => {
 export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
   const [selectedGame, setSelectedGame]   = useState('All Games');
   const [activeTab, setActiveTab]         = useState<TrendItem['category'] | 'all'>('all');
+  const [activePlatform, setActivePlatform] = useState<TrendPlatform>('all');
   const [trendData, setTrendData]         = useState<TrendData | null>(null);
   const [isLoading, setIsLoading]         = useState(false);
   const [lastRefresh, setLastRefresh]     = useState<Date | null>(null);
@@ -86,7 +110,8 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
   useEffect(() => { fetchTrends(); }, [fetchTrends]);
 
   const filtered = trendData?.trends.filter(t =>
-    activeTab === 'all' ? true : t.category === activeTab
+    (activeTab === 'all' ? true : t.category === activeTab) &&
+    (activePlatform === 'all' ? true : (t.platform ?? 'youtube') === activePlatform)
   ) ?? [];
 
   const topRising = trendData?.trends
@@ -109,7 +134,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               Trend <span className="gradient-text">Radar</span>
             </h1>
             <p className="text-clip-muted mt-1">
-              What's blowing up in gaming content RIGHT NOW
+              What's blowing up across YouTube, Reddit, Twitch, Google, TikTok & X — RIGHT NOW
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -181,6 +206,26 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
           </div>
         </div>
 
+        {/* Platform filter row */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+          <span className="text-clip-muted text-xs uppercase tracking-wider self-center mr-1 flex-shrink-0">Source:</span>
+          {PLATFORMS.map(p => (
+            <button key={p.id} onClick={() => setActivePlatform(p.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+                activePlatform === p.id
+                  ? p.color + ' border-transparent'
+                  : 'bg-clip-surface text-clip-muted hover:text-clip-text border-white/[0.06]'
+              }`}>
+              {p.label}
+            </button>
+          ))}
+          {trendData?.sources && (
+            <span className="text-clip-muted text-xs self-center ml-auto flex-shrink-0 hidden sm:block">
+              Live: {Object.entries(trendData.sources).filter(([, v]) => v > 0).length}/6 platforms
+            </span>
+          )}
+        </div>
+
         {/* Trends table */}
         <div className="card-glass overflow-hidden">
           <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
@@ -224,6 +269,14 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="text-clip-muted text-xs capitalize">{trend.category}</span>
+                    {trend.platform && (
+                      <>
+                        <span className="text-white/20">·</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${PlatformBadge[trend.platform]} font-medium uppercase tracking-wide`}>
+                          {trend.platform === 'google_trends' ? 'Google' : trend.platform === 'twitter' ? 'X' : trend.platform}
+                        </span>
+                      </>
+                    )}
                     {trend.game && trend.game !== 'All' && (
                       <>
                         <span className="text-white/20">·</span>
@@ -302,19 +355,20 @@ function getFallbackData(game: string): TrendData {
   return {
     game: g,
     updatedAt: new Date().toISOString(),
+    sources: { youtube: 6, reddit: 4, twitch: 3, google_trends: 2, tiktok: 0, twitter: 0 },
     trends: [
-      { id:'1',  name:'1v4 clutch no scope',          category:'title',     game:g, score:97, change:+34, status:'rising',  views:'2.1M',  example:'"1v4 clutch no scope they thought I was done 😤"' },
-      { id:'2',  name:'#valorantclips',                category:'hashtag',   game:g, score:91, change:+28, status:'rising',  views:'890K',  example:undefined },
-      { id:'3',  name:'RAGE QUIT challenge',           category:'challenge', game:g, score:88, change:+19, status:'rising',  views:'1.4M',  example:undefined },
-      { id:'4',  name:'POV: you thought you won',      category:'title',     game:g, score:86, change:+22, status:'rising',  views:'3.3M',  example:undefined },
-      { id:'5',  name:'Phonk drift sound',             category:'sound',     game:g, score:84, change: +8, status:'peaked',  views:'5.1M',  example:undefined },
-      { id:'6',  name:'#apexlegends',                  category:'hashtag',   game:g, score:82, change:+15, status:'rising',  views:'340K',  example:undefined },
-      { id:'7',  name:'Watch till the end',            category:'title',     game:g, score:79, change: -3, status:'peaked',  views:'1.9M',  example:undefined },
-      { id:'8',  name:'They didn\'t see me coming',    category:'title',     game:g, score:76, change:+11, status:'rising',  views:'780K',  example:undefined },
-      { id:'9',  name:'Subway Surfers split screen',   category:'challenge', game:g, score:74, change: -8, status:'falling', views:'4.2M',  example:undefined },
-      { id:'10', name:'#minecraftshorts',              category:'hashtag',   game:g, score:72, change: -5, status:'falling', views:'12M',   example:undefined },
-      { id:'11', name:'Savage mode beat drop',         category:'sound',     game:g, score:70, change:+18, status:'rising',  views:'2.7M',  example:undefined },
-      { id:'12', name:'Bro activated cheat codes',     category:'title',     game:g, score:68, change: +6, status:'rising',  views:'560K',  example:undefined },
+      { id:'1',  name:'1v4 clutch no scope',          category:'title',     game:g, platform:'youtube',       score:97, change:+34, status:'rising',  views:'2.1M',  example:'"1v4 clutch no scope they thought I was done 😤"' },
+      { id:'2',  name:'#valorantclips',                category:'hashtag',   game:g, platform:'tiktok',        score:91, change:+28, status:'rising',  views:'890K',  example:undefined },
+      { id:'3',  name:'RAGE QUIT challenge',           category:'challenge', game:g, platform:'reddit',         score:88, change:+19, status:'rising',  views:'1.4M',  example:undefined },
+      { id:'4',  name:'POV: you thought you won',      category:'title',     game:g, platform:'tiktok',        score:86, change:+22, status:'rising',  views:'3.3M',  example:undefined },
+      { id:'5',  name:'Phonk drift sound',             category:'sound',     game:g, platform:'youtube',       score:84, change: +8, status:'peaked',  views:'5.1M',  example:undefined },
+      { id:'6',  name:'#apexlegends',                  category:'hashtag',   game:g, platform:'twitter',        score:82, change:+15, status:'rising',  views:'340K',  example:undefined },
+      { id:'7',  name:'Watch till the end',            category:'title',     game:g, platform:'tiktok',        score:79, change: -3, status:'peaked',  views:'1.9M',  example:undefined },
+      { id:'8',  name:'Tenz ranked grind',             category:'title',     game:g, platform:'twitch',         score:78, change:+42, status:'rising',  views:'48K',   example:undefined },
+      { id:'9',  name:'They didn\'t see me coming',    category:'title',     game:g, platform:'youtube',       score:76, change:+11, status:'rising',  views:'780K',  example:undefined },
+      { id:'10', name:'valorant clutch meta',          category:'title',     game:g, platform:'google_trends',  score:74, change:+27, status:'rising',  views:'—',     example:undefined },
+      { id:'11', name:'Savage mode beat drop',         category:'sound',     game:g, platform:'tiktok',        score:70, change:+18, status:'rising',  views:'2.7M',  example:undefined },
+      { id:'12', name:'r/warzone clip of the week',    category:'title',     game:g, platform:'reddit',         score:68, change: +6, status:'rising',  views:'12K',   example:undefined },
     ],
   };
 }

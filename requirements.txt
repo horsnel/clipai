@@ -13,3 +13,6 @@ redis==5.0.7
 psycopg2-binary==2.9.9
 APScheduler==3.10.4
 PyJWT==2.9.0
+# v4.2 — multi-platform trend sources (hybrid model)
+pytrends==4.9.2
+praw==7.7.1
