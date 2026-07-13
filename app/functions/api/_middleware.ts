@@ -44,6 +44,8 @@ interface Env {
   SUPABASE_JWT_SECRET: string;
   // AI
   GROQ_API_KEY: string;
+  MISTRAL_API_KEY: string;
+  LLM_MODEL: string;        // optional override (e.g. 'mistral-small-latest', 'llama-3.3-70b-versatile')
   GEMINI_API_KEY: string;
   // Trends
   YOUTUBE_API_KEY: string;
@@ -285,31 +287,65 @@ function requirePlan(...plans: string[]) {
   };
 }
 
-// ─── Groq helpers ────────────────────────────────────────────────────────────
-async function groqChat(env: Env, messages: any[], opts: { max_tokens?: number; temperature?: number } = {}): Promise<string> {
-  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+// ─── LLM helpers (Mistral primary, Groq fallback) ───────────────────────────
+// Both Mistral and Groq expose OpenAI-compatible /v1/chat/completions endpoints,
+// so we route to whichever key is configured. Set MISTRAL_API_KEY to use Mistral,
+// or GROQ_API_KEY to use Groq. If both are set, Mistral wins. Override the model
+// with LLM_MODEL; otherwise we pick a sensible default per provider.
+//
+// Default models (chosen for speed + cost on trend synthesis / forge tasks):
+//   Mistral → 'mistral-small-latest'  (~$0.20/1M in, ~$0.60/1M out, 32k ctx)
+//   Groq    → 'llama-3.3-70b-versatile' (free tier, fast inference)
+//
+// Other good options you can set via LLM_MODEL:
+//   'open-mistral-nemo'      — 128k context, open weights, great for long inputs
+//   'mistral-large-latest'   — flagship, ~$2/1M in (use for highest-quality forge)
+//   'llama-3.1-8b-instant'   — Groq's fastest model, lower quality
+function pickLlm(env: Env): { provider: 'mistral' | 'groq'; url: string; key: string; model: string } {
+  if (env.MISTRAL_API_KEY) {
+    return {
+      provider: 'mistral',
+      url: 'https://api.mistral.ai/v1/chat/completions',
+      key: env.MISTRAL_API_KEY,
+      model: env.LLM_MODEL || 'mistral-small-latest',
+    };
+  }
+  if (env.GROQ_API_KEY) {
+    return {
+      provider: 'groq',
+      url: 'https://api.groq.com/openai/v1/chat/completions',
+      key: env.GROQ_API_KEY,
+      model: env.LLM_MODEL || 'llama-3.3-70b-versatile',
+    };
+  }
+  throw new Error('No LLM provider configured. Set MISTRAL_API_KEY or GROQ_API_KEY in Cloudflare env vars.');
+}
+
+async function llmChat(env: Env, messages: any[], opts: { max_tokens?: number; temperature?: number } = {}): Promise<string> {
+  const { provider, url, key, model } = pickLlm(env);
+  const r = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${env.GROQ_API_KEY}`,
+      Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
+      model,
       messages,
       max_tokens: opts.max_tokens ?? 800,
       temperature: opts.temperature ?? 0.85,
     }),
   });
-  if (!r.ok) throw new Error(`Groq API ${r.status}: ${await r.text()}`);
+  if (!r.ok) throw new Error(`${provider} API ${r.status}: ${await r.text()}`);
   const data = (await r.json()) as any;
   return data.choices?.[0]?.message?.content?.trim() ?? '';
 }
 
-async function groqJson<T = any>(env: Env, prompt: string, system = '', maxTokens = 1200): Promise<T> {
+async function llmJson<T = any>(env: Env, prompt: string, system = '', maxTokens = 1200): Promise<T> {
   const msgs: any[] = [];
   if (system) msgs.push({ role: 'system', content: system });
   msgs.push({ role: 'user', content: prompt });
-  let raw = await groqChat(env, msgs, { max_tokens: maxTokens });
+  let raw = await llmChat(env, msgs, { max_tokens: maxTokens });
   for (const fence of ['```json', '```']) raw = raw.replace(fence, '');
   return JSON.parse(raw.trim()) as T;
 }
@@ -332,9 +368,10 @@ async function hmacSha512(secret: string, body: ArrayBuffer): Promise<string> {
 app.get('/health', (c) => json({
   status: 'ok',
   service: 'clipai-worker',
-  version: '4.3-cf',
+  version: '4.4-cf',
   runtime: 'cloudflare-pages',
   supabase: !!c.env.SUPABASE_URL,
+  llm: c.env.MISTRAL_API_KEY ? 'mistral' : (c.env.GROQ_API_KEY ? 'groq' : 'none'),
 }));
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -731,7 +768,7 @@ Rules:
 - Rank by viralScore descending
 - Make them feel authentic, not corporate`;
   try {
-    return json(await groqJson(env, prompt, system));
+    return json(await llmJson(env, prompt, system));
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
@@ -768,7 +805,7 @@ Rules:
 - Reference Nigerian gaming culture where natural
 - No corporate language`;
   try {
-    return json(await groqJson(env, prompt, system));
+    return json(await llmJson(env, prompt, system));
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
@@ -794,7 +831,7 @@ Requirements:
 - Include #naijagamer and #gamingafrica
 - All lowercase, no spaces`;
   try {
-    return json(await groqJson(env, prompt, system));
+    return json(await llmJson(env, prompt, system));
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
@@ -818,7 +855,7 @@ Rules:
 - Optimised for TikTok/Reels viewer psychology
 - Reference ${game} naturally`;
   try {
-    return json(await groqJson(env, prompt, system));
+    return json(await llmJson(env, prompt, system));
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
@@ -852,7 +889,7 @@ app.post('/clipbot', requireAuth, async (c) => {
     const msgs: any[] = [{ role: 'system', content: CLIPBOT_SYSTEM }];
     for (const h of history.slice(-8)) msgs.push({ role: h.role, content: h.content });
     msgs.push({ role: 'user', content: message });
-    const reply = await groqChat(env, msgs, { max_tokens: 600, temperature: 0.9 });
+    const reply = await llmChat(env, msgs, { max_tokens: 600, temperature: 0.9 });
 
     for (const [role, content] of [['user', message], ['assistant', reply]] as const) {
       await sbFetch(env, 'clipbot_history', {
@@ -1217,7 +1254,10 @@ app.get('/trends/_diag', async (c) => {
       REDDIT_USER_AGENT: !!env.REDDIT_USER_AGENT,
       SERPAPI_KEY: !!env.SERPAPI_KEY,
       GROQ_API_KEY: !!env.GROQ_API_KEY,
+      MISTRAL_API_KEY: !!env.MISTRAL_API_KEY,
+      LLM_MODEL: env.LLM_MODEL || null,
     },
+    llm_provider: env.MISTRAL_API_KEY ? 'mistral' : (env.GROQ_API_KEY ? 'groq' : 'none'),
     layers: {},
   };
 
@@ -1423,7 +1463,7 @@ Rules:
 - Prefer rising trends over peaked ones (>=60% should be 'rising').`;
 
   try {
-    const data: any = await groqJson(env, prompt, system);
+    const data: any = await llmJson(env, prompt, system);
     data.updatedAt = new Date().toISOString();
     data.sources = data.sources || {
       youtube: ytResults.length,
@@ -1470,7 +1510,7 @@ Return JSON:
   "recommendation": "<2-3 sentences on how to compete with or beat them>"
 }`;
   try {
-    return json(await groqJson(env, prompt, system));
+    return json(await llmJson(env, prompt, system));
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
@@ -1495,7 +1535,7 @@ Return JSON:
   "insight": "<2-3 sentence actionable insight specific to Nigerian ${game} creators>"
 }`;
   try {
-    return json(await groqJson(env, prompt, system));
+    return json(await llmJson(env, prompt, system));
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
@@ -1529,7 +1569,7 @@ Return JSON:
 
 The winner must have a higher score. Scores must differ by at least 5.`;
   try {
-    return json(await groqJson(env, prompt, system));
+    return json(await llmJson(env, prompt, system));
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
