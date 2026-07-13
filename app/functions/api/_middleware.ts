@@ -43,9 +43,10 @@ interface Env {
   SUPABASE_SERVICE_KEY: string;
   SUPABASE_JWT_SECRET: string;
   // AI
+  SILICONFLOW_API_KEY: string;
   GROQ_API_KEY: string;
   MISTRAL_API_KEY: string;
-  LLM_MODEL: string;        // optional override (e.g. 'mistral-small-latest', 'llama-3.3-70b-versatile')
+  LLM_MODEL: string;        // optional override — see pickLlm() for defaults per provider
   GEMINI_API_KEY: string;
   // Trends
   YOUTUBE_API_KEY: string;
@@ -287,21 +288,42 @@ function requirePlan(...plans: string[]) {
   };
 }
 
-// ─── LLM helpers (Mistral primary, Groq fallback) ───────────────────────────
-// Both Mistral and Groq expose OpenAI-compatible /v1/chat/completions endpoints,
-// so we route to whichever key is configured. Set MISTRAL_API_KEY to use Mistral,
-// or GROQ_API_KEY to use Groq. If both are set, Mistral wins. Override the model
-// with LLM_MODEL; otherwise we pick a sensible default per provider.
+// ─── LLM helpers (SiliconFlow primary, Mistral fallback, Groq last) ────────
+// All three providers expose OpenAI-compatible /v1/chat/completions endpoints,
+// so we route to whichever key is configured. Provider priority:
+//   1. SILICONFLOW_API_KEY → SiliconFlow (China-friendly egress, reasoning models)
+//   2. MISTRAL_API_KEY     → Mistral (OpenAI-compatible, cheap, fast)
+//   3. GROQ_API_KEY        → Groq (free tier, llama 70b)
 //
-// Default models (chosen for speed + cost on trend synthesis / forge tasks):
-//   Mistral → 'mistral-small-latest'  (~$0.20/1M in, ~$0.60/1M out, 32k ctx)
-//   Groq    → 'llama-3.3-70b-versatile' (free tier, fast inference)
+// SiliconFlow notes:
+//   - Most models on SiliconFlow (Qwen3, GLM-5, DeepSeek-V4, Kimi-K2) are
+//     reasoning models: they emit `reasoning_content` BEFORE the final answer
+//     in `content`. Reasoning tokens count against `max_tokens`, so we use a
+//     larger default (6000) to leave headroom.
+//   - International endpoint is api.siliconflow.com (NOT .cn).
 //
-// Other good options you can set via LLM_MODEL:
-//   'open-mistral-nemo'      — 128k context, open weights, great for long inputs
-//   'mistral-large-latest'   — flagship, ~$2/1M in (use for highest-quality forge)
-//   'llama-3.1-8b-instant'   — Groq's fastest model, lower quality
-function pickLlm(env: Env): { provider: 'mistral' | 'groq'; url: string; key: string; model: string } {
+// Default models (chosen for trend synthesis / forge quality + speed):
+//   SiliconFlow → 'Qwen/Qwen3-32B'        (32B params, good JSON, balanced)
+//   Mistral     → 'mistral-small-latest'   (~$0.20/1M in, ~$0.60/1M out)
+//   Groq        → 'llama-3.3-70b-versatile' (free tier)
+//
+// Override any default with LLM_MODEL env var. Good SiliconFlow alternatives:
+//   'deepseek-ai/DeepSeek-V4-Pro'   — flagship reasoning, highest quality
+//   'deepseek-ai/DeepSeek-V4-Flash' — faster/cheaper reasoning
+//   'zai-org/GLM-5.2'               — Z.ai flagship, 128k context
+//   'moonshotai/Kimi-K2.7'          — strong at long-context synthesis
+//   'MiniMaxAI/MiniMax-M3'          — multimodal-capable, fast
+type LlmProvider = 'siliconflow' | 'mistral' | 'groq';
+
+function pickLlm(env: Env): { provider: LlmProvider; url: string; key: string; model: string } {
+  if (env.SILICONFLOW_API_KEY) {
+    return {
+      provider: 'siliconflow',
+      url: 'https://api.siliconflow.com/v1/chat/completions',
+      key: env.SILICONFLOW_API_KEY,
+      model: env.LLM_MODEL || 'Qwen/Qwen3-32B',
+    };
+  }
   if (env.MISTRAL_API_KEY) {
     return {
       provider: 'mistral',
@@ -318,30 +340,85 @@ function pickLlm(env: Env): { provider: 'mistral' | 'groq'; url: string; key: st
       model: env.LLM_MODEL || 'llama-3.3-70b-versatile',
     };
   }
-  throw new Error('No LLM provider configured. Set MISTRAL_API_KEY or GROQ_API_KEY in Cloudflare env vars.');
+  throw new Error('No LLM provider configured. Set SILICONFLOW_API_KEY, MISTRAL_API_KEY, or GROQ_API_KEY in Cloudflare env vars.');
+}
+
+// Returns ALL configured providers in priority order — used for automatic
+// fallback if the primary returns 5xx / 402 / 429 (transient or quota errors).
+function allLlmProviders(env: Env): { provider: LlmProvider; url: string; key: string; model: string }[] {
+  const out: { provider: LlmProvider; url: string; key: string; model: string }[] = [];
+  if (env.SILICONFLOW_API_KEY) out.push({ provider: 'siliconflow', url: 'https://api.siliconflow.com/v1/chat/completions', key: env.SILICONFLOW_API_KEY, model: env.LLM_MODEL || 'Qwen/Qwen3-32B' });
+  if (env.MISTRAL_API_KEY)     out.push({ provider: 'mistral',     url: 'https://api.mistral.ai/v1/chat/completions',     key: env.MISTRAL_API_KEY,     model: env.LLM_MODEL || 'mistral-small-latest' });
+  if (env.GROQ_API_KEY)        out.push({ provider: 'groq',        url: 'https://api.groq.com/openai/v1/chat/completions',  key: env.GROQ_API_KEY,        model: env.LLM_MODEL || 'llama-3.3-70b-versatile' });
+  return out;
 }
 
 async function llmChat(env: Env, messages: any[], opts: { max_tokens?: number; temperature?: number } = {}): Promise<string> {
-  const { provider, url, key, model } = pickLlm(env);
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: opts.max_tokens ?? 800,
-      temperature: opts.temperature ?? 0.85,
-    }),
-  });
-  if (!r.ok) throw new Error(`${provider} API ${r.status}: ${await r.text()}`);
-  const data = (await r.json()) as any;
-  return data.choices?.[0]?.message?.content?.trim() ?? '';
+  const providers = allLlmProviders(env);
+  if (providers.length === 0) {
+    throw new Error('No LLM provider configured. Set SILICONFLOW_API_KEY, MISTRAL_API_KEY, or GROQ_API_KEY in Cloudflare env vars.');
+  }
+  // Try each provider in priority order. Fail over on:
+  //   - 5xx (server errors, "system busy")
+  //   - 402 / 30001 (SiliconFlow balance-insufficient)
+  //   - 429 (rate limit)
+  // Do NOT fail over on 4xx client errors (400 bad request, 401 auth) — those
+  // would fail on every provider, so just throw the first one.
+  let lastErr: Error | null = null;
+  for (const { provider, url, key, model } of providers) {
+    const defaultMax = provider === 'siliconflow' ? 6000 : 800;
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          max_tokens: opts.max_tokens ?? defaultMax,
+          temperature: opts.temperature ?? 0.85,
+        }),
+      });
+      // Failover-worthy status codes
+      if (r.status >= 500 || r.status === 429 || r.status === 402) {
+        const body = await r.text();
+        lastErr = new Error(`${provider} API ${r.status}: ${body}`);
+        console.warn(`[llmChat] ${provider} failed (${r.status}), trying next provider…`);
+        continue;
+      }
+      // SiliconFlow sometimes returns 200 with a balance error in the body — handle that
+      if (!r.ok) {
+        const body = await r.text();
+        // Check for SiliconFlow balance-insufficient body even on 200
+        if (body.includes('balance is insufficient') || body.includes('"code":30001')) {
+          lastErr = new Error(`${provider} balance insufficient`);
+          console.warn(`[llmChat] ${provider} balance insufficient, trying next provider…`);
+          continue;
+        }
+        throw new Error(`${provider} API ${r.status}: ${body}`);
+      }
+      const data = (await r.json()) as any;
+      const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+      // Even on 200, SiliconFlow sometimes embeds the balance error in the response
+      if (data.code === 30001 || (typeof data.message === 'string' && data.message.includes('balance is insufficient'))) {
+        lastErr = new Error(`${provider} balance insufficient`);
+        console.warn(`[llmChat] ${provider} balance insufficient (in 200 body), trying next provider…`);
+        continue;
+      }
+      return content;
+    } catch (e: any) {
+      // Network error — try next provider
+      lastErr = e;
+      console.warn(`[llmChat] ${provider} threw: ${e.message}, trying next provider…`);
+      continue;
+    }
+  }
+  throw lastErr ?? new Error('All LLM providers failed');
 }
 
-async function llmJson<T = any>(env: Env, prompt: string, system = '', maxTokens = 1200): Promise<T> {
+async function llmJson<T = any>(env: Env, prompt: string, system = '', maxTokens = 6000): Promise<T> {
   const msgs: any[] = [];
   if (system) msgs.push({ role: 'system', content: system });
   msgs.push({ role: 'user', content: prompt });
@@ -382,10 +459,10 @@ async function hmacSha512(secret: string, body: ArrayBuffer): Promise<string> {
 app.get('/health', (c) => json({
   status: 'ok',
   service: 'clipai-worker',
-  version: '4.4-cf',
+  version: '4.5-cf',
   runtime: 'cloudflare-pages',
   supabase: !!c.env.SUPABASE_URL,
-  llm: c.env.MISTRAL_API_KEY ? 'mistral' : (c.env.GROQ_API_KEY ? 'groq' : 'none'),
+  llm: c.env.SILICONFLOW_API_KEY ? 'siliconflow' : (c.env.MISTRAL_API_KEY ? 'mistral' : (c.env.GROQ_API_KEY ? 'groq' : 'none')),
 }));
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
@@ -1269,9 +1346,10 @@ app.get('/trends/_diag', async (c) => {
       SERPAPI_KEY: !!env.SERPAPI_KEY,
       GROQ_API_KEY: !!env.GROQ_API_KEY,
       MISTRAL_API_KEY: !!env.MISTRAL_API_KEY,
+      SILICONFLOW_API_KEY: !!env.SILICONFLOW_API_KEY,
       LLM_MODEL: env.LLM_MODEL || null,
     },
-    llm_provider: env.MISTRAL_API_KEY ? 'mistral' : (env.GROQ_API_KEY ? 'groq' : 'none'),
+    llm_provider: env.SILICONFLOW_API_KEY ? 'siliconflow' : (env.MISTRAL_API_KEY ? 'mistral' : (env.GROQ_API_KEY ? 'groq' : 'none')),
     layers: {},
   };
 
@@ -1477,7 +1555,7 @@ Rules:
 - Prefer rising trends over peaked ones (>=60% should be 'rising').`;
 
   try {
-    const data: any = await llmJson(env, prompt, system, 4000);
+    const data: any = await llmJson(env, prompt, system, 8000);
     data.updatedAt = new Date().toISOString();
     data.sources = data.sources || {
       youtube: ytResults.length,
