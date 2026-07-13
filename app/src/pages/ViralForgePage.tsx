@@ -35,7 +35,7 @@ const GAMES = ['Call of Duty', 'Bloodstrike', 'PUBG', 'Mobile Legends', 'Free Fi
 const VIBES = ['Hype 🔥', 'Funny 😂', 'Savage 💀', 'Mysterious 👀', 'Wholesome 🥹'];
 const PLATFORMS = ['TikTok', 'YouTube Shorts', 'Instagram Reels'];
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '';
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 async function callForge(endpoint: string, body: object) {
   const res = await fetch(`${API_BASE}${endpoint}`, {

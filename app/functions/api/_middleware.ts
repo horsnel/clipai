@@ -1,0 +1,1212 @@
+/**
+ * ClipAI Worker — Cloudflare Pages Function (Phase 1 port from Python/Flask)
+ * ============================================================================
+ * Mounted at /api/* on the same Cloudflare Pages domain. Video editor endpoints
+ * (/upload, /analyse, /render, /captions) are SKIPPED — the editor is locked
+ * behind a waitlist until December 2026.
+ *
+ * Endpoints (all under /api/):
+ *   GET  /health
+ *   GET  /auth/me                  (require_auth + daily streak logic)
+ *   POST /waitlist/join
+ *   GET  /clips                    (require_auth)
+ *   GET  /leaderboard              (require_auth)
+ *   GET  /rank/me                  (require_auth)
+ *   GET  /referrals/stats          (require_auth)
+ *   POST /referrals/apply          (require_auth)
+ *   POST /payment/init             (require_auth)
+ *   POST /payment/webhook          (HMAC-SHA512 verify)
+ *   GET  /payment/verify           (require_auth)
+ *   PATCH /settings/profile        (require_auth)
+ *   PATCH /settings/notifications  (require_auth)
+ *   POST /forge/vote               (require_auth)
+ *   GET  /forge/top-captions
+ *   POST /forge/titles             (require_auth)
+ *   POST /forge/captions           (require_auth)
+ *   POST /forge/hashtags           (require_auth)
+ *   POST /forge/hooks              (require_auth)
+ *   POST /clipbot                  (require_auth)
+ *   GET  /clipbot/history          (require_auth)
+ *   GET  /trends                   (5-platform multi-source)
+ *   POST /intel/spy                (require_auth + plan=pro|creator)
+ *   POST /intel/timing             (require_auth)
+ *   POST /intel/abtitle            (require_auth)
+ */
+import { Hono } from 'hono';
+import { jwtVerify, decodeJwt } from 'jose';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface Env {
+  // Supabase
+  SUPABASE_URL: string;
+  SUPABASE_ANON_KEY: string;
+  SUPABASE_SERVICE_KEY: string;
+  SUPABASE_JWT_SECRET: string;
+  // AI
+  GROQ_API_KEY: string;
+  GEMINI_API_KEY: string;
+  // Trends
+  YOUTUBE_API_KEY: string;
+  REDDIT_USER_AGENT: string;
+  SERPAPI_KEY: string;
+  // Paystack
+  PAYSTACK_SECRET_KEY: string;
+  // Worker
+  WORKER_SECRET: string;
+}
+
+type Profile = {
+  id: string;
+  email: string;
+  full_name?: string;
+  plan: 'free' | 'starter' | 'pro' | 'creator';
+  credits: number;
+  clips_used: number;
+  referral_code: string;
+  xp: number;
+  streak_days: number;
+  last_active_date?: string;
+  avatar_url?: string;
+  notification_prefs?: Record<string, boolean>;
+};
+
+type Ctx = { Bindings: Env; Variables: { userId: string; profile: Profile } };
+
+const app = new Hono<Ctx>().basePath('/api');
+
+// ─── Config (mirrors config.py) ──────────────────────────────────────────────
+const PLAN_FEATURES: Record<string, { credits_monthly: number; clipbot_daily_limit: number }> = {
+  free:    { credits_monthly: 50,   clipbot_daily_limit: 10 },
+  starter: { credits_monthly: 200,  clipbot_daily_limit: 25  },
+  pro:     { credits_monthly: 1000, clipbot_daily_limit: 100 },
+  creator: { credits_monthly: 3000, clipbot_daily_limit: -1  },
+};
+
+const XP_REWARDS = {
+  signup: 100, analyse: 50, render: 20, caption: 10,
+  referral_signup: 100, referral_paid: 200,
+  daily_streak: 25, clips_voted: 5, chat_message: 1,
+} as const;
+
+const PLAN_AMOUNT_KOBO: Record<string, number> = {
+  starter: 1000 * 100,
+  pro: 2500 * 100,
+  creator: 6000 * 100,
+};
+
+const RANK_TIERS = [
+  { name: 'Rookie',         min_xp: 0,     color: '#9CA3AF' },
+  { name: 'Clipper',        min_xp: 500,   color: '#3B82F6' },
+  { name: 'Highlight Reel', min_xp: 2000,  color: '#8B5CF6' },
+  { name: 'Legend',         min_xp: 5000,  color: '#F59E0B' },
+  { name: 'GOD TIER',       min_xp: 10000, color: '#EF4444' },
+];
+
+const GAME_SUBREDDITS: Record<string, string[]> = {
+  valorant: ['valorant', 'valorantclips', 'valorantcompetitive'],
+  apex: ['apexlegends', 'apexclips'],
+  'apex legends': ['apexlegends', 'apexclips'],
+  fortnite: ['fortnitebr', 'fortniteclips'],
+  minecraft: ['minecraft', 'minecraftbuilds'],
+  roblox: ['roblox', 'robloxgamedev'],
+  'call of duty': ['modernwarfare', 'callofduty', 'warzone'],
+  warzone: ['warzone', 'modernwarfare'],
+  all: ['gaming', 'gamingsclips'],
+};
+
+const CLIPBOT_SYSTEM = `You are ClipBot, an expert AI gaming content coach built into ClipAI.
+You help gaming content creators — especially Nigerian and African teenagers — grow their channels,
+go viral, and create better content.
+
+You know everything about:
+- TikTok, YouTube Shorts, Instagram Reels algorithms
+- What makes gaming clips go viral in Nigeria/Africa
+- Titles, captions, hashtags, hooks that actually work
+- Growth strategies for small channels
+- Free Fire, Bloodstrike, PUBG, COD, Mobile Legends content trends
+- Best posting times for Nigerian audiences (WAT timezone)
+
+Tone: Friendly, hype, knowledgeable. Like a big brother who's a successful gaming creator.
+Be direct. Use bullet points. Keep responses under 200 words unless a detailed plan is needed.
+Don't be corporate. Say "bro" occasionally. Use gaming slang naturally.`;
+
+// ─── Helpers: JSON responses ─────────────────────────────────────────────────
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+// ─── CORS ────────────────────────────────────────────────────────────────────
+app.use('*', async (c, next) => {
+  const origin = c.req.header('Origin') || '*';
+  c.header('Access-Control-Allow-Origin', origin);
+  c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Paystack-Signature');
+  if (c.req.method === 'OPTIONS') return new Response(null, { status: 204 });
+  await next();
+});
+
+// ─── Supabase REST helpers ───────────────────────────────────────────────────
+async function sbFetch<T = any>(
+  env: Env,
+  path: string,
+  init: RequestInit = {},
+): Promise<T | null> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) return null;
+  const url = `${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${path}`;
+  const headers: Record<string, string> = {
+    apikey: env.SUPABASE_SERVICE_KEY,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+    'Content-Type': 'application/json',
+    ...((init.headers as Record<string, string>) || {}),
+  };
+  try {
+    const r = await fetch(url, { ...init, headers });
+    if (!r.ok) {
+      console.warn(`Supabase ${init.method || 'GET'} ${path} → ${r.status}: ${await r.text()}`);
+      return null;
+    }
+    if (r.status === 204) return null;
+    const ct = r.headers.get('content-type') || '';
+    if (ct.includes('application/json')) return (await r.json()) as T;
+    return null;
+  } catch (e) {
+    console.warn('Supabase fetch error:', e);
+    return null;
+  }
+}
+
+async function sbHead(env: Env, path: string): Promise<number> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) return 0;
+  const url = `${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/${path}`;
+  try {
+    const r = await fetch(url, {
+      method: 'HEAD',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+        Prefer: 'count=exact',
+      },
+    });
+    const cr = r.headers.get('content-range') || '*/0';
+    const n = cr.split('/').pop();
+    return n ? parseInt(n, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function fetchProfile(env: Env, userId: string): Promise<Profile | null> {
+  const rows = await sbFetch<Profile[]>(env, `profiles?id=eq.${userId}&select=*`);
+  return rows && rows.length > 0 ? rows[0] : null;
+}
+
+async function updateProfile(env: Env, userId: string, fields: Record<string, unknown>): Promise<boolean> {
+  const r = await sbFetch(env, `profiles?id=eq.${userId}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify(fields),
+  });
+  return r !== null || true; // sbFetch returns null both on success-no-content and on failure
+}
+
+async function awardCredits(env: Env, userId: string, delta: number, reason: string, referenceId?: string): Promise<boolean> {
+  const p = await fetchProfile(env, userId);
+  if (!p) return false;
+  const newBalance = Math.max(0, (p.credits || 0) + delta);
+  await updateProfile(env, userId, { credits: newBalance });
+  await sbFetch(env, 'credit_transactions', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ user_id: userId, delta, reason, reference_id: referenceId ?? null }),
+  });
+  return true;
+}
+
+async function awardXp(env: Env, userId: string, action: string, xpDelta: number, referenceId?: string): Promise<boolean> {
+  const p = await fetchProfile(env, userId);
+  if (!p) return false;
+  const newXp = (p.xp || 0) + xpDelta;
+  await updateProfile(env, userId, { xp: newXp });
+  await sbFetch(env, 'xp_events', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ user_id: userId, action, xp_delta: xpDelta, reference_id: referenceId ?? null }),
+  });
+  return true;
+}
+
+// ─── Auth middleware ─────────────────────────────────────────────────────────
+async function requireAuth(c: any, next: any) {
+  const authHeader = c.req.header('Authorization') || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return json({ error: 'Missing or malformed Authorization header' }, 401);
+  }
+  const token = authHeader.slice(7).trim();
+  try {
+    const secret = new TextEncoder().encode(c.env.SUPABASE_JWT_SECRET);
+    const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'], audience: 'authenticated' });
+    const userId = payload.sub as string;
+    if (!userId) return json({ error: 'Invalid token: missing sub' }, 401);
+    const profile = await fetchProfile(c.env, userId);
+    if (!profile) return json({ error: 'Profile not found' }, 404);
+    c.set('userId', userId);
+    c.set('profile', profile);
+    await next();
+  } catch (e: any) {
+    // Fallback: decode without verification (older tokens) — but only trust if profile exists
+    try {
+      const decoded = decodeJwt(token);
+      const userId = decoded.sub as string;
+      if (!userId) throw e;
+      const profile = await fetchProfile(c.env, userId);
+      if (!profile) return json({ error: 'Profile not found' }, 404);
+      c.set('userId', userId);
+      c.set('profile', profile);
+      await next();
+    } catch {
+      return json({ error: 'Invalid or expired token', detail: e?.message }, 401);
+    }
+  }
+}
+
+function requirePlan(...plans: string[]) {
+  return async (c: any, next: any) => {
+    const profile = c.get('profile') as Profile;
+    if (!plans.includes(profile.plan || 'free')) {
+      return json({
+        error: 'Plan upgrade required',
+        required_plan: plans[0],
+        current_plan: profile.plan || 'free',
+      }, 402);
+    }
+    await next();
+  };
+}
+
+// ─── Groq helpers ────────────────────────────────────────────────────────────
+async function groqChat(env: Env, messages: any[], opts: { max_tokens?: number; temperature?: number } = {}): Promise<string> {
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages,
+      max_tokens: opts.max_tokens ?? 800,
+      temperature: opts.temperature ?? 0.85,
+    }),
+  });
+  if (!r.ok) throw new Error(`Groq API ${r.status}: ${await r.text()}`);
+  const data = (await r.json()) as any;
+  return data.choices?.[0]?.message?.content?.trim() ?? '';
+}
+
+async function groqJson<T = any>(env: Env, prompt: string, system = '', maxTokens = 1200): Promise<T> {
+  const msgs: any[] = [];
+  if (system) msgs.push({ role: 'system', content: system });
+  msgs.push({ role: 'user', content: prompt });
+  let raw = await groqChat(env, msgs, { max_tokens: maxTokens });
+  for (const fence of ['```json', '```']) raw = raw.replace(fence, '');
+  return JSON.parse(raw.trim()) as T;
+}
+
+// ─── Paystack webhook HMAC ───────────────────────────────────────────────────
+async function hmacSha512(secret: string, body: ArrayBuffer): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-512' }, false, ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, body);
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ROUTES
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── Health ──────────────────────────────────────────────────────────────────
+app.get('/health', (c) => json({
+  status: 'ok',
+  service: 'clipai-worker',
+  version: '4.3-cf',
+  runtime: 'cloudflare-pages',
+  supabase: !!c.env.SUPABASE_URL,
+}));
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+app.get('/auth/me', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const profile = c.get('profile') as Profile;
+  const userId = c.get('userId') as string;
+
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const lastActiveStr = profile.last_active_date ? String(profile.last_active_date).slice(0, 10) : null;
+  let streakBumped = false;
+  let streakCredits = 0;
+
+  if (lastActiveStr !== todayStr) {
+    const yesterday = new Date(today.getTime() - 86400000).toISOString().slice(0, 10);
+    const newStreak = lastActiveStr === yesterday ? (profile.streak_days || 0) + 1 : 1;
+    await updateProfile(env, userId, { streak_days: newStreak, last_active_date: todayStr });
+    await awardCredits(env, userId, 5, 'daily_streak');
+    await awardXp(env, userId, 'daily_streak', XP_REWARDS.daily_streak);
+    streakBumped = true;
+    streakCredits = 5;
+    const fresh = await fetchProfile(env, userId);
+    if (fresh) Object.assign(profile, fresh);
+    profile.streak_days = newStreak;
+  }
+
+  return json({
+    id: profile.id,
+    email: profile.email || '',
+    name: profile.full_name || 'Gamer',
+    plan: profile.plan || 'free',
+    credits: profile.credits || 0,
+    clipsUsed: profile.clips_used || 0,
+    referralCode: profile.referral_code || '',
+    xp: profile.xp || 0,
+    streakDays: profile.streak_days || 0,
+    avatarUrl: profile.avatar_url,
+    streakBumped,
+    streakCreditsAwarded: streakCredits,
+  });
+});
+
+// ─── Waitlist ────────────────────────────────────────────────────────────────
+app.post('/waitlist/join', async (c) => {
+  const env = c.env as Env;
+  const body = await c.req.json().catch(() => ({}));
+  const email = (body.email || '').toString().trim().toLowerCase();
+  if (!email || !email.includes('@')) return json({ error: 'Valid email required' }, 400);
+
+  const gameInterest = (body.game_interest || '').toString().trim().toLowerCase() || null;
+  const source = (body.source || 'upload_page').toString();
+
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
+    return json({
+      success: true, position: 1, creditsAwarded: 0,
+      message: "You're on the list! We'll email you when the editor launches.",
+    });
+  }
+
+  const existing = await sbFetch<any[]>(env, `waitlist?email=eq.${encodeURIComponent(email)}&select=id,credits_awarded`);
+  if (existing && existing.length > 0) {
+    const position = (await sbHead(env, 'waitlist?select=id')) || 1;
+    return json({
+      success: true, position, creditsAwarded: 0,
+      message: "You're already on the waitlist!",
+    });
+  }
+
+  const profileRows = await sbFetch<any[]>(env, `profiles?email=eq.${encodeURIComponent(email)}&select=id,credits`);
+  let userId: string | null = null;
+  if (profileRows && profileRows.length > 0) userId = profileRows[0].id;
+
+  await sbFetch(env, 'waitlist', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      email, user_id: userId, game_interest: gameInterest, source, credits_awarded: false,
+    }),
+  });
+
+  let creditsAwarded = 0;
+  if (userId) {
+    if (await awardCredits(env, userId, 25, 'waitlist_bonus')) {
+      await sbFetch(env, `waitlist?email=eq.${encodeURIComponent(email)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ credits_awarded: true }),
+      });
+      creditsAwarded = 25;
+    }
+  }
+
+  const position = (await sbHead(env, 'waitlist?select=id')) || 1;
+  return json({
+    success: true,
+    position,
+    creditsAwarded,
+    message: "Welcome to the v3 waitlist! We'll email you when the editor launches.",
+  });
+});
+
+// ─── Clips ───────────────────────────────────────────────────────────────────
+app.get('/clips', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const rows = await sbFetch<any[]>(env, `clips?user_id=eq.${userId}&order=created_at.desc&limit=20`);
+  return json({ clips: rows || [] });
+});
+
+// ─── Leaderboard ─────────────────────────────────────────────────────────────
+app.get('/leaderboard', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const type = c.req.query('type') === 'weekly' ? 'weekly' : 'alltime';
+  const view = type === 'alltime' ? 'leaderboard_alltime' : 'leaderboard_weekly';
+  const rows = await sbFetch<any[]>(env, `${view}?order=rank.asc&limit=100`);
+  if (!rows) return json({ players: [], currentUser: null });
+  let me = rows.find((r) => r.id === userId) || null;
+  if (!me) {
+    const myRow = await sbFetch<any[]>(env, `${view}?id=eq.${userId}`);
+    me = myRow && myRow.length > 0 ? myRow[0] : { rank: 999, id: userId, xp: 0 };
+  }
+  return json({ players: rows, currentUser: me });
+});
+
+// ─── Rank ────────────────────────────────────────────────────────────────────
+app.get('/rank/me', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const profile = c.get('profile') as Profile;
+  const xp = profile.xp || 0;
+  const tier = RANK_TIERS.reduce((acc, t) => (xp >= t.min_xp ? t : acc), RANK_TIERS[0]);
+  const nextTier = RANK_TIERS.find((t) => t.min_xp > xp) || null;
+
+  const rank = (await sbHead(env, `profiles?xp=gt.${xp}&select=id`)) + 1;
+
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const weekRows = await sbFetch<any[]>(env, `xp_events?user_id=eq.${userId}&created_at=gt.${weekAgo}&select=xp_delta`);
+  const weeklyXp = (weekRows || []).reduce((s, r) => s + (r.xp_delta || 0), 0);
+
+  return json({
+    xp, weeklyXp, tier, nextTier,
+    globalRank: rank,
+    streakDays: profile.streak_days || 0,
+    clipsAnalysed: profile.clips_used || 0,
+  });
+});
+
+// ─── Referrals ───────────────────────────────────────────────────────────────
+app.get('/referrals/stats', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const rows = await sbFetch<any[]>(env, `referrals?referrer_id=eq.${userId}&select=referred_id,credits_awarded_referrer,created_at`);
+  if (!rows) return json({ total: 0, creditsEarned: 0, referred: [] });
+  return json({
+    total: rows.length,
+    creditsEarned: rows.reduce((s, r) => s + (r.credits_awarded_referrer || 0), 0),
+    referred: rows.slice(0, 5),
+  });
+});
+
+app.post('/referrals/apply', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const body = await c.req.json().catch(() => ({}));
+  const code = (body.code || '').toString().toUpperCase().trim();
+  if (!code) return json({ valid: false, error: 'No code provided' }, 400);
+  const rows = await sbFetch<any[]>(env, `profiles?referral_code=eq.${encodeURIComponent(code)}&select=id,full_name`);
+  if (!rows || rows.length === 0) return json({ valid: false, error: 'Code not found' });
+  const owner = rows[0];
+  if (owner.id === userId) return json({ valid: false, error: 'Cannot use your own code' });
+  return json({ valid: true, ownerName: owner.full_name || 'Gamer', discountPercent: 10 });
+});
+
+// ─── Paystack ────────────────────────────────────────────────────────────────
+app.post('/payment/init', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const profile = c.get('profile') as Profile;
+  const body = await c.req.json().catch(() => ({}));
+  const plan = (body.plan || 'pro').toString().toLowerCase();
+  if (!PLAN_AMOUNT_KOBO[plan]) return json({ error: `Invalid plan: ${plan}` }, 400);
+  const interval = body.interval === 'annual' ? 'annual' : 'monthly';
+  let amount = PLAN_AMOUNT_KOBO[plan];
+  if (interval === 'annual') amount = Math.floor(amount * 12 * 0.8);
+  const callbackUrl = body.callbackUrl || 'https://clipai-bqo.pages.dev/?payment=success';
+
+  const payload = {
+    email: profile.email,
+    amount,
+    currency: 'NGN',
+    callback_url: callbackUrl,
+    metadata: {
+      user_id: c.get('userId'),
+      plan_code: plan,
+      interval,
+      referral_code: body.referralCode || '',
+    },
+  };
+
+  try {
+    const r = await fetch('https://api.paystack.co/transaction/initialize', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = (await r.json()) as any;
+    if (!r.ok) throw new Error(data.message || `Paystack ${r.status}`);
+    return json({
+      authorization_url: data.data.authorization_url,
+      reference: data.data.reference,
+      amount_kobo: amount,
+      plan,
+    });
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+app.post('/payment/webhook', async (c) => {
+  const env = c.env as Env;
+  const secret = env.PAYSTACK_SECRET_KEY || '';
+  const sig = c.req.header('X-Paystack-Signature') || '';
+  const rawBody = await c.req.text();
+  const expected = await hmacSha512(secret, new TextEncoder().encode(rawBody).buffer as ArrayBuffer);
+  if (sig !== expected) return json({ error: 'Invalid signature' }, 401);
+
+  const event = JSON.parse(rawBody) as any;
+  console.log(`Paystack event: ${event.event}`);
+
+  if (event.event === 'charge.success') {
+    const data = event.data || {};
+    const reference = data.reference || '';
+    const metadata = data.metadata || {};
+    const planCode = metadata.plan_code || '';
+    const planName = PLAN_AMOUNT_KOBO[planCode] ? planCode : 'pro';
+    const userId = metadata.user_id || '';
+    const amount = data.amount || 0;
+
+    if (userId && env.SUPABASE_URL) {
+      const monthlyCredits = (PLAN_FEATURES[planName] || PLAN_FEATURES.free).credits_monthly;
+      await updateProfile(env, userId, { plan: planName, credits: monthlyCredits });
+      await awardXp(env, userId, 'referral_paid', XP_REWARDS.referral_paid);
+
+      const refCode = metadata.referral_code || '';
+      if (refCode) {
+        const referrerRows = await sbFetch<any[]>(env, `profiles?referral_code=eq.${encodeURIComponent(refCode.toUpperCase())}&select=id`);
+        if (referrerRows && referrerRows.length > 0) {
+          const referrerId = referrerRows[0].id;
+          await sbFetch(env, `referrals?referred_id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: { Prefer: 'return=minimal' },
+            body: JSON.stringify({ paid: true }),
+          });
+          await awardXp(env, referrerId, 'referral_paid', XP_REWARDS.referral_paid, userId);
+          await awardCredits(env, referrerId, 50, 'referral_paid_bonus', userId);
+        }
+      }
+
+      await sbFetch(env, 'subscriptions', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({
+          user_id: userId, plan: planName, paystack_ref: reference,
+          status: 'success', amount_kobo: amount, interval: metadata.interval || 'monthly',
+        }),
+      });
+    }
+  }
+  return json({ status: 'ok' });
+});
+
+app.get('/payment/verify', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const reference = c.req.query('reference') || '';
+  if (!reference) return json({ success: false, error: 'No reference' }, 400);
+  try {
+    const r = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      headers: { Authorization: `Bearer ${env.PAYSTACK_SECRET_KEY}` },
+    });
+    const data = (await r.json()) as any;
+    if (!data.status || data.data?.status !== 'success') {
+      return json({ success: false, error: 'Payment not verified' });
+    }
+    const metadata = data.data.metadata || {};
+    const planCode = metadata.plan_code || '';
+    const planName = PLAN_AMOUNT_KOBO[planCode] ? planCode : 'pro';
+    return json({ success: true, plan: planName, reference });
+  } catch (e: any) {
+    return json({ success: false, error: e.message }, 500);
+  }
+});
+
+// ─── Settings ────────────────────────────────────────────────────────────────
+app.patch('/settings/profile', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const body = await c.req.json().catch(() => ({}));
+  const fields: Record<string, unknown> = {};
+  if (typeof body.full_name === 'string') fields.full_name = body.full_name.slice(0, 100);
+  if (typeof body.avatar_url === 'string') fields.avatar_url = body.avatar_url.slice(0, 500);
+  if (Object.keys(fields).length === 0) return json({ error: 'No updatable fields' }, 400);
+  await updateProfile(env, userId, fields);
+  return json({ success: true });
+});
+
+app.patch('/settings/notifications', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const profile = c.get('profile') as Profile;
+  const body = await c.req.json().catch(() => ({}));
+  const prefs: Record<string, boolean> = { ...(profile.notification_prefs || {}) };
+  for (const k of ['email_updates', 'product_news', 'clip_ready', 'weekly_digest']) {
+    if (typeof body[k] === 'boolean') prefs[k] = body[k];
+  }
+  await updateProfile(env, userId, { notification_prefs: prefs });
+  return json({ success: true, prefs });
+});
+
+// ─── Forge voting ────────────────────────────────────────────────────────────
+app.post('/forge/vote', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const body = await c.req.json().catch(() => ({}));
+  const caption = (body.caption || '').toString().trim();
+  const vote = parseInt(body.vote, 10) || 0;
+  if (!caption || (vote !== 1 && vote !== -1)) return json({ error: 'Invalid vote' }, 400);
+
+  await sbFetch(env, `caption_votes?user_id=eq.${userId}&caption_text=eq.${encodeURIComponent(caption)}`, {
+    method: 'DELETE',
+    headers: { Prefer: 'return=minimal' },
+  });
+  await sbFetch(env, 'caption_votes', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      user_id: userId, caption_text: caption, vote,
+      game: body.game || null, vibe: body.vibe || null,
+    }),
+  });
+  await awardXp(env, userId, 'clips_voted', XP_REWARDS.clips_voted);
+  return json({ success: true });
+});
+
+app.get('/forge/top-captions', async (c) => {
+  const env = c.env as Env;
+  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+  const rows = await sbFetch<any[]>(env, `caption_votes?created_at=gt.${weekAgo}&select=caption_text,vote,game,vibe&order=created_at.desc&limit=50`);
+  if (!rows) return json({ captions: [] });
+  const agg: Record<string, any> = {};
+  for (const r of rows) {
+    const t = r.caption_text;
+    if (!agg[t]) agg[t] = { caption: t, score: 0, game: r.game, vibe: r.vibe };
+    agg[t].score += r.vote;
+  }
+  const top = Object.values(agg).sort((a: any, b: any) => b.score - a.score).slice(0, 10);
+  return json({ captions: top });
+});
+
+// ─── Forge tools (Groq) ──────────────────────────────────────────────────────
+app.post('/forge/titles', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const body = await c.req.json().catch(() => ({}));
+  const desc = body.description || '';
+  const game = body.game || 'Gaming';
+  const platform = body.platform || 'TikTok';
+  const system = 'You are a viral gaming content strategist. Return ONLY valid JSON.';
+  const prompt = `Generate 7 viral title options for this gaming clip:
+Description: "${desc}"
+Game: ${game}
+Platform: ${platform}
+
+Return JSON:
+{
+  "titles": [
+    {
+      "id": "t1",
+      "text": "<full title with emoji>",
+      "viralScore": <65-99 integer>,
+      "searchVolume": "<e.g. 24K>",
+      "trend": "<rising|stable|declining>",
+      "votes": 0
+    }
+  ]
+}
+
+Rules:
+- Titles must be 6-14 words
+- Include 1-2 emojis per title
+- Optimise for ${platform} algorithm
+- Rank by viralScore descending
+- Make them feel authentic, not corporate`;
+  try {
+    return json(await groqJson(env, prompt, system));
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+app.post('/forge/captions', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const body = await c.req.json().catch(() => ({}));
+  const desc = body.description || '';
+  const game = body.game || 'Gaming';
+  const vibe = body.vibe || 'Hype';
+  const platform = body.platform || 'TikTok';
+  const system = 'You are a viral gaming caption writer who knows what Nigerian teens love. Return ONLY valid JSON.';
+  const prompt = `Write 6 viral captions for this gaming clip:
+Description: "${desc}"
+Game: ${game}, Vibe: ${vibe}, Platform: ${platform}
+
+Return JSON:
+{
+  "captions": [
+    {
+      "id": "c1",
+      "text": "<caption with 1-2 emojis, under 120 chars>",
+      "vibe": "${vibe}",
+      "viralScore": <70-99>,
+      "votes": 0
+    }
+  ]
+}
+
+Rules:
+- Mix conversational tone with hype
+- Include comment bait (ask viewers to react)
+- Reference Nigerian gaming culture where natural
+- No corporate language`;
+  try {
+    return json(await groqJson(env, prompt, system));
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+app.post('/forge/hashtags', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const body = await c.req.json().catch(() => ({}));
+  const desc = body.description || '';
+  const game = body.game || 'Gaming';
+  const platform = body.platform || 'TikTok';
+  const system = 'You are a hashtag strategist for gaming creators. Return ONLY valid JSON.';
+  const prompt = `Generate the perfect hashtag set for:
+Description: "${desc}", Game: ${game}, Platform: ${platform}
+
+Return JSON: {"hashtags": ["#tag1", "#tag2", ...]}
+
+Requirements:
+- 14-18 total hashtags
+- First 3: mega tags (100M+ posts) — platform general
+- Next 5: mid-tier (1M-100M posts) — gaming specific
+- Last 6-10: niche (under 1M) — game specific + Nigerian gaming
+- Include #naijagamer and #gamingafrica
+- All lowercase, no spaces`;
+  try {
+    return json(await groqJson(env, prompt, system));
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+app.post('/forge/hooks', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const body = await c.req.json().catch(() => ({}));
+  const desc = body.description || '';
+  const game = body.game || 'Gaming';
+  const system = 'You are a viral short-form video scriptwriter. Return ONLY valid JSON.';
+  const prompt = `Write 8 killer opening hook lines for this ${game} gaming clip:
+"${desc}"
+
+Return JSON: {"hooks": ["hook1", "hook2", ...]}
+
+Rules:
+- Each hook is 1-2 sentences max
+- Must stop the scroll in under 2 seconds
+- Mix formats: POV, question, statement, challenge
+- Optimised for TikTok/Reels viewer psychology
+- Reference ${game} naturally`;
+  try {
+    return json(await groqJson(env, prompt, system));
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+// ─── ClipBot ─────────────────────────────────────────────────────────────────
+app.post('/clipbot', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const profile = c.get('profile') as Profile;
+  const body = await c.req.json().catch(() => ({}));
+  const message = (body.message || '').toString();
+  const history = Array.isArray(body.history) ? body.history : [];
+  if (!message) return json({ error: 'No message' }, 400);
+
+  const plan = profile.plan || 'free';
+  const dailyLimit = (PLAN_FEATURES[plan] || PLAN_FEATURES.free).clipbot_daily_limit;
+  if (dailyLimit > 0) {
+    const cutoff = new Date().toISOString();
+    const usedToday = await sbHead(env, `clipbot_history?user_id=eq.${userId}&created_at=lt.${cutoff}&select=id`);
+    if (usedToday >= dailyLimit) {
+      return json({
+        error: 'Daily message limit reached',
+        limit: dailyLimit, used: usedToday,
+        upgrade_required: true,
+      }, 402);
+    }
+  }
+
+  try {
+    const msgs: any[] = [{ role: 'system', content: CLIPBOT_SYSTEM }];
+    for (const h of history.slice(-8)) msgs.push({ role: h.role, content: h.content });
+    msgs.push({ role: 'user', content: message });
+    const reply = await groqChat(env, msgs, { max_tokens: 600, temperature: 0.9 });
+
+    for (const [role, content] of [['user', message], ['assistant', reply]] as const) {
+      await sbFetch(env, 'clipbot_history', {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ user_id: userId, role, content }),
+      });
+    }
+    await awardXp(env, userId, 'chat_message', XP_REWARDS.chat_message);
+    return json({ reply });
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+app.get('/clipbot/history', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const rows = await sbFetch<any[]>(env, `clipbot_history?user_id=eq.${userId}&order=created_at.desc&limit=50&select=role,content,created_at`);
+  if (!rows) return json({ history: [] });
+  rows.reverse();
+  return json({ history: rows });
+});
+
+// ─── Trends (5 platforms) ────────────────────────────────────────────────────
+async function ytTrending(env: Env, game: string, max = 10): Promise<any[]> {
+  if (!env.YOUTUBE_API_KEY) return [];
+  try {
+    const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(game + ' gaming highlights')}&type=video&videoDuration=short&order=viewCount&maxResults=${max}&key=${env.YOUTUBE_API_KEY}&regionCode=NG`);
+    if (!r.ok) return [];
+    const data = (await r.json()) as any;
+    return data.items || [];
+  } catch {
+    return [];
+  }
+}
+
+async function redditTop(env: Env, game: string, limit = 8): Promise<any[]> {
+  const key = (game || 'all').toLowerCase().trim();
+  const subs = GAME_SUBREDDITS[key] || GAME_SUBREDDITS.all;
+  const out: any[] = [];
+  for (const subName of subs.slice(0, 2)) {
+    try {
+      const r = await fetch(`https://www.reddit.com/r/${subName}/top.json?t=day&limit=${limit}`, {
+        headers: { 'User-Agent': env.REDDIT_USER_AGENT || 'clipai-trend-radar/2.0' },
+      });
+      if (!r.ok) continue;
+      const data = (await r.json()) as any;
+      const children = data?.data?.children || [];
+      for (const child of children) {
+        const d = child.data;
+        if (!d || (d.score || 0) < 50) continue;
+        out.push({ title: d.title, score: d.score, url: `https://reddit.com${d.permalink}`, subreddit: subName, platform: 'reddit' });
+        if (out.length >= limit) return out;
+      }
+    } catch {}
+  }
+  return out;
+}
+
+async function googleTrends(env: Env, game: string, limit = 6): Promise<any[]> {
+  // Keyless Google Trends — replicate pytrends two-step (explore → widgetdata)
+  try {
+    const kw = (game && game.toLowerCase() !== 'all') ? `${game} gaming` : 'gaming';
+    const exploreReq = JSON.stringify({
+      comparisonItem: [{ keyword: kw, geo: '', time: 'now 7-d' }],
+      category: 833,
+      property: '',
+    });
+    const exploreUrl = `https://trends.google.com/trends/api/explore?hl=en-US&tz=60&req=${encodeURIComponent(exploreReq)}`;
+    const r1 = await fetch(exploreUrl);
+    if (!r1.ok) return [];
+    const text = await r1.text();
+    const json1 = JSON.parse(text.replace(/^\)\]\}'\s*\n/, ''));
+    const widgets = json1.widgets || [];
+    const relatedWidget = widgets.find((w: any) => w.id === 'RELATED_QUERIES');
+    if (!relatedWidget) return [];
+    const req2 = JSON.stringify({
+      restriction: {
+        geo: {}, time: 'now 7-d', originalTimeRangeForExploreUrl: 'now 7-d',
+      },
+      keyword: kw,
+      metric: ['TOP', 'RISING'],
+      language: 'en',
+    });
+    const r2 = await fetch(`https://trends.google.com/trends/api/widgetdata/related_searches?hl=en-US&tz=60&req=${encodeURIComponent(req2)}&token=${relatedWidget.token}`);
+    if (!r2.ok) return [];
+    const text2 = await r2.text();
+    const json2 = JSON.parse(text2.replace(/^\)\]\}'\s*\n/, ''));
+    const rising = (json2.default?.rankedList || []).flatMap((rl: any) => rl.rankedKeyword || []);
+    const out: any[] = [];
+    for (const r of rising.slice(0, limit)) {
+      out.push({ title: r.query || r.topic?.title || '', value: r.formattedValue || r.value || 0, platform: 'google_trends' });
+    }
+    return out;
+  } catch (e) {
+    console.warn('Google Trends failed:', e);
+    return [];
+  }
+}
+
+async function serpSearch(env: Env, query: string, num = 10, engine = 'google'): Promise<any[]> {
+  if (!env.SERPAPI_KEY) return [];
+  try {
+    const params = new URLSearchParams({ engine, q: query, num: String(num), api_key: env.SERPAPI_KEY });
+    const r = await fetch(`https://serpapi.com/search?${params}`);
+    if (!r.ok) return [];
+    const data = (await r.json()) as any;
+    if (engine === 'tiktok_search') return data.video_results || data.organic_results || [];
+    if (engine === 'twitter_search') return data.tweets || data.organic_results || [];
+    return data.organic_results || [];
+  } catch {
+    return [];
+  }
+}
+
+async function serpTiktok(env: Env, game: string, limit = 6): Promise<any[]> {
+  const q = (game && game.toLowerCase() !== 'all') ? `${game} gaming viral` : 'gaming viral 2026';
+  const raw = await serpSearch(env, q, limit, 'tiktok_search');
+  return raw.slice(0, limit).map((v: any) => ({
+    title: v.title || v.desc || '',
+    views: v.play_count || v.views || 0,
+    author: v.author || v.channel || '',
+    url: v.link || v.watch_url || '',
+    platform: 'tiktok',
+  }));
+}
+
+async function serpTwitter(env: Env, game: string, limit = 6): Promise<any[]> {
+  const q = (game && game.toLowerCase() !== 'all') ? `${game} gaming #clips` : 'gaming clips viral 2026';
+  const raw = await serpSearch(env, q, limit, 'twitter_search');
+  return raw.slice(0, limit).map((t: any) => ({
+    title: t.text || t.title || '',
+    views: t.views || t.retweet_count || 0,
+    author: typeof t.user === 'object' ? t.user?.name || '' : String(t.user || ''),
+    url: t.link || t.url || '',
+    platform: 'twitter',
+  }));
+}
+
+app.get('/trends', async (c) => {
+  const env = c.env as Env;
+  const game = (c.req.query('game') || '').trim();
+  const gameLabel = game || 'All';
+
+  const [ytResults, redditResults, trendsResults, tiktokResults, twitterResults] = await Promise.all([
+    ytTrending(env, game || 'gaming', 10),
+    redditTop(env, game, 8),
+    googleTrends(env, game, 6),
+    serpTiktok(env, game, 6),
+    serpTwitter(env, game, 6),
+  ]);
+
+  const ytTitles = ytResults.slice(0, 8).map((it: any) =>
+    `- ${it?.snippet?.title || ''} (channel: ${it?.snippet?.channelTitle || ''})`
+  ).join('\n') || 'No YouTube data available.';
+
+  const redditBlock = redditResults.slice(0, 6).map((r: any) =>
+    `- ${r.title} (r/${r.subreddit}, score: ${r.score})`
+  ).join('\n') || 'No Reddit data available.';
+
+  const gtrendsBlock = trendsResults.slice(0, 5).map((t: any) =>
+    `- ${t.title} (+${t.value}% growth)`
+  ).join('\n') || 'No Google Trends data available.';
+
+  const tiktokBlock = tiktokResults.slice(0, 5).map((t: any) =>
+    `- ${t.title} (@${t.author}, ${t.views} views)`
+  ).join('\n') || 'No TikTok data available (SerpAPI key missing or quota exhausted).';
+
+  const twitterBlock = twitterResults.slice(0, 5).map((t: any) =>
+    `- ${t.title} (@${t.author}, ${t.views} impressions)`
+  ).join('\n') || 'No Twitter data available (SerpAPI key missing or quota exhausted).';
+
+  const system = 'You are a viral gaming content trend analyst. Return ONLY valid JSON.';
+  const prompt = `Synthesize these live cross-platform signals into the TOP 12 trending items
+for gaming content creators right now. Each trend MUST tag the platform where it
+originated so the frontend can render a badge.
+
+=== YOUTUBE (trending short videos) ===
+${ytTitles}
+
+=== REDDIT (top posts of the day from gaming subs) ===
+${redditBlock}
+
+=== GOOGLE TRENDS (rising search queries, last 7 days) ===
+${gtrendsBlock}
+
+=== TIKTOK (viral clips via SerpAPI) ===
+${tiktokBlock}
+
+=== TWITTER/X (trending tweets via SerpAPI) ===
+${twitterBlock}
+
+Game focus: ${gameLabel}
+
+Return a JSON object:
+{
+  "game": "${gameLabel}",
+  "updatedAt": "<ISO timestamp>",
+  "sources": {
+    "youtube": <int count of items we received>,
+    "reddit": <int>,
+    "google_trends": <int>,
+    "tiktok": <int>,
+    "twitter": <int>
+  },
+  "trends": [
+    {
+      "id": "<unique id>",
+      "name": "<trend name/phrase>",
+      "category": "<one of: title|hashtag|sound|challenge>",
+      "game": "<game name or All>",
+      "platform": "<one of: youtube|reddit|google_trends|tiktok|twitter>",
+      "score": <0-100 integer>,
+      "change": <percentage change integer, can be negative>,
+      "status": "<rising|peaked|falling>",
+      "views": "<e.g. 1.2M>",
+      "example": "<optional short example usage>"
+    }
+  ]
+}
+
+Rules:
+- Distribute trends across platforms; do not let YouTube dominate.
+- If a platform returned no data, do not invent trends for it.
+- Make trends specific, actionable, and relevant to Nigerian/African gaming creators.
+- Prefer rising trends over peaked ones (>=60% should be 'rising').`;
+
+  try {
+    const data: any = await groqJson(env, prompt, system);
+    data.updatedAt = new Date().toISOString();
+    data.sources = data.sources || {
+      youtube: ytResults.length,
+      reddit: redditResults.length,
+      google_trends: trendsResults.length,
+      tiktok: tiktokResults.length,
+      twitter: twitterResults.length,
+    };
+    return json(data);
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+// ─── Growth Intel ────────────────────────────────────────────────────────────
+app.post('/intel/spy', requireAuth, requirePlan('pro', 'creator'), async (c) => {
+  const env = c.env as Env;
+  const body = await c.req.json().catch(() => ({}));
+  const channelUrl = body.channelUrl || '';
+  const game = body.game || '';
+  const channelName = channelUrl.includes('@')
+    ? channelUrl.split('@').pop()!.split('/')[0]
+    : 'unknown';
+
+  const serp = await serpSearch(env, `site:youtube.com ${channelName} gaming ${game} most popular videos`, 8, 'google');
+  const context = serp.slice(0, 6).map((r: any) => `- ${r.title || ''}: ${r.snippet || ''}`).join('\n');
+  const system = 'You are a YouTube channel analyst. Return ONLY valid JSON.';
+  const prompt = `Analyse this gaming creator's channel strategy:
+Channel: ${channelUrl}
+Game: ${game || 'unknown'}
+
+Search data found:
+${context || 'Limited data available — provide general analysis based on top gaming creators.'}
+
+Return JSON:
+{
+  "channelName": "<clean name>",
+  "avgViews": "<range like 45K-280K>",
+  "postingFrequency": "<e.g. 5-7 videos/week>",
+  "bestPerformingGame": "<game name>",
+  "titlePattern": "<their typical title formula>",
+  "thumbnailStyle": "<brief description>",
+  "topFormulas": ["<formula1>", "<formula2>", "<formula3>", "<formula4>", "<formula5>"],
+  "recommendation": "<2-3 sentences on how to compete with or beat them>"
+}`;
+  try {
+    return json(await groqJson(env, prompt, system));
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+app.post('/intel/timing', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const body = await c.req.json().catch(() => ({}));
+  const platform = body.platform || 'TikTok';
+  const game = body.game || 'gaming';
+  const system = 'You are a social media timing expert. Return ONLY valid JSON.';
+  const prompt = `What are the best times to post ${game} gaming content on ${platform} for Nigerian creators?
+Use WAT (West Africa Time = UTC+1) timezone.
+
+Return JSON:
+{
+  "platform": "${platform}",
+  "slots": [
+    {"day": "<day>", "time": "<time range WAT>", "score": <0-100>, "label": "<PEAK|GREAT|GOOD>"},
+    ... (7 slots, one per day, sorted by score desc)
+  ],
+  "insight": "<2-3 sentence actionable insight specific to Nigerian ${game} creators>"
+}`;
+  try {
+    return json(await groqJson(env, prompt, system));
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+app.post('/intel/abtitle', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const body = await c.req.json().catch(() => ({}));
+  const titleA = body.titleA || '';
+  const titleB = body.titleB || '';
+  const game = body.game || 'gaming';
+  const system = 'You are a YouTube CTR and title optimisation expert. Return ONLY valid JSON.';
+  const prompt = `Predict which title will perform better for a ${game} gaming video:
+
+Title A: "${titleA}"
+Title B: "${titleB}"
+
+Analyse based on: hook strength, emotional trigger, specificity, emoji usage,
+click-through-rate potential, search intent alignment, and mobile scroll-stop power.
+
+Return JSON:
+{
+  "titleA": "${titleA}",
+  "titleB": "${titleB}",
+  "winner": "<A or B>",
+  "scoreA": <50-99>,
+  "scoreB": <50-99>,
+  "reasoning": "<2-3 sentences explaining why the winner is better>",
+  "improvements": ["<specific improvement 1>", "<improvement 2>", "<improvement 3>"]
+}
+
+The winner must have a higher score. Scores must differ by at least 5.`;
+  try {
+    return json(await groqJson(env, prompt, system));
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
+// ─── 404 fallback ────────────────────────────────────────────────────────────
+app.all('*', (c) => json({ error: 'Not found', path: c.req.path }, 404));
+
+// ─── Export for Cloudflare Pages _middleware ─────────────────────────────────
+// Cloudflare Pages passes a single context object; Hono expects (request, env, ctx).
+// Adapt the signature so Hono handles routing correctly.
+type PagesContext = { request: Request; env: any; ctx: any; next: () => Promise<Response> };
+
+const handleRequest = (ctx: PagesContext) => app.fetch(ctx.request, ctx.env, ctx.ctx);
+
+export const onRequest = handleRequest;
+export const onRequestGet = handleRequest;
+export const onRequestPost = handleRequest;
+export const onRequestPatch = handleRequest;
+export const onRequestDelete = handleRequest;
+export const onRequestOptions = handleRequest;
