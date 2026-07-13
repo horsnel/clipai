@@ -891,67 +891,277 @@ async function ytTrending(env: Env, game: string, max = 10): Promise<any[]> {
 }
 
 async function redditTop(env: Env, game: string, limit = 8): Promise<any[]> {
+  // Reddit's `.json` endpoint blocks datacenter IPs with 403. The `.rss`
+  // (Atom) feed is more permissive and works keyless from Cloudflare Workers.
+  // We lose the score field (RSS doesn't include upvotes), but the title +
+  // permalink + subreddit are enough for the Groq trend synthesizer.
+  //
+  // Reddit aggressively rate-limits unauthenticated requests (~10s between
+  // requests per IP). We use Cloudflare's Cache API (caches.default) to cache
+  // responses for 90 seconds, so repeat /trends calls within that window don't
+  // re-hit Reddit. We also only fetch ONE subreddit per call (not 2) to halve
+  // the request count.
   const key = (game || 'all').toLowerCase().trim();
   const subs = GAME_SUBREDDITS[key] || GAME_SUBREDDITS.all;
-  const out: any[] = [];
-  for (const subName of subs.slice(0, 2)) {
+  const ua = env.REDDIT_USER_AGENT
+    || 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 ClipAI/2.0';
+  const cacheKey = new Request(`https://cache.clipai.local/reddit/${key}/${limit}`);
+  const cache = caches.default;
+  const cached = await cache.match(cacheKey);
+  if (cached) {
     try {
-      const r = await fetch(`https://www.reddit.com/r/${subName}/top.json?t=day&limit=${limit}`, {
-        headers: { 'User-Agent': env.REDDIT_USER_AGENT || 'clipai-trend-radar/2.0' },
+      const out = await cached.json();
+      if (Array.isArray(out) && out.length > 0) return out;
+    } catch {}
+  }
+  const out: any[] = [];
+  // Only fetch the FIRST subreddit to halve request volume. The cache above
+  // makes this cheap on repeat calls.
+  for (const subName of subs.slice(0, 1)) {
+    try {
+      const url = `https://www.reddit.com/r/${subName}/top/.rss?t=day&limit=${limit}`;
+      const r = await fetch(url, {
+        headers: {
+          'User-Agent': ua,
+          'Accept': 'application/atom+xml,application/xml,text/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        redirect: 'follow',
       });
       if (!r.ok) continue;
-      const data = (await r.json()) as any;
-      const children = data?.data?.children || [];
-      for (const child of children) {
-        const d = child.data;
-        if (!d || (d.score || 0) < 50) continue;
-        out.push({ title: d.title, score: d.score, url: `https://reddit.com${d.permalink}`, subreddit: subName, platform: 'reddit' });
-        if (out.length >= limit) return out;
+      const xml = await r.text();
+      const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
+      let m: RegExpExecArray | null;
+      while ((m = entryRegex.exec(xml)) !== null) {
+        const block = m[1];
+        const titleMatch = block.match(/<title[^>]*>([\s\S]*?)<\/title>/);
+        const linkMatch = block.match(/<link[^>]*href="([^"]+)"[^>]*\/?>/);
+        if (!titleMatch) continue;
+        const title = decodeXmlEntities(titleMatch[1].trim());
+        const linkUrl = linkMatch ? linkMatch[1] : '';
+        out.push({
+          title,
+          score: 0,
+          url: linkUrl,
+          subreddit: subName,
+          platform: 'reddit',
+        });
+        if (out.length >= limit) break;
       }
+    } catch (e) {
+      console.warn(`redditTop: r/${subName} threw:`, e);
+    }
+  }
+  // Cache for 90 seconds. Reddit returns new "top of day" content slowly,
+  // so 90s is a good balance between freshness and rate-limit safety.
+  if (out.length > 0) {
+    try {
+      await cache.put(cacheKey, new Response(JSON.stringify(out), {
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'max-age=90' },
+      }));
     } catch {}
   }
   return out;
 }
 
-async function googleTrends(env: Env, game: string, limit = 6): Promise<any[]> {
-  // Keyless Google Trends — replicate pytrends two-step (explore → widgetdata)
-  try {
-    const kw = (game && game.toLowerCase() !== 'all') ? `${game} gaming` : 'gaming';
-    const exploreReq = JSON.stringify({
-      comparisonItem: [{ keyword: kw, geo: '', time: 'now 7-d' }],
-      category: 833,
-      property: '',
-    });
-    const exploreUrl = `https://trends.google.com/trends/api/explore?hl=en-US&tz=60&req=${encodeURIComponent(exploreReq)}`;
-    const r1 = await fetch(exploreUrl);
-    if (!r1.ok) return [];
-    const text = await r1.text();
-    const json1 = JSON.parse(text.replace(/^\)\]\}'\s*\n/, ''));
-    const widgets = json1.widgets || [];
-    const relatedWidget = widgets.find((w: any) => w.id === 'RELATED_QUERIES');
-    if (!relatedWidget) return [];
-    const req2 = JSON.stringify({
-      restriction: {
-        geo: {}, time: 'now 7-d', originalTimeRangeForExploreUrl: 'now 7-d',
-      },
-      keyword: kw,
-      metric: ['TOP', 'RISING'],
-      language: 'en',
-    });
-    const r2 = await fetch(`https://trends.google.com/trends/api/widgetdata/related_searches?hl=en-US&tz=60&req=${encodeURIComponent(req2)}&token=${relatedWidget.token}`);
-    if (!r2.ok) return [];
-    const text2 = await r2.text();
-    const json2 = JSON.parse(text2.replace(/^\)\]\}'\s*\n/, ''));
-    const rising = (json2.default?.rankedList || []).flatMap((rl: any) => rl.rankedKeyword || []);
-    const out: any[] = [];
-    for (const r of rising.slice(0, limit)) {
-      out.push({ title: r.query || r.topic?.title || '', value: r.formattedValue || r.value || 0, platform: 'google_trends' });
-    }
-    return out;
-  } catch (e) {
-    console.warn('Google Trends failed:', e);
-    return [];
+function decodeXmlEntities(s: string): string {
+  return s
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .replace(/&amp;/g, '&');
+}
+
+// ─── Google Trends (layered fallback) ─────────────────────────────────────────
+// Three strategies, all returning the same shape { title, value, platform }:
+//   Layer 1: explore → widgetdata/related_searches  (most game-specific; pytrends pattern)
+//   Layer 2: Google News RSS (geo=NG)               (real-time gaming news headlines)
+//   Layer 3: SerpAPI google_trends engine            (optional — uses SERPAPI_KEY quota)
+//
+// As of 2026, Google deprecated the trends.google.com /api/dailytrends endpoint
+// (returns 404 for all geos), and the /api/explore endpoint is heavily rate-
+// limited against datacenter IPs (429). Layer 2 (Google News RSS) is the most
+// reliable keyless signal we have — it gives us real gaming news headlines from
+// Google's index, geo-targeted to Nigeria (our primary audience).
+function stripTrendsPrefix(text: string): string {
+  // Google Trends API responses start with )]}'  (XSSI protection)
+  return text.replace(/^\)\]\}'\s*\n?/, '');
+}
+
+function watDateString(): string {
+  // Compute yesterday's date in WAT (UTC+1) as YYYYMMDD.
+  const now = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const wat = new Date(now.getTime() + 60 * 60 * 1000);
+  return wat.toISOString().slice(0, 10).replace(/-/g, '');
+}
+
+async function googleTrendsRelated(env: Env, game: string, limit: number): Promise<any[]> {
+  const kw = (game && game.toLowerCase() !== 'all') ? `${game} gaming` : 'gaming';
+  const exploreReq = JSON.stringify({
+    comparisonItem: [{ keyword: kw, geo: '', time: 'now 7-d' }],
+    category: 833, // Games
+    property: '',
+  });
+  const exploreUrl = `https://trends.google.com/trends/api/explore?hl=en-US&tz=60&req=${encodeURIComponent(exploreReq)}`;
+  const r1 = await fetch(exploreUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ClipAI-TrendRadar/2.0)' } });
+  if (!r1.ok) return [];
+  const json1 = JSON.parse(stripTrendsPrefix(await r1.text()));
+  const widgets = json1.widgets || [];
+  const relatedWidget = widgets.find((w: any) => w.id === 'RELATED_QUERIES');
+  if (!relatedWidget) return [];
+
+  const req2 = JSON.stringify({
+    restriction: { geo: {}, time: 'now 7-d', originalTimeRangeForExploreUrl: 'now 7-d' },
+    keyword: kw,
+    metric: ['TOP', 'RISING'],
+    language: 'en',
+  });
+  const r2 = await fetch(
+    `https://trends.google.com/trends/api/widgetdata/related_searches?hl=en-US&tz=60&req=${encodeURIComponent(req2)}&token=${relatedWidget.token}`,
+    { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ClipAI-TrendRadar/2.0)' } },
+  );
+  if (!r2.ok) return [];
+  const json2 = JSON.parse(stripTrendsPrefix(await r2.text()));
+  const ranked = (json2.default?.rankedList || []).flatMap((rl: any) => rl.rankedKeyword || []);
+  const out: any[] = [];
+  for (const r of ranked.slice(0, limit)) {
+    const value = typeof r.value === 'number'
+      ? r.value
+      : parseInt(String(r.formattedValue || '0').replace(/\D/g, ''), 10) || 0;
+    out.push({ title: r.query || r.topic?.title || '', value, platform: 'google_trends', layer: 'related_searches' });
   }
+  return out;
+}
+
+async function googleTrendsNews(env: Env, game: string, limit: number): Promise<any[]> {
+  // Layer 2 strategy: try Google News RSS (geo=NG) first, then Bing News RSS
+  // as fallback. Google News is more geo-targeted but blocks datacenter IPs
+  // with 503 ("unusual traffic"). Bing News is more permissive but worldwide.
+  const kw = (game && game.toLowerCase() !== 'all') ? `${game} gaming` : 'gaming';
+  const ua = 'Mozilla/5.0 (compatible; ClipAI-TrendRadar/2.0)';
+
+  // Try 1: Google News RSS
+  try {
+    const r = await fetch(
+      `https://news.google.com/rss/search?q=${encodeURIComponent(kw)}&hl=en-US&gl=NG&ceid=NG:en`,
+      { headers: { 'User-Agent': ua }, redirect: 'follow' },
+    );
+    if (r.ok) {
+      const xml = await r.text();
+      const items = parseNewsRssItems(xml, 'google_news_rss', 'NG');
+      if (items.length > 0) return items.slice(0, limit);
+    }
+  } catch (e) {
+    console.warn('googleTrendsNews: Google News RSS failed:', e);
+  }
+
+  // Try 2: Bing News RSS
+  try {
+    const r = await fetch(
+      `https://www.bing.com/news/search?q=${encodeURIComponent(kw)}&format=rss`,
+      { headers: { 'User-Agent': ua } },
+    );
+    if (r.ok) {
+      const xml = await r.text();
+      const items = parseNewsRssItems(xml, 'bing_news_rss', 'WW');
+      if (items.length > 0) return items.slice(0, limit);
+    }
+  } catch (e) {
+    console.warn('googleTrendsNews: Bing News RSS failed:', e);
+  }
+
+  return [];
+}
+
+function parseNewsRssItems(xml: string, layer: string, region: string): any[] {
+  // Both Google News and Bing News use the standard RSS 2.0 <item> shape.
+  // Google News titles look like "Headline - Source", Bing titles are just "Headline".
+  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  const out: any[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = itemRegex.exec(xml))) {
+    const block = m[1];
+    const titleMatch = block.match(/<title[^>]*>([\s\S]*?)<\/title>/);
+    const pubMatch = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/);
+    if (!titleMatch) continue;
+    const raw = decodeXmlEntities(titleMatch[1].trim());
+    const dashIdx = raw.lastIndexOf(' - ');
+    const headline = dashIdx > 0 ? raw.slice(0, dashIdx) : raw;
+    const source = dashIdx > 0 ? raw.slice(dashIdx + 3) : '';
+    const pubDate = pubMatch ? new Date(pubMatch[1].trim()).getTime() : Date.now();
+    // Recency score: 100 for items <6h old, decaying to 0 over 48h.
+    const ageHours = (Date.now() - pubDate) / (60 * 60 * 1000);
+    const recency = Math.max(0, Math.round(100 * (1 - ageHours / 48)));
+    out.push({
+      title: headline,
+      value: recency,
+      source,
+      platform: 'google_trends',
+      layer,
+      region,
+      publishedAt: pubMatch ? pubMatch[1].trim() : '',
+    });
+  }
+  return out;
+}
+
+async function googleTrendsSerp(env: Env, game: string, limit: number): Promise<any[]> {
+  const kw = (game && game.toLowerCase() !== 'all') ? `${game} gaming` : 'gaming';
+  const params = new URLSearchParams({
+    engine: 'google_trends',
+    q: kw,
+    data_type: 'RELATED_QUERIES',
+    time: 'now 7-d',
+    api_key: env.SERPAPI_KEY,
+  });
+  const r = await fetch(`https://serpapi.com/search?${params}`);
+  if (!r.ok) return [];
+  const data = (await r.json()) as any;
+  const rising = data?.related_queries?.rising || data?.related_queries?.top || [];
+  return rising.slice(0, limit).map((q: any) => ({
+    title: q.query || q.link || '',
+    value: typeof q.value === 'number'
+      ? q.value
+      : parseInt(String(q.extracted_value || '0').replace(/\D/g, ''), 10) || 0,
+    platform: 'google_trends',
+    layer: 'serpapi',
+  }));
+}
+
+async function googleTrends(env: Env, game: string, limit = 6): Promise<any[]> {
+  // Layer 1: explore → related_searches (most specific to the game; often 429'd)
+  try {
+    const related = await googleTrendsRelated(env, game, limit);
+    if (related.length > 0) return related;
+    console.warn('Google Trends layer 1 (related_searches) returned 0 results — falling through');
+  } catch (e) {
+    console.warn('Google Trends layer 1 (related_searches) failed:', e);
+  }
+
+  // Layer 2: Google News RSS (NG) — stable, real-time, geo-targeted
+  try {
+    const news = await googleTrendsNews(env, game, limit);
+    if (news.length > 0) return news;
+    console.warn('Google Trends layer 2 (google news rss) returned 0 results — falling through');
+  } catch (e) {
+    console.warn('Google Trends layer 2 (google news rss) failed:', e);
+  }
+
+  // Layer 3: SerpAPI google_trends engine (only if SERPAPI_KEY configured)
+  if (env.SERPAPI_KEY) {
+    try {
+      const serp = await googleTrendsSerp(env, game, limit);
+      if (serp.length > 0) return serp;
+      console.warn('Google Trends layer 3 (SerpAPI) returned 0 results — falling through');
+    } catch (e) {
+      console.warn('Google Trends layer 3 (SerpAPI) failed:', e);
+    }
+  }
+
+  console.warn('Google Trends: all layers exhausted, returning []');
+  return [];
 }
 
 async function serpSearch(env: Env, query: string, num = 10, engine = 'google'): Promise<any[]> {
@@ -993,10 +1203,113 @@ async function serpTwitter(env: Env, game: string, limit = 6): Promise<any[]> {
   }));
 }
 
+app.get('/trends/_diag', async (c) => {
+  // Diagnostic endpoint — pings each keyless platform directly and reports
+  // raw HTTP status + first 200 chars of body. Helps isolate which layer
+  // is failing from Cloudflare's egress IP. NOT for production use.
+  const env = c.env as Env;
+  const game = (c.req.query('game') || 'valorant').trim();
+  const out: any = {
+    generatedAt: new Date().toISOString(),
+    game,
+    env_keys_present: {
+      YOUTUBE_API_KEY: !!env.YOUTUBE_API_KEY,
+      REDDIT_USER_AGENT: !!env.REDDIT_USER_AGENT,
+      SERPAPI_KEY: !!env.SERPAPI_KEY,
+      GROQ_API_KEY: !!env.GROQ_API_KEY,
+    },
+    layers: {},
+  };
+
+  // Reddit — call production redditTop() and report results.
+  // (Skips a redundant direct fetch to avoid double-rate-limiting against Reddit.)
+  try {
+    out.redditTop_output = await redditTop(env, 'valorant', 5);
+    out.redditTop_count = out.redditTop_output.length;
+  } catch (e: any) {
+    out.redditTop_output = { error: e.message };
+  }
+
+  // Google Trends — explore
+  try {
+    const kw = `${game} gaming`;
+    const exploreReq = JSON.stringify({
+      comparisonItem: [{ keyword: kw, geo: '', time: 'now 7-d' }],
+      category: 833,
+      property: '',
+    });
+    const r = await fetch(`https://trends.google.com/trends/api/explore?hl=en-US&tz=60&req=${encodeURIComponent(exploreReq)}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ClipAI-TrendRadar/2.0)' },
+    });
+    const body = await r.text();
+    out.layers.google_trends_explore = {
+      status: r.status,
+      body_len: body.length,
+      body_preview: body.slice(0, 200),
+    };
+  } catch (e: any) {
+    out.layers.google_trends_explore = { error: e.message };
+  }
+
+  // Google News RSS (the production googleTrendsNews() path)
+  try {
+    const kw = `${game} gaming`;
+    const r = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(kw)}&hl=en-US&gl=NG&ceid=NG:en`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ClipAI-TrendRadar/2.0)' },
+      redirect: 'follow',
+    });
+    const body = await r.text();
+    out.layers.google_news_rss_ng = {
+      status: r.status,
+      body_len: body.length,
+      body_preview: body.slice(0, 300),
+      items_found: (body.match(/<item>/g) || []).length,
+    };
+  } catch (e: any) {
+    out.layers.google_news_rss_ng = { error: e.message };
+  }
+
+  // Bing News RSS (the fallback inside googleTrendsNews())
+  try {
+    const kw = `${game} gaming`;
+    const r = await fetch(`https://www.bing.com/news/search?q=${encodeURIComponent(kw)}&format=rss`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ClipAI-TrendRadar/2.0)' },
+    });
+    const body = await r.text();
+    out.layers.bing_news_rss = {
+      status: r.status,
+      body_len: body.length,
+      body_preview: body.slice(0, 300),
+      items_found: (body.match(/<item>/g) || []).length,
+    };
+  } catch (e: any) {
+    out.layers.bing_news_rss = { error: e.message };
+  }
+
+  // SerpAPI (if key set)
+  if (env.SERPAPI_KEY) {
+    try {
+      const params = new URLSearchParams({
+        engine: 'google_trends', q: `${game} gaming`,
+        data_type: 'RELATED_QUERIES', time: 'now 7-d', api_key: env.SERPAPI_KEY,
+      });
+      const r = await fetch(`https://serpapi.com/search?${params}`);
+      out.layers.serpapi_google_trends = { status: r.status };
+    } catch (e: any) {
+      out.layers.serpapi_google_trends = { error: e.message };
+    }
+  } else {
+    out.layers.serpapi_google_trends = { skipped: 'SERPAPI_KEY not set' };
+  }
+
+  return json(out);
+});
+
 app.get('/trends', async (c) => {
   const env = c.env as Env;
   const game = (c.req.query('game') || '').trim();
   const gameLabel = game || 'All';
+  const debug = c.req.query('debug') === '1';
 
   const [ytResults, redditResults, trendsResults, tiktokResults, twitterResults] = await Promise.all([
     ytTrending(env, game || 'gaming', 10),
@@ -1006,6 +1319,31 @@ app.get('/trends', async (c) => {
     serpTwitter(env, game, 6),
   ]);
 
+  // Debug mode: return raw per-platform payloads without calling Groq.
+  // Useful for verifying each trend source independently (e.g. before GROQ_API_KEY
+  // is set, or to inspect which Google Trends layer produced results).
+  if (debug) {
+    return json({
+      debug: true,
+      game: gameLabel,
+      generatedAt: new Date().toISOString(),
+      sources: {
+        youtube: ytResults.length,
+        reddit: redditResults.length,
+        google_trends: trendsResults.length,
+        tiktok: tiktokResults.length,
+        twitter: twitterResults.length,
+      },
+      raw: {
+        youtube: ytResults,
+        reddit: redditResults,
+        google_trends: trendsResults,
+        tiktok: tiktokResults,
+        twitter: twitterResults,
+      },
+    });
+  }
+
   const ytTitles = ytResults.slice(0, 8).map((it: any) =>
     `- ${it?.snippet?.title || ''} (channel: ${it?.snippet?.channelTitle || ''})`
   ).join('\n') || 'No YouTube data available.';
@@ -1014,9 +1352,12 @@ app.get('/trends', async (c) => {
     `- ${r.title} (r/${r.subreddit}, score: ${r.score})`
   ).join('\n') || 'No Reddit data available.';
 
-  const gtrendsBlock = trendsResults.slice(0, 5).map((t: any) =>
-    `- ${t.title} (+${t.value}% growth)`
-  ).join('\n') || 'No Google Trends data available.';
+  const gtrendsBlock = trendsResults.slice(0, 5).map((t: any) => {
+    if (t.layer === 'google_news_rss' && t.source) {
+      return `- ${t.title} (via ${t.source}, recency ${t.value})`;
+    }
+    return `- ${t.title} (+${t.value}% growth)`;
+  }).join('\n') || 'No Google Trends data available.';
 
   const tiktokBlock = tiktokResults.slice(0, 5).map((t: any) =>
     `- ${t.title} (@${t.author}, ${t.views} views)`
