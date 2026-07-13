@@ -51,7 +51,7 @@ interface Env {
   // Trends
   YOUTUBE_API_KEY: string;
   REDDIT_USER_AGENT: string;
-  SERPAPI_KEY: string;
+  SERPER_API_KEY: string;   // serper.dev — powers TikTok/X site-search + Google Trends news layer
   // Paystack
   PAYSTACK_SECRET_KEY: string;
   // Worker
@@ -459,7 +459,7 @@ async function hmacSha512(secret: string, body: ArrayBuffer): Promise<string> {
 app.get('/health', (c) => json({
   status: 'ok',
   service: 'clipai-worker',
-  version: '4.5-cf',
+  version: '4.6-cf',
   runtime: 'cloudflare-pages',
   supabase: !!c.env.SUPABASE_URL,
   llm: c.env.SILICONFLOW_API_KEY ? 'siliconflow' : (c.env.MISTRAL_API_KEY ? 'mistral' : (c.env.GROQ_API_KEY ? 'groq' : 'none')),
@@ -1106,7 +1106,7 @@ function decodeXmlEntities(s: string): string {
 // Three strategies, all returning the same shape { title, value, platform }:
 //   Layer 1: explore → widgetdata/related_searches  (most game-specific; pytrends pattern)
 //   Layer 2: Google News RSS (geo=NG)               (real-time gaming news headlines)
-//   Layer 3: SerpAPI google_trends engine            (optional — uses SERPAPI_KEY quota)
+//   Layer 3: Serper.dev /news           (optional — uses SERPER_API_KEY quota, high quality)
 //
 // As of 2026, Google deprecated the trends.google.com /api/dailytrends endpoint
 // (returns 404 for all geos), and the /api/explore endpoint is heavily rate-
@@ -1235,26 +1235,29 @@ function parseNewsRssItems(xml: string, layer: string, region: string): any[] {
   return out;
 }
 
-async function googleTrendsSerp(env: Env, game: string, limit: number): Promise<any[]> {
-  const kw = (game && game.toLowerCase() !== 'all') ? `${game} gaming` : 'gaming';
-  const params = new URLSearchParams({
-    engine: 'google_trends',
-    q: kw,
-    data_type: 'RELATED_QUERIES',
-    time: 'now 7-d',
-    api_key: env.SERPAPI_KEY,
+async function googleTrendsSerper(env: Env, game: string, limit: number): Promise<any[]> {
+  // Serper.dev /news — high-quality, geo-targeted, no RSS parsing needed.
+  // Replaces the old SerpAPI google_trends engine (10x cheaper, more reliable).
+  const kw = (game && game.toLowerCase() !== 'all') ? `${game} gaming esports` : 'gaming esports';
+  const r = await fetch('https://google.serper.dev/news', {
+    method: 'POST',
+    headers: {
+      'X-API-KEY': env.SERPER_API_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ q: kw, gl: 'ng', hl: 'en', num: limit + 4 }),
   });
-  const r = await fetch(`https://serpapi.com/search?${params}`);
   if (!r.ok) return [];
   const data = (await r.json()) as any;
-  const rising = data?.related_queries?.rising || data?.related_queries?.top || [];
-  return rising.slice(0, limit).map((q: any) => ({
-    title: q.query || q.link || '',
-    value: typeof q.value === 'number'
-      ? q.value
-      : parseInt(String(q.extracted_value || '0').replace(/\D/g, ''), 10) || 0,
+  const stories = data.news || [];
+  return stories.slice(0, limit).map((s: any) => ({
+    title: s.title || '',
+    value: 50,   // Serper doesn't expose growth %; use stable midpoint
     platform: 'google_trends',
-    layer: 'serpapi',
+    layer: 'serper_news',
+    source: s.source || '',
+    url: s.link || s.url || '',
+    publishedAt: s.date || '',
   }));
 }
 
@@ -1277,14 +1280,14 @@ async function googleTrends(env: Env, game: string, limit = 6): Promise<any[]> {
     console.warn('Google Trends layer 2 (google news rss) failed:', e);
   }
 
-  // Layer 3: SerpAPI google_trends engine (only if SERPAPI_KEY configured)
-  if (env.SERPAPI_KEY) {
+  // Layer 3: Serper.dev /news (only if SERPER_API_KEY configured)
+  if (env.SERPER_API_KEY) {
     try {
-      const serp = await googleTrendsSerp(env, game, limit);
-      if (serp.length > 0) return serp;
-      console.warn('Google Trends layer 3 (SerpAPI) returned 0 results — falling through');
+      const serper = await googleTrendsSerper(env, game, limit);
+      if (serper.length > 0) return serper;
+      console.warn('Google Trends layer 3 (Serper /news) returned 0 results — falling through');
     } catch (e) {
-      console.warn('Google Trends layer 3 (SerpAPI) failed:', e);
+      console.warn('Google Trends layer 3 (Serper /news) failed:', e);
     }
   }
 
@@ -1292,41 +1295,54 @@ async function googleTrends(env: Env, game: string, limit = 6): Promise<any[]> {
   return [];
 }
 
-async function serpSearch(env: Env, query: string, num = 10, engine = 'google'): Promise<any[]> {
-  if (!env.SERPAPI_KEY) return [];
+// Serper.dev /search — used for TikTok and Twitter/X data without paying for
+// native APIs. We use site: queries (site:tiktok.com, site:x.com) to scope
+// Google's index to each platform. ~$0.001 per search vs $0.01 for SerpAPI.
+async function serperSearch(env: Env, query: string, num = 10): Promise<any[]> {
+  if (!env.SERPER_API_KEY) return [];
   try {
-    const params = new URLSearchParams({ engine, q: query, num: String(num), api_key: env.SERPAPI_KEY });
-    const r = await fetch(`https://serpapi.com/search?${params}`);
+    const r = await fetch('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': env.SERPER_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ q: query, gl: 'ng', hl: 'en', num }),
+    });
     if (!r.ok) return [];
     const data = (await r.json()) as any;
-    if (engine === 'tiktok_search') return data.video_results || data.organic_results || [];
-    if (engine === 'twitter_search') return data.tweets || data.organic_results || [];
-    return data.organic_results || [];
+    return data.organic || [];
   } catch {
     return [];
   }
 }
 
 async function serpTiktok(env: Env, game: string, limit = 6): Promise<any[]> {
-  const q = (game && game.toLowerCase() !== 'all') ? `${game} gaming viral` : 'gaming viral 2026';
-  const raw = await serpSearch(env, q, limit, 'tiktok_search');
+  // Use Google's index via Serper — site:tiktok.com scopes to TikTok videos only.
+  const q = (game && game.toLowerCase() !== 'all')
+    ? `site:tiktok.com ${game} gaming viral`
+    : 'site:tiktok.com gaming viral 2026';
+  const raw = await serperSearch(env, q, limit + 4);
   return raw.slice(0, limit).map((v: any) => ({
-    title: v.title || v.desc || '',
-    views: v.play_count || v.views || 0,
-    author: v.author || v.channel || '',
-    url: v.link || v.watch_url || '',
+    title: v.title || '',
+    views: 0,   // Serper doesn't expose play counts
+    author: '', // TikTok author is in the URL path, not the search result
+    url: v.link || '',
     platform: 'tiktok',
   }));
 }
 
 async function serpTwitter(env: Env, game: string, limit = 6): Promise<any[]> {
-  const q = (game && game.toLowerCase() !== 'all') ? `${game} gaming #clips` : 'gaming clips viral 2026';
-  const raw = await serpSearch(env, q, limit, 'twitter_search');
+  // Use Google's index via Serper — site:x.com scopes to Twitter/X posts.
+  const q = (game && game.toLowerCase() !== 'all')
+    ? `site:x.com ${game} gaming clips`
+    : 'site:x.com gaming clips viral 2026';
+  const raw = await serperSearch(env, q, limit + 4);
   return raw.slice(0, limit).map((t: any) => ({
-    title: t.text || t.title || '',
-    views: t.views || t.retweet_count || 0,
-    author: typeof t.user === 'object' ? t.user?.name || '' : String(t.user || ''),
-    url: t.link || t.url || '',
+    title: t.title || '',
+    views: 0,
+    author: '',
+    url: t.link || '',
     platform: 'twitter',
   }));
 }
@@ -1343,7 +1359,7 @@ app.get('/trends/_diag', async (c) => {
     env_keys_present: {
       YOUTUBE_API_KEY: !!env.YOUTUBE_API_KEY,
       REDDIT_USER_AGENT: !!env.REDDIT_USER_AGENT,
-      SERPAPI_KEY: !!env.SERPAPI_KEY,
+      SERPER_API_KEY: !!env.SERPER_API_KEY,
       GROQ_API_KEY: !!env.GROQ_API_KEY,
       MISTRAL_API_KEY: !!env.MISTRAL_API_KEY,
       SILICONFLOW_API_KEY: !!env.SILICONFLOW_API_KEY,
@@ -1418,20 +1434,46 @@ app.get('/trends/_diag', async (c) => {
     out.layers.bing_news_rss = { error: e.message };
   }
 
-  // SerpAPI (if key set)
-  if (env.SERPAPI_KEY) {
+  // Serper.dev (if key set)
+  if (env.SERPER_API_KEY) {
     try {
-      const params = new URLSearchParams({
-        engine: 'google_trends', q: `${game} gaming`,
-        data_type: 'RELATED_QUERIES', time: 'now 7-d', api_key: env.SERPAPI_KEY,
+      const r = await fetch('https://google.serper.dev/news', {
+        method: 'POST',
+        headers: { 'X-API-KEY': env.SERPER_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: `${game} gaming esports`, gl: 'ng', num: 6 }),
       });
-      const r = await fetch(`https://serpapi.com/search?${params}`);
-      out.layers.serpapi_google_trends = { status: r.status };
+      const data = await r.json().catch(() => ({}));
+      out.layers.serper_news = {
+        status: r.status,
+        items_found: (data.news || []).length,
+        sample: (data.news || []).slice(0, 2).map((n: any) => n.title),
+      };
     } catch (e: any) {
-      out.layers.serpapi_google_trends = { error: e.message };
+      out.layers.serper_news = { error: e.message };
     }
   } else {
-    out.layers.serpapi_google_trends = { skipped: 'SERPAPI_KEY not set' };
+    out.layers.serper_news = { skipped: 'SERPER_API_KEY not set' };
+  }
+
+  // Serper.dev site-search (TikTok + Twitter/X)
+  if (env.SERPER_API_KEY) {
+    try {
+      const r = await fetch('https://google.serper.dev/search', {
+        method: 'POST',
+        headers: { 'X-API-KEY': env.SERPER_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: `site:tiktok.com ${game}`, gl: 'ng', num: 5 }),
+      });
+      const data = await r.json().catch(() => ({}));
+      out.layers.serper_tiktok = {
+        status: r.status,
+        items_found: (data.organic || []).length,
+        sample: (data.organic || []).slice(0, 2).map((n: any) => n.title),
+      };
+    } catch (e: any) {
+      out.layers.serper_tiktok = { error: e.message };
+    }
+  } else {
+    out.layers.serper_tiktok = { skipped: 'SERPER_API_KEY not set' };
   }
 
   return json(out);
@@ -1488,16 +1530,19 @@ app.get('/trends', async (c) => {
     if (t.layer === 'google_news_rss' && t.source) {
       return `- ${t.title} (via ${t.source}, recency ${t.value})`;
     }
+    if (t.layer === 'serper_news' && t.source) {
+      return `- ${t.title} (via ${t.source}, ${t.publishedAt || 'recent'})`;
+    }
     return `- ${t.title} (+${t.value}% growth)`;
   }).join('\n') || 'No Google Trends data available.';
 
   const tiktokBlock = tiktokResults.slice(0, 5).map((t: any) =>
-    `- ${t.title} (@${t.author}, ${t.views} views)`
-  ).join('\n') || 'No TikTok data available (SerpAPI key missing or quota exhausted).';
+    `- ${t.title} (${t.url || 'no url'})`
+  ).join('\n') || 'No TikTok data available (Serper key missing or quota exhausted).';
 
   const twitterBlock = twitterResults.slice(0, 5).map((t: any) =>
-    `- ${t.title} (@${t.author}, ${t.views} impressions)`
-  ).join('\n') || 'No Twitter data available (SerpAPI key missing or quota exhausted).';
+    `- ${t.title} (${t.url || 'no url'})`
+  ).join('\n') || 'No Twitter data available (Serper key missing or quota exhausted).';
 
   const system = 'You are a viral gaming content trend analyst. Return ONLY valid JSON.';
   const prompt = `Synthesize these live cross-platform signals into the TOP 12 trending items
@@ -1513,10 +1558,10 @@ ${redditBlock}
 === GOOGLE TRENDS (rising search queries, last 7 days) ===
 ${gtrendsBlock}
 
-=== TIKTOK (viral clips via SerpAPI) ===
+=== TIKTOK (viral clips via Serper.dev site:tiktok.com) ===
 ${tiktokBlock}
 
-=== TWITTER/X (trending tweets via SerpAPI) ===
+=== TWITTER/X (trending posts via Serper.dev site:x.com) ===
 ${twitterBlock}
 
 Game focus: ${gameLabel}
