@@ -125,7 +125,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ) => {
     const { error } = await supabase.auth.signUp({
       email, password,
-      options: { data: { full_name: name ?? '', referral_code: referralCode ?? '' } },
+      options: {
+        data: { full_name: name ?? '', referral_code: referralCode ?? '' },
+        // Explicit redirect — overrides Supabase's default Site URL (which may
+        // still be http://localhost:3000 if the dashboard hasn't been updated).
+        // The Supabase client has detectSessionInUrl:true, so it will
+        // automatically parse the auth tokens from the redirect URL and fire
+        // onAuthStateChange, which the AuthContext already handles.
+        emailRedirectTo: window.location.origin,
+      },
     });
     if (error) throw error;
   }, []);
