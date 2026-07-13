@@ -66,7 +66,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-clip-amber/10 border border-clip-amber/30">
             <Lock className="w-4 h-4 text-clip-amber" />
             <span className="text-clip-amber text-xs font-bold uppercase tracking-wider">
-              Coming Q1 2026 · Early Access
+              Coming December 2026 · Early Access
             </span>
           </div>
         </div>

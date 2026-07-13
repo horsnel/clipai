@@ -75,7 +75,7 @@ const plans: Plan[] = [
       { text: 'Unlimited ClipBot + priority AI', included: true },
       { text: 'GrowthIntel competitor spy', included: true },
       { text: 'Real-time Trend Radar', included: true },
-      { text: 'Early Access: Video Editor (Q1 2026)', included: true },
+      { text: 'Early Access: Video Editor (December 2026)', included: true },
       { text: 'Caption Battle × 3 vote weight', included: true },
     ],
   },
@@ -92,7 +92,7 @@ const plans: Plan[] = [
       { text: 'Exclusive Creator-tier trends', included: true },
       { text: 'GrowthIntel + monthly strategy call', included: true },
       { text: 'Caption Battle × 5 vote weight', included: true },
-      { text: 'Early Access: Video Editor (Q1 2026)', included: true },
+      { text: 'Early Access: Video Editor (December 2026)', included: true },
       { text: 'Featured on leaderboard + verified badge', included: true },
     ],
   },
@@ -336,7 +336,7 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
               },
               {
                 q: 'Is the AI video editor included?',
-                a: 'The video editor launches in Q1 2026. Pro and Creator subscribers get Early Access the moment it ships. Until then, you can use ViralForge, ClipBot, TrendRadar, and Caption Battle.',
+                a: 'The video editor launches in December 2026. Pro and Creator subscribers get Early Access the moment it ships. Until then, you can use ViralForge, ClipBot, TrendRadar, and Caption Battle.',
               },
               {
                 q: 'What payment methods do you accept?',

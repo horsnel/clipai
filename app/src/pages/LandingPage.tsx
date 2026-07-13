@@ -321,7 +321,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             {/* Content */}
             <div>
               <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-6">
-                Smart cuts. <span className="gradient-text">Coming Q1 2026.</span>
+                Smart cuts. <span className="gradient-text">Coming December 2026.</span>
               </h2>
               
               <div className="space-y-5 mb-8">
