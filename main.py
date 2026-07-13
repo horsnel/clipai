@@ -1556,16 +1556,17 @@ def clipbot_history():
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# TREND RADAR + FORGE + GROWTH INTEL (v4.2 — hybrid multi-platform)
+# TREND RADAR + FORGE + GROWTH INTEL (v4.3 — keyless multi-platform)
 # ════════════════════════════════════════════════════════════════════════════
 # Hybrid model — only TikTok + Twitter/X go through SerpAPI (no free API),
-# everything else uses free native APIs:
-#   • YouTube      → YouTube Data API v3
-#   • Reddit       → PRAW (or public JSON fallback)
-#   • Twitch       → Twitch Helix API
-#   • Google Trends → pytrends
+# everything else uses free / keyless sources:
+#   • YouTube      → YouTube Data API v3 (free key required)
+#   • Reddit       → public .json endpoints (NO key, NO OAuth, NO policy)
+#   • Google Trends → pytrends (NO key required)
 #   • TikTok       → SerpAPI (paid, ~$1.50/100 calls)
 #   • Twitter/X    → SerpAPI (paid, shares quota)
+#   • Twitch       → dropped (Helix API requires 2FA-locked dev console; can be
+#                    re-added later when 2FA is sorted)
 # ════════════════════════════════════════════════════════════════════════════
 
 # Per-game subreddit map (covers all 7 games in the selector + All)
@@ -1581,166 +1582,41 @@ GAME_SUBREDDITS = {
     "all": ["gaming", "gamingsclips"],
 }
 
-# Twitch game_id cache (Helix requires numeric game_id for filtering)
-_TWITCH_GAME_CACHE: dict[str, str] = {}
-
-# Module-level Reddit client (lazy)
-_reddit_client = None
-
-
-def _get_reddit():
-    """Lazily build a PRAW Reddit instance. Returns None if creds missing."""
-    global _reddit_client
-    if _reddit_client is not None:
-        return _reddit_client
-    if not all([Config.REDDIT_CLIENT_ID, Config.REDDIT_CLIENT_SECRET]):
-        return None
-    try:
-        import praw
-        _reddit_client = praw.Reddit(
-            client_id=Config.REDDIT_CLIENT_ID,
-            client_secret=Config.REDDIT_CLIENT_SECRET,
-            user_agent=Config.REDDIT_USER_AGENT,
-        )
-        _reddit_client.read_only = True
-        return _reddit_client
-    except Exception as e:
-        log.warning(f"PRAW init failed, will fall back to public JSON: {e}")
-        return None
-
 
 def _reddit_top(game: str, limit: int = 8) -> list[dict]:
-    """Return rising/hot gaming posts from subreddits matching the game.
+    """Return top-of-day gaming posts from subreddits matching the game.
 
-    Tries PRAW first, then falls back to public .json endpoints (no auth needed,
-    but rate-limited harder). Returns list of {title, score, url, subreddit}.
+    Uses Reddit's PUBLIC .json endpoints — NO API key, NO OAuth, NO policy
+    acceptance needed. Just needs a User-Agent header (Reddit's bot policy).
+    Rate-limited harder than the official API but fine for our scale.
     """
     key = (game or "all").lower().strip()
     subs = GAME_SUBREDDITS.get(key, GAME_SUBREDDITS["all"])
     out: list[dict] = []
-
-    reddit = _get_reddit()
-    if reddit:
+    for sub_name in subs[:2]:  # 2 subs keeps latency under 2s
         try:
-            for sub_name in subs[:2]:  # limit to 2 subs to keep latency low
-                sub = reddit.subreddit(sub_name)
-                for post in sub.top(time_filter="day", limit=limit):
-                    if post.score < 50:
-                        continue
-                    out.append({
-                        "title": post.title,
-                        "score": post.score,
-                        "url": post.url,
-                        "subreddit": sub_name,
-                        "platform": "reddit",
-                    })
-                    if len(out) >= limit:
-                        return out
+            r = requests.get(
+                f"https://www.reddit.com/r/{sub_name}/top.json?t=day&limit={limit}",
+                headers={"User-Agent": Config.REDDIT_USER_AGENT},
+                timeout=8,
+            )
+            r.raise_for_status()
+            for child in r.json().get("data", {}).get("children", []):
+                d = child.get("data", {})
+                if d.get("score", 0) < 50:
+                    continue
+                out.append({
+                    "title": d.get("title", ""),
+                    "score": d.get("score", 0),
+                    "url": f"https://reddit.com{d.get('permalink', '')}",
+                    "subreddit": sub_name,
+                    "platform": "reddit",
+                })
+                if len(out) >= limit:
+                    return out
         except Exception as e:
-            log.warning(f"PRAW fetch failed: {e}")
-
-    # Fallback: public JSON (no auth)
-    if not out:
-        for sub_name in subs[:2]:
-            try:
-                r = requests.get(
-                    f"https://www.reddit.com/r/{sub_name}/top.json?t=day&limit={limit}",
-                    headers={"User-Agent": Config.REDDIT_USER_AGENT},
-                    timeout=8,
-                )
-                r.raise_for_status()
-                for child in r.json().get("data", {}).get("children", []):
-                    d = child.get("data", {})
-                    if d.get("score", 0) < 50:
-                        continue
-                    out.append({
-                        "title": d.get("title", ""),
-                        "score": d.get("score", 0),
-                        "url": f"https://reddit.com{d.get('permalink', '')}",
-                        "subreddit": sub_name,
-                        "platform": "reddit",
-                    })
-                    if len(out) >= limit:
-                        return out
-            except Exception as e:
-                log.warning(f"Reddit JSON fallback for r/{sub_name} failed: {e}")
+            log.warning(f"Reddit JSON fetch for r/{sub_name} failed: {e}")
     return out
-
-
-def _twitch_app_token() -> str | None:
-    """Get a Twitch app access token via client_credentials."""
-    if not all([Config.TWITCH_CLIENT_ID, Config.TWITCH_CLIENT_SECRET]):
-        return None
-    try:
-        r = requests.post("https://id.twitch.tv/oauth2/token", data={
-            "client_id": Config.TWITCH_CLIENT_ID,
-            "client_secret": Config.TWITCH_CLIENT_SECRET,
-            "grant_type": "client_credentials",
-        }, timeout=8)
-        r.raise_for_status()
-        return r.json().get("access_token")
-    except Exception as e:
-        log.warning(f"Twitch token failed: {e}")
-        return None
-
-
-def _twitch_game_id(game: str, token: str) -> str | None:
-    """Look up Twitch game_id (cached in memory)."""
-    if not Config.TWITCH_CLIENT_ID:
-        return None
-    key = (game or "").lower().strip()
-    if key in _TWITCH_GAME_CACHE:
-        return _TWITCH_GAME_CACHE[key]
-    if not key or key == "all":
-        # Treat "all" as no game filter
-        _TWITCH_GAME_CACHE[key] = ""
-        return ""
-    try:
-        r = requests.get("https://api.twitch.tv/helix/games", params={"name": game}, headers={
-            "Client-ID": Config.TWITCH_CLIENT_ID,
-            "Authorization": f"Bearer {token}",
-        }, timeout=8)
-        r.raise_for_status()
-        data = r.json().get("data", [])
-        if data:
-            gid = data[0]["id"]
-            _TWITCH_GAME_CACHE[key] = gid
-            return gid
-    except Exception as e:
-        log.warning(f"Twitch game lookup for '{game}' failed: {e}")
-    _TWITCH_GAME_CACHE[key] = ""
-    return ""
-
-
-def _twitch_top(game: str, limit: int = 8) -> list[dict]:
-    """Return top live streams for the game (or all top streams if no game)."""
-    token = _twitch_app_token()
-    if not token:
-        return []
-    gid = _twitch_game_id(game, token)
-    params: dict[str, Any] = {"first": limit}
-    if gid:
-        params["game_id"] = gid
-    try:
-        r = requests.get("https://api.twitch.tv/helix/streams", params=params, headers={
-            "Client-ID": Config.TWITCH_CLIENT_ID,
-            "Authorization": f"Bearer {token}",
-        }, timeout=8)
-        r.raise_for_status()
-        out = []
-        for s in r.json().get("data", [])[:limit]:
-            out.append({
-                "title": s.get("title", ""),
-                "viewers": s.get("viewer_count", 0),
-                "streamer": s.get("user_name", ""),
-                "game": s.get("game_name", game or "Unknown"),
-                "url": f"https://twitch.tv/{s.get('user_name', '')}",
-                "platform": "twitch",
-            })
-        return out
-    except Exception as e:
-        log.warning(f"Twitch streams failed: {e}")
-        return []
 
 
 def _google_trends(game: str, limit: int = 6) -> list[dict]:
@@ -1865,13 +1741,12 @@ def _groq_json(prompt: str, system: str = "") -> dict | list:
 
 @app.route("/trends")
 def trends():
-    """Hybrid multi-platform trend radar.
+    """Keyless-friendly multi-platform trend radar.
 
-    Pulls real data from 6 platforms:
-      • YouTube (free Data API) — trending video titles
-      • Reddit (PRAW or public JSON) — top posts of the day from gaming subreddits
-      • Twitch (free Helix API) — top live streams for the game
-      • Google Trends (pytrends) — rising search queries
+    Pulls real data from 5 platforms (Twitch dropped — needs 2FA-locked dev console):
+      • YouTube (free Data API key) — trending video titles
+      • Reddit (NO KEY — public .json endpoints) — top posts of the day
+      • Google Trends (NO KEY — pytrends) — rising search queries
       • TikTok (SerpAPI paid) — viral clips (premium)
       • Twitter/X (SerpAPI paid) — trending tweets (premium)
 
@@ -1884,7 +1759,6 @@ def trends():
     # Fetch from all sources in sequence (each helper handles its own failures)
     yt_results = _yt_trending(game or "gaming", max_results=10)
     reddit_results = _reddit_top(game, limit=8)
-    twitch_results = _twitch_top(game, limit=8)
     trends_results = _google_trends(game, limit=6)
     tiktok_results = _serp_tiktok(game, limit=6)
     twitter_results = _serp_twitter(game, limit=6)
@@ -1898,10 +1772,6 @@ def trends():
         f"- {r['title']} (r/{r['subreddit']}, score: {r['score']})"
         for r in reddit_results[:6]
     ) or "No Reddit data available."
-    twitch_block = "\n".join(
-        f"- {t['streamer']}: {t['title']} ({t['viewers']} viewers, {t['game']})"
-        for t in twitch_results[:6]
-    ) or "No Twitch data available."
     gtrends_block = "\n".join(
         f"- {t['title']} (+{t['value']}% growth)"
         for t in trends_results[:5]
@@ -1927,9 +1797,6 @@ originated so the frontend can render a badge.
 === REDDIT (top posts of the day from gaming subs) ===
 {reddit_block}
 
-=== TWITCH (top live streams right now) ===
-{twitch_block}
-
 === GOOGLE TRENDS (rising search queries, last 7 days) ===
 {gtrends_block}
 
@@ -1948,7 +1815,6 @@ Return a JSON object:
   "sources": {{
     "youtube": <int count of items we received>,
     "reddit": <int>,
-    "twitch": <int>,
     "google_trends": <int>,
     "tiktok": <int>,
     "twitter": <int>
@@ -1959,7 +1825,7 @@ Return a JSON object:
       "name": "<trend name/phrase>",
       "category": "<one of: title|hashtag|sound|challenge>",
       "game": "<game name or All>",
-      "platform": "<one of: youtube|reddit|twitch|google_trends|tiktok|twitter>",
+      "platform": "<one of: youtube|reddit|google_trends|tiktok|twitter>",
       "score": <0-100 integer>,
       "change": <percentage change integer, can be negative>,
       "status": "<rising|peaked|falling>",
@@ -1978,11 +1844,10 @@ Rules:
     try:
         data = _groq_json(prompt, system)
         data["updatedAt"] = datetime.now(timezone.utc).isoformat()
-        # Attach real source counts so the frontend can show "Live from 6 platforms"
+        # Attach real source counts so the frontend can show "Live from N/5 platforms"
         data.setdefault("sources", {
             "youtube": len(yt_results),
             "reddit": len(reddit_results),
-            "twitch": len(twitch_results),
             "google_trends": len(trends_results),
             "tiktok": len(tiktok_results),
             "twitter": len(twitter_results),

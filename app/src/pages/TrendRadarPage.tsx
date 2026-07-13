@@ -12,7 +12,7 @@ interface TrendRadarPageProps {
 }
 
 type TrendStatus = 'rising' | 'peaked' | 'falling';
-type TrendPlatform = 'youtube' | 'reddit' | 'twitch' | 'google_trends' | 'tiktok' | 'twitter' | 'all';
+type TrendPlatform = 'youtube' | 'reddit' | 'google_trends' | 'tiktok' | 'twitter' | 'all';
 
 interface TrendItem {
   id: string;
@@ -45,7 +45,6 @@ const PLATFORMS: { id: TrendPlatform; label: string; color: string }[] = [
   { id: 'all',            label: 'All',           color: 'bg-clip-cyan text-black' },
   { id: 'youtube',        label: 'YouTube',        color: 'bg-red-500/15 text-red-400' },
   { id: 'reddit',         label: 'Reddit',         color: 'bg-orange-500/15 text-orange-400' },
-  { id: 'twitch',         label: 'Twitch',         color: 'bg-purple-500/15 text-purple-400' },
   { id: 'google_trends',  label: 'Google',         color: 'bg-blue-500/15 text-blue-400' },
   { id: 'tiktok',         label: 'TikTok',         color: 'bg-pink-500/15 text-pink-400' },
   { id: 'twitter',        label: 'X',              color: 'bg-slate-500/15 text-slate-300' },
@@ -54,7 +53,6 @@ const PLATFORMS: { id: TrendPlatform; label: string; color: string }[] = [
 const PlatformBadge: Record<TrendPlatform, string> = {
   youtube:        'bg-red-500/15 text-red-400 border-red-500/20',
   reddit:         'bg-orange-500/15 text-orange-400 border-orange-500/20',
-  twitch:         'bg-purple-500/15 text-purple-400 border-purple-500/20',
   google_trends:  'bg-blue-500/15 text-blue-400 border-blue-500/20',
   tiktok:         'bg-pink-500/15 text-pink-400 border-pink-500/20',
   twitter:        'bg-slate-500/15 text-slate-300 border-slate-400/20',
@@ -134,7 +132,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               Trend <span className="gradient-text">Radar</span>
             </h1>
             <p className="text-clip-muted mt-1">
-              What's blowing up across YouTube, Reddit, Twitch, Google, TikTok & X — RIGHT NOW
+              What's blowing up across YouTube, Reddit, Google, TikTok & X — RIGHT NOW
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -221,7 +219,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
           ))}
           {trendData?.sources && (
             <span className="text-clip-muted text-xs self-center ml-auto flex-shrink-0 hidden sm:block">
-              Live: {Object.entries(trendData.sources).filter(([, v]) => v > 0).length}/6 platforms
+              Live: {Object.entries(trendData.sources).filter(([, v]) => v > 0).length}/5 platforms
             </span>
           )}
         </div>
@@ -355,7 +353,7 @@ function getFallbackData(game: string): TrendData {
   return {
     game: g,
     updatedAt: new Date().toISOString(),
-    sources: { youtube: 6, reddit: 4, twitch: 3, google_trends: 2, tiktok: 0, twitter: 0 },
+    sources: { youtube: 6, reddit: 4, google_trends: 2, tiktok: 0, twitter: 0 },
     trends: [
       { id:'1',  name:'1v4 clutch no scope',          category:'title',     game:g, platform:'youtube',       score:97, change:+34, status:'rising',  views:'2.1M',  example:'"1v4 clutch no scope they thought I was done 😤"' },
       { id:'2',  name:'#valorantclips',                category:'hashtag',   game:g, platform:'tiktok',        score:91, change:+28, status:'rising',  views:'890K',  example:undefined },
@@ -364,11 +362,11 @@ function getFallbackData(game: string): TrendData {
       { id:'5',  name:'Phonk drift sound',             category:'sound',     game:g, platform:'youtube',       score:84, change: +8, status:'peaked',  views:'5.1M',  example:undefined },
       { id:'6',  name:'#apexlegends',                  category:'hashtag',   game:g, platform:'twitter',        score:82, change:+15, status:'rising',  views:'340K',  example:undefined },
       { id:'7',  name:'Watch till the end',            category:'title',     game:g, platform:'tiktok',        score:79, change: -3, status:'peaked',  views:'1.9M',  example:undefined },
-      { id:'8',  name:'Tenz ranked grind',             category:'title',     game:g, platform:'twitch',         score:78, change:+42, status:'rising',  views:'48K',   example:undefined },
+      { id:'8',  name:'valorant clutch meta',          category:'title',     game:g, platform:'google_trends',  score:78, change:+42, status:'rising',  views:'—',     example:undefined },
       { id:'9',  name:'They didn\'t see me coming',    category:'title',     game:g, platform:'youtube',       score:76, change:+11, status:'rising',  views:'780K',  example:undefined },
-      { id:'10', name:'valorant clutch meta',          category:'title',     game:g, platform:'google_trends',  score:74, change:+27, status:'rising',  views:'—',     example:undefined },
+      { id:'10', name:'r/warzone clip of the week',    category:'title',     game:g, platform:'reddit',         score:74, change:+27, status:'rising',  views:'12K',   example:undefined },
       { id:'11', name:'Savage mode beat drop',         category:'sound',     game:g, platform:'tiktok',        score:70, change:+18, status:'rising',  views:'2.7M',  example:undefined },
-      { id:'12', name:'r/warzone clip of the week',    category:'title',     game:g, platform:'reddit',         score:68, change: +6, status:'rising',  views:'12K',   example:undefined },
+      { id:'12', name:'gaming clips 2026',             category:'title',     game:g, platform:'google_trends',  score:68, change: +6, status:'rising',  views:'—',     example:undefined },
     ],
   };
 }

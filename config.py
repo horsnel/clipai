@@ -30,17 +30,18 @@ class Config:
     SERPAPI_KEY: str | None = os.getenv("SERPAPI_KEY")
     YOUTUBE_API_KEY: str | None = os.getenv("YOUTUBE_API_KEY")
 
-    # ── Multi-platform trend sources (hybrid model) ─────────────────────────
-    # Reddit (free — https://www.reddit.com/prefs/apps, "script" type)
-    REDDIT_CLIENT_ID: str | None = os.getenv("REDDIT_CLIENT_ID")
-    REDDIT_CLIENT_SECRET: str | None = os.getenv("REDDIT_CLIENT_SECRET")
+    # ── Reddit (NO API KEY — uses public .json endpoints) ────────────────────
+    # Just needs a descriptive User-Agent per Reddit's bot policy.
+    # Format: "<appname>/<version> by u_<reddit_username>"
     REDDIT_USER_AGENT: str = os.getenv("REDDIT_USER_AGENT", "clipai-trend-radar/2.0 by u_clipai")
 
-    # Twitch (free — https://dev.twitch.tv/console)
-    TWITCH_CLIENT_ID: str | None = os.getenv("TWITCH_CLIENT_ID")
-    TWITCH_CLIENT_SECRET: str | None = os.getenv("TWITCH_CLIENT_SECRET")
+    # ── Google Trends (NO KEY — uses pytrends library, no auth) ──────────────
 
-    # Google Trends (free — pytrends library, no key required)
+    # ── Twitch (DROPPED — Helix API requires 2FA-locked dev console) ─────────
+    # To re-enable later:
+    #   TWITCH_CLIENT_ID  = os.getenv("TWITCH_CLIENT_ID")
+    #   TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
+    # Then restore the _twitch_* helpers from git history (commit 5b89523).
 
     # ── Cloudflare R2 ────────────────────────────────────────────────────────
     R2_ENDPOINT: str | None = os.getenv("R2_ENDPOINT") or os.getenv("R2_ACCOUNT_ID")
