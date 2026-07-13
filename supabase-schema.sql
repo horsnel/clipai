@@ -166,6 +166,20 @@ create table if not exists public.clipbot_history (
 );
 create index if not exists idx_clipbot_user_id on public.clipbot_history(user_id, created_at desc);
 
+-- ─── VIDEO EDITOR WAITLIST ──────────────────────────────────────────────────
+-- Collects emails of users waiting for the v3 video editor launch.
+-- When a waitlist email matches a registered profile, award 25 credits.
+create table if not exists public.waitlist (
+  id              uuid primary key default uuid_generate_v4(),
+  email           text unique not null,
+  user_id         uuid references public.profiles(id) on delete set null,
+  game_interest   text,                       -- 'valorant' / 'apex' / etc.
+  source          text default 'upload_page',
+  credits_awarded boolean not null default false,
+  created_at      timestamptz not null default now()
+);
+create index if not exists idx_waitlist_email on public.waitlist(email);
+
 -- ============================================================================
 -- HELPER FUNCTIONS
 -- ============================================================================
@@ -310,6 +324,7 @@ alter table public.subscriptions       enable row level security;
 alter table public.topup_purchases     enable row level security;
 alter table public.caption_votes       enable row level security;
 alter table public.clipbot_history     enable row level security;
+alter table public.waitlist            enable row level security;
 
 -- PROFILES: users can read own + see others (for leaderboard)
 drop policy if exists "profiles_self_select" on public.profiles;
@@ -372,6 +387,15 @@ create policy caption_votes_select on public.caption_votes
 drop policy if exists "caption_votes_insert" on public.caption_votes;
 create policy caption_votes_insert on public.caption_votes
   for insert with check (auth.uid() = user_id);
+
+-- WAITLIST: anyone can insert their email; users can read own rows
+drop policy if exists "waitlist_anon_insert" on public.waitlist;
+create policy waitlist_anon_insert on public.waitlist
+  for insert with check (true);
+
+drop policy if exists "waitlist_self_select" on public.waitlist;
+create policy waitlist_self_select on public.waitlist
+  for select using (auth.uid() = user_id);
 
 -- ============================================================================
 -- Done. Verify with: select * from public.profiles limit 5;

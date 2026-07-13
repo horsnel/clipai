@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
+import { toast } from 'sonner';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { apiClient } from '@/services/api';
 
@@ -44,7 +45,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = useCallback(async (sess: Session): Promise<AuthUser | null> => {
     try {
       apiClient.setToken(sess.access_token);
-      const me = await apiClient.get<AuthUser>('/auth/me');
+      const me = await apiClient.get<AuthUser & { streakBumped?: boolean; streakCreditsAwarded?: number }>('/auth/me');
+      // Celebrate streak bump (only fires once per day per server logic)
+      if (me.streakBumped && me.streakCreditsAwarded) {
+        toast.success(`🔥 Day ${me.streakDays} streak! +${me.streakCreditsAwarded} credits`, {
+          description: 'Come back tomorrow for more.',
+        });
+      }
       return me;
     } catch (err) {
       console.warn('[auth] /auth/me failed, falling back to session metadata', err);

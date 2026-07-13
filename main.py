@@ -28,7 +28,7 @@ import subprocess
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
@@ -435,8 +435,43 @@ def health():
 @app.route("/auth/me")
 @require_auth
 def auth_me():
-    """Return the current user's profile. Frontend uses this after Supabase login."""
+    """Return the current user's profile. Frontend uses this after Supabase login.
+
+    Also applies the daily streak: if `last_active_date` is yesterday or earlier,
+    bump `streak_days`, award +5 credits (cap 50/day total streak credits) and +25 XP.
+    """
     profile = request.profile
+    user_id = profile["id"]
+
+    # ─── Daily streak check ─────────────────────────────────────────────────
+    today = date.today()
+    last_active_str = profile.get("last_active_date")
+    streak_bumped = False
+    streak_credits = 0
+    try:
+        if last_active_str:
+            # Postgres returns ISO date string
+            last_active = date.fromisoformat(str(last_active_str)[:10])
+        else:
+            last_active = None
+    except (ValueError, TypeError):
+        last_active = None
+
+    if last_active != today:
+        new_streak = (profile.get("streak_days", 0) + 1) if last_active == (today - timedelta(days=1)) else 1
+        # Award streak credits + XP only once per day
+        update_profile(user_id, {
+            "streak_days": new_streak,
+            "last_active_date": today.isoformat(),
+        })
+        award_credits(user_id, 5, "daily_streak", reference_id=None)
+        award_xp(user_id, "daily_streak", Config.XP_REWARDS["daily_streak"])
+        streak_bumped = True
+        streak_credits = 5
+        # Refresh profile so returned values reflect the new state
+        profile = fetch_profile(user_id) or profile
+        profile["streak_days"] = new_streak
+
     return jsonify({
         "id": profile["id"],
         "email": profile.get("email", ""),
@@ -448,6 +483,134 @@ def auth_me():
         "xp": profile.get("xp", 0),
         "streakDays": profile.get("streak_days", 0),
         "avatarUrl": profile.get("avatar_url"),
+        "streakBumped": streak_bumped,
+        "streakCreditsAwarded": streak_credits,
+    })
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# VIDEO EDITOR WAITLIST
+# ════════════════════════════════════════════════════════════════════════════
+@app.route("/waitlist/join", methods=["POST"])
+def waitlist_join():
+    """Join the v3 video editor waitlist.
+
+    Body: { email, game_interest?, source? }
+    - Idempotent (insert-or-noop on conflict).
+    - If the email matches an existing profile, link user_id + award 25 credits once.
+    - Returns { success, position, creditsAwarded }.
+    """
+    body = request.get_json(silent=True) or {}
+    email = (body.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        return jsonify({"error": "Valid email required"}), 400
+
+    game_interest = (body.get("game_interest") or "").strip().lower() or None
+    source = (body.get("source") or "upload_page").strip()
+
+    if not Config.SUPABASE_URL or not Config.SUPABASE_SERVICE_KEY:
+        # DB not configured — accept anyway so the UX doesn't break
+        return jsonify({
+            "success": True, "position": 1, "creditsAwarded": 0,
+            "message": "You're on the list! We'll email you when the editor launches.",
+        })
+
+    headers = {
+        "apikey": Config.SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {Config.SUPABASE_SERVICE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+
+    # Check if email already on waitlist
+    check_url = (
+        f"{Config.SUPABASE_URL.rstrip('/')}/rest/v1/waitlist?"
+        f"email=eq.{email}&select=id,credits_awarded"
+    )
+    try:
+        r = requests.get(check_url, headers=headers, timeout=10)
+        existing = r.json() if r.ok else []
+    except requests.RequestException:
+        existing = []
+
+    if existing:
+        # Already on list — return their existing position
+        count_url = (
+            f"{Config.SUPABASE_URL.rstrip('/')}/rest/v1/waitlist?"
+            f"created_at=lt.(select created_at from waitlist where email=eq.{email})"
+        )
+        try:
+            cr = requests.head(count_url, headers={**headers, "Prefer": "count=exact"}, timeout=10)
+            rng = cr.headers.get("content-range", "*/0")
+            position = int(rng.split("/")[-1] or 1) + 1
+        except (requests.RequestException, ValueError):
+            position = 1
+        return jsonify({
+            "success": True, "position": position, "creditsAwarded": 0,
+            "message": "You're already on the waitlist!",
+        })
+
+    # Try to link to existing profile by email
+    profile_url = (
+        f"{Config.SUPABASE_URL.rstrip('/')}/rest/v1/profiles?"
+        f"email=eq.{email}&select=id,credits"
+    )
+    user_id = None
+    credits_awarded = 0
+    try:
+        pr = requests.get(profile_url, headers=headers, timeout=10)
+        if pr.ok:
+            rows = pr.json()
+            if rows:
+                user_id = rows[0]["id"]
+    except requests.RequestException:
+        pass
+
+    # Insert waitlist row
+    payload = {
+        "email": email,
+        "user_id": user_id,
+        "game_interest": game_interest,
+        "source": source,
+        "credits_awarded": False,
+    }
+    insert_url = f"{Config.SUPABASE_URL.rstrip('/')}/rest/v1/waitlist"
+    try:
+        ir = requests.post(insert_url, json=payload, headers={**headers, "Prefer": "return=minimal"}, timeout=10)
+        if ir.status_code not in (200, 201):
+            return jsonify({"error": "Could not join waitlist", "detail": ir.text}), 500
+    except requests.RequestException as e:
+        return jsonify({"error": "Network error", "detail": str(e)}), 500
+
+    # Award 25 credits if linked to a real profile
+    if user_id:
+        if award_credits(user_id, 25, "waitlist_bonus"):
+            # Mark as awarded
+            upd_url = (
+                f"{Config.SUPABASE_URL.rstrip('/')}/rest/v1/waitlist?"
+                f"email=eq.{email}"
+            )
+            try:
+                requests.patch(upd_url, json={"credits_awarded": True}, headers=headers, timeout=10)
+            except requests.RequestException:
+                pass
+            credits_awarded = 25
+
+    # Compute position (count rows created before this one)
+    position = 1
+    try:
+        count_url = f"{Config.SUPABASE_URL.rstrip('/')}/rest/v1/waitlist?select=id"
+        cr = requests.head(count_url, headers={**headers, "Prefer": "count=exact"}, timeout=10)
+        rng = cr.headers.get("content-range", "*/0")
+        position = int(rng.split("/")[-1] or 1)
+    except (requests.RequestException, ValueError):
+        pass
+
+    return jsonify({
+        "success": True,
+        "position": position,
+        "creditsAwarded": credits_awarded,
+        "message": "Welcome to the v3 waitlist! We'll email you when the editor launches.",
     })
 
 
@@ -1396,18 +1559,11 @@ def clipbot_history():
 # TREND RADAR + FORGE + GROWTH INTEL (preserved from v1, light auth added)
 # ════════════════════════════════════════════════════════════════════════════
 def _serp_search(query: str, num: int = 10) -> list:
-    if not Config.SERPAPI_KEY:
-        return []
-    try:
-        resp = requests.get("https://serpapi.com/search", params={
-            "q": query, "num": num, "api_key": Config.SERPAPI_KEY,
-            "engine": "google", "gl": "ng", "hl": "en",
-        }, timeout=10)
-        resp.raise_for_status()
-        return resp.json().get("organic_results", [])
-    except Exception as e:
-        log.warning(f"SerpAPI error: {e}")
-        return []
+    """SerpAPI is deprecated for cost reasons — return [] so caller falls back to YouTube only.
+
+    Kept for backward compatibility with old forge endpoints that mix serp + youtube data.
+    """
+    return []
 
 
 def _yt_trending(game: str, max_results: int = 15) -> list:

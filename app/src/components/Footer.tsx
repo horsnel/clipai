@@ -26,7 +26,7 @@ export function Footer({ onNavigate }: FooterProps) {
               </span>
             </button>
             <p className="text-clip-muted text-sm leading-relaxed max-w-sm mb-6">
-              AI-powered gaming highlight clips. Upload your gameplay, let our AI detect the hype moments, and export viral-ready content in seconds.
+              The AI growth platform for gaming creators. Trend Radar, ViralForge, ClipBot coach, and Caption Battle — built for the games you actually play. Made in Lagos.
             </p>
             <div className="flex items-center gap-3">
               <a

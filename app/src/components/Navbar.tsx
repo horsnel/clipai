@@ -34,7 +34,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
         { label: 'ClipBot', page: 'clipbot' as Page },
         { label: 'My Rank', page: 'rank' as Page },
         { label: 'Growth Intel', page: 'growth' as Page },
-        { label: 'Upload', page: 'upload' as Page },
+        { label: 'Editor (Soon)', page: 'upload' as Page },
         { label: 'Leaderboard', page: 'leaderboard' as Page },
         { label: 'Pricing', page: 'pricing' as Page },
         { label: 'Settings', page: 'settings' as Page },

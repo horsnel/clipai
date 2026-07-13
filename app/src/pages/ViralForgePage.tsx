@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
 import { Zap, Copy, ThumbsUp, RefreshCw,
   Hash, Type, Sparkles, ChevronRight, CheckCheck,
-  TrendingUp, Flame,
+  TrendingUp, Flame, Trophy, Crown,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { voteOnCaption } from '@/services/api';
+import { voteOnCaption, getTopCaptions } from '@/services/api';
 
 interface ViralForgePageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -65,6 +65,56 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
   // Caption battle
   const [battlePair, setBattlePair]   = useState<[GeneratedCaption, GeneratedCaption] | null>(null);
   const [battleWinner, setBattleWinner] = useState<GeneratedCaption | null>(null);
+
+  // Top voted captions (community battle board)
+  const [topCaptions, setTopCaptions] = useState<Array<{
+    caption: string; net_votes: number; game?: string; vibe?: string;
+  }>>([]);
+  const [topLoading, setTopLoading]   = useState(false);
+  const [votedSet, setVotedSet]       = useState<Set<string>>(new Set());
+
+  const fetchTopCaptions = useCallback(async () => {
+    setTopLoading(true);
+    try {
+      const data = await getTopCaptions();
+      setTopCaptions(data.captions ?? []);
+    } catch {
+      // Silent fail — battle board is supplementary
+      setTopCaptions([]);
+    } finally {
+      setTopLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchTopCaptions(); }, [fetchTopCaptions]);
+
+  const handleTopVote = async (caption: string, vote: 1 | -1) => {
+    if (votedSet.has(caption)) {
+      toast.info('You already voted on this one');
+      return;
+    }
+    // Optimistic update
+    setTopCaptions(prev =>
+      prev.map(c => c.caption === caption
+        ? { ...c, net_votes: c.net_votes + vote }
+        : c,
+      ).sort((a, b) => b.net_votes - a.net_votes),
+    );
+    setVotedSet(prev => new Set([...prev, caption]));
+    try {
+      await voteOnCaption(caption, vote, undefined, undefined);
+    } catch {
+      // Revert on failure
+      setTopCaptions(prev =>
+        prev.map(c => c.caption === caption
+          ? { ...c, net_votes: c.net_votes - vote }
+          : c,
+        ).sort((a, b) => b.net_votes - a.net_votes),
+      );
+      setVotedSet(prev => { const n = new Set(prev); n.delete(caption); return n; });
+      toast.error('Vote failed — try again');
+    }
+  };
 
   const copy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -424,14 +474,84 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
           </div>
         </div>
 
+        {/* Caption Battle — Top Voted This Week */}
+        <div className="mt-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Crown className="w-5 h-5 text-clip-amber" />
+              <h2 className="font-display font-bold text-xl text-clip-text">
+                Top Voted This Week
+              </h2>
+            </div>
+            <button
+              onClick={fetchTopCaptions}
+              disabled={topLoading}
+              className="text-clip-muted hover:text-clip-cyan text-xs flex items-center gap-1.5 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${topLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+
+          {topCaptions.length === 0 ? (
+            <div className="card-glass p-8 text-center">
+              <Trophy className="w-10 h-10 mx-auto mb-3 text-clip-muted opacity-30" />
+              <p className="text-clip-muted text-sm">
+                No community votes yet this week. Generate captions above and vote to claim the #1 spot.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {topCaptions.slice(0, 8).map((c, i) => {
+                const alreadyVoted = votedSet.has(c.caption);
+                return (
+                  <div key={i} className={`card-glass p-4 flex items-start gap-3 ${
+                    i === 0 ? 'border-clip-amber/30 bg-clip-amber/5' : ''
+                  }`}>
+                    <span className={`font-display font-bold text-lg w-8 flex-shrink-0 ${
+                      i === 0 ? 'text-clip-amber' : i === 1 ? 'text-clip-muted' : i === 2 ? 'text-amber-700' : 'text-clip-muted/60'
+                    }`}>
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-clip-text text-sm leading-relaxed mb-1">{c.caption}</p>
+                      <div className="flex items-center gap-3 text-xs text-clip-muted">
+                        {c.game && <span className="capitalize">{c.game}</span>}
+                        {c.vibe && <><span className="text-white/20">·</span><span>{c.vibe}</span></>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={() => handleTopVote(c.caption, 1)}
+                        disabled={alreadyVoted}
+                        className={`p-1.5 rounded-lg transition-all ${
+                          alreadyVoted
+                            ? 'text-clip-muted/40 cursor-not-allowed'
+                            : 'text-clip-muted hover:text-green-400 hover:bg-green-400/10'
+                        }`}
+                        title={alreadyVoted ? 'Voted' : 'Upvote'}
+                      >
+                        <ThumbsUp className="w-4 h-4" />
+                      </button>
+                      <span className="text-clip-cyan font-mono text-sm w-8 text-center">
+                        {c.net_votes}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         {/* Upgrade nudge */}
         {user?.plan === 'free' && (
           <div className="mt-8 card-glass p-5 border-clip-cyan/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Sparkles className="w-5 h-5 text-clip-cyan flex-shrink-0" />
               <div>
-                <p className="text-clip-text font-medium text-sm">Get 10x more generations + live search data</p>
-                <p className="text-clip-muted text-xs">Free plan: 5 generations/day. Pro: unlimited + SerpAPI live trends</p>
+                <p className="text-clip-text font-medium text-sm">Unlimited generations + priority AI</p>
+                <p className="text-clip-muted text-xs">Free plan: 5 generations/day. Pro: unlimited ViralForge + ClipBot access.</p>
               </div>
             </div>
             <button onClick={() => onNavigate('pricing')} className="btn-primary text-sm px-5 py-2 whitespace-nowrap">

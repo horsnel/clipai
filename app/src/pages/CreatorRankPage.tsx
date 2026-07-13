@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Page } from '../App';
 import {
   Flame, Star, Trophy, Zap,
-  Crown, ChevronUp, Award, TrendingUp, Lock,
+  Crown, ChevronUp, Award, TrendingUp, Lock, Share2, Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { getMyRank } from '@/services/api';
 
 interface CreatorRankPageProps {
@@ -57,6 +58,8 @@ function rankFor(xp: number): Rank {
 export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'ranks' | 'leaderboard' | 'earn'>('profile');
   const [rankData, setRankData] = useState<any>(null);
+  const [shareLoading, setShareLoading] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     getMyRank().then(setRankData).catch(() => {});
@@ -75,6 +78,123 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
     ? ((userXP - currentRank.minXP) / (nextRank.minXP - currentRank.minXP)) * 100
     : 100;
 
+  // ── Share card generator ─────────────────────────────────────────────────
+  const generateShareCard = async () => {
+    setShareLoading(true);
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas) throw new Error('Canvas not ready');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas 2D context unavailable');
+
+      const W = 1080, H = 1080;
+      canvas.width = W; canvas.height = H;
+
+      // Background — dark gradient
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, '#08080d');
+      bg.addColorStop(1, '#101018');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Glow blobs
+      ctx.fillStyle = 'rgba(0, 200, 255, 0.08)';
+      ctx.beginPath();
+      ctx.arc(W * 0.2, H * 0.2, 320, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 184, 0, 0.05)';
+      ctx.beginPath();
+      ctx.arc(W * 0.85, H * 0.85, 280, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Header pill
+      ctx.fillStyle = 'rgba(0, 200, 255, 0.15)';
+      roundRect(ctx, W/2 - 130, 80, 260, 50, 25);
+      ctx.fill();
+      ctx.fillStyle = '#00C8FF';
+      ctx.font = 'bold 22px Inter, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('CLIPAI CREATOR RANK', W/2, 112);
+
+      // Rank icon (emoji) — big
+      ctx.font = '180px serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(currentRank.icon, W/2, 280);
+
+      // Rank name
+      const rankColors: Record<string, string> = {
+        rookie: '#9CA3AF', clipper: '#4ADE80', reel: '#60A5FA',
+        legend: '#00C8FF', godtier: '#FFB800',
+      };
+      ctx.fillStyle = rankColors[currentRank.id] ?? '#00C8FF';
+      ctx.font = 'bold 88px Inter, system-ui, sans-serif';
+      ctx.fillText(currentRank.name.toUpperCase(), W/2, 430);
+
+      // User name
+      ctx.fillStyle = '#F4F6FA';
+      ctx.font = 'bold 48px Inter, system-ui, sans-serif';
+      ctx.fillText(user?.name ?? 'Gamer', W/2, 520);
+
+      // Divider
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(180, 580); ctx.lineTo(W - 180, 580);
+      ctx.stroke();
+
+      // Stats row — 3 boxes
+      const statY = 660;
+      const statW = 240;
+      const stats = [
+        { label: 'TOTAL XP',    value: userXP.toLocaleString() },
+        { label: 'GLOBAL RANK', value: globalRank ? `#${globalRank}` : '—' },
+        { label: 'DAY STREAK',  value: `${streak} 🔥` },
+      ];
+      stats.forEach((s, i) => {
+        const x = (W - statW * 3) / 2 + i * statW + statW / 2;
+        ctx.fillStyle = 'rgba(255,255,255,0.04)';
+        roundRect(ctx, x - statW/2 + 10, statY - 60, statW - 20, 140, 16);
+        ctx.fill();
+        ctx.fillStyle = '#9CA3AF';
+        ctx.font = 'bold 18px Inter, system-ui, sans-serif';
+        ctx.fillText(s.label, x, statY - 20);
+        ctx.fillStyle = '#00C8FF';
+        ctx.font = 'bold 48px Inter, system-ui, sans-serif';
+        ctx.fillText(s.value, x, statY + 30);
+      });
+
+      // Footer
+      ctx.fillStyle = '#6B7280';
+      ctx.font = '24px Inter, system-ui, sans-serif';
+      ctx.fillText('clipai.app · @clipai', W/2, H - 80);
+      ctx.fillStyle = '#4ADE80';
+      ctx.font = 'bold 22px Inter, system-ui, sans-serif';
+      ctx.fillText('Climb the leaderboard →', W/2, H - 50);
+
+      // Download
+      const link = document.createElement('a');
+      link.download = `clipai-rank-${currentRank.id}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast.success('Rank card downloaded — share it on socials!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not generate card');
+    } finally {
+      setShareLoading(false);
+    }
+  };
+
+  // Helper: rounded rect path
+  function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
   return (
     <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
       <div className="max-w-5xl mx-auto">
@@ -87,14 +207,28 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
             </h1>
             <p className="text-clip-muted mt-1">Level up. Earn XP. Become a GOD TIER creator.</p>
           </div>
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${currentRank.borderColor} ${currentRank.bgColor}`}>
-            <span className="text-2xl">{currentRank.icon}</span>
-            <div>
-              <p className={`font-display font-bold ${currentRank.color}`}>{currentRank.name}</p>
-              <p className="text-clip-muted text-xs">{userXP.toLocaleString()} XP</p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={generateShareCard}
+              disabled={shareLoading}
+              className="btn-secondary flex items-center gap-2 text-sm px-4 py-3 disabled:opacity-50"
+              title="Download a shareable PNG of your rank"
+            >
+              {shareLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Share2 className="w-4 h-4" />}
+              Share Rank
+            </button>
+            <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${currentRank.borderColor} ${currentRank.bgColor}`}>
+              <span className="text-2xl">{currentRank.icon}</span>
+              <div>
+                <p className={`font-display font-bold ${currentRank.color}`}>{currentRank.name}</p>
+                <p className="text-clip-muted text-xs">{userXP.toLocaleString()} XP</p>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Hidden canvas for PNG generation */}
+        <canvas ref={canvasRef} style={{ display: 'none' }} />
 
         {/* Tabs */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-1">

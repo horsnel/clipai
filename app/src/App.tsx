@@ -4,8 +4,7 @@ import { Footer } from './components/Footer';
 import { LandingPage } from './pages/LandingPage';
 import { AuthPage } from './pages/AuthPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { UploadPage } from './pages/UploadPage';
-import { ResultsPage } from './pages/ResultsPage';
+import { WaitlistPage } from './pages/WaitlistPage';
 import { PricingPage } from './pages/PricingPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TermsPage } from './pages/TermsPage';
@@ -18,7 +17,7 @@ import { CreatorRankPage } from './pages/CreatorRankPage';
 import { GrowthIntelPage } from './pages/GrowthIntelPage';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import type { DetectedClip, Plan } from './types';
+import type { Plan } from './types';
 import { verifyPayment } from './services/api';
 import './App.css';
 
@@ -42,7 +41,6 @@ interface AppUser {
 
 function AppContent() {
   const [currentPage, setCurrentPage]         = useState<Page>('landing');
-  const [detectedClips, setDetectedClips]     = useState<DetectedClip[] | undefined>(undefined);
   const { user: authUser, session, isLoading, signOut, refreshUser } = useAuth();
 
   const isLoggedIn = !!authUser;
@@ -97,14 +95,13 @@ function AppContent() {
     setCurrentPage('landing');
   };
 
-  const navigateTo = (page: Page, clips?: unknown[]) => {
-    if (clips) setDetectedClips(clips as DetectedClip[]);
+  const navigateTo = (page: Page, _clips?: unknown[]) => {
     setCurrentPage(page);
     window.scrollTo(0, 0);
   };
 
-  // Pages that require login
-  const PROTECTED: Page[] = ['dashboard','upload','results','settings','trends','forge','clipbot','rank','growth'];
+  // Pages that require login. 'upload' + 'results' now route to the v3 waitlist (no auth required).
+  const PROTECTED: Page[] = ['dashboard','settings','trends','forge','clipbot','rank','growth'];
 
   const renderPage = () => {
     if (PROTECTED.includes(currentPage) && !isLoggedIn) {
@@ -114,8 +111,8 @@ function AppContent() {
       case 'landing':     return <LandingPage onNavigate={navigateTo} />;
       case 'auth':        return <AuthPage onNavigate={navigateTo} onLogin={handleLogin} />;
       case 'dashboard':   return <DashboardPage user={user} onNavigate={navigateTo} onLogout={handleLogout} />;
-      case 'upload':      return <UploadPage user={user} onNavigate={navigateTo} />;
-      case 'results':     return <ResultsPage user={user} onNavigate={navigateTo} clips={detectedClips} />;
+      case 'upload':      return <WaitlistPage user={user} onNavigate={navigateTo} />;
+      case 'results':     return <WaitlistPage user={user} onNavigate={navigateTo} />;
       case 'pricing':     return <PricingPage user={user} onNavigate={navigateTo} isLoggedIn={isLoggedIn} />;
       case 'settings':    return <SettingsPage user={user} onNavigate={navigateTo} />;
       case 'terms':       return <TermsPage onNavigate={navigateTo} />;

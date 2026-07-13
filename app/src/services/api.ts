@@ -211,3 +211,13 @@ export async function updateNotifications(prefs: {
 }) {
   return apiClient.patch<{ success: boolean; prefs: any }>('/settings/notifications', prefs);
 }
+
+// ─── Video Editor Waitlist ─────────────────────────────────────────────────
+export async function joinWaitlist(email: string, gameInterest?: string, source = 'upload_page') {
+  return apiClient.post<{
+    success: boolean;
+    position: number;
+    creditsAwarded: number;
+    message: string;
+  }>('/waitlist/join', { email, game_interest: gameInterest, source });
+}

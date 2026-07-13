@@ -32,16 +32,16 @@ const plans: Plan[] = [
     name: 'Free',
     price: 0,
     priceAnnual: 0,
-    clips: '3 clips',
+    clips: '50 credits',
     icon: Zap,
     color: 'text-clip-muted',
     features: [
-      { text: '3 clips per month', included: true },
-      { text: 'Basic AI detection', included: true },
-      { text: '480p export', included: true },
-      { text: 'Beat sync', included: false },
-      { text: 'Watermark removal', included: false },
-      { text: 'Priority processing', included: false },
+      { text: '50 credits / month', included: true },
+      { text: '10 ClipBot messages / day', included: true },
+      { text: 'Trend Radar (24h delayed)', included: true },
+      { text: 'CreatorRank + Leaderboard', included: true },
+      { text: 'Daily streak credits (+5 / day)', included: true },
+      { text: 'Real-time trends + competitor spy', included: false },
     ],
   },
   {
@@ -49,16 +49,16 @@ const plans: Plan[] = [
     name: 'Starter',
     price: 1000,
     priceAnnual: 800,
-    clips: '10 clips',
+    clips: '200 credits',
     icon: Sparkles,
     color: 'text-blue-400',
     features: [
-      { text: '10 clips per month', included: true },
-      { text: 'Basic AI detection', included: true },
-      { text: '720p export', included: true },
-      { text: 'Beat sync', included: false },
-      { text: 'Watermark removal', included: true },
-      { text: 'Priority processing', included: false },
+      { text: '200 ViralForge credits / month', included: true },
+      { text: 'Unlimited ClipBot coach', included: true },
+      { text: 'Real-time Trend Radar', included: true },
+      { text: 'Daily streak credits (+5 / day)', included: true },
+      { text: 'Caption Battle voting', included: true },
+      { text: 'GrowthIntel competitor spy', included: false },
     ],
   },
   {
@@ -66,17 +66,17 @@ const plans: Plan[] = [
     name: 'Pro',
     price: 2500,
     priceAnnual: 2000,
-    clips: '30 clips',
+    clips: '1,000 credits',
     icon: Sparkles,
     color: 'text-clip-cyan',
     popular: true,
     features: [
-      { text: '30 clips per month', included: true },
-      { text: 'Advanced AI detection', included: true },
-      { text: '1080p export', included: true },
-      { text: 'Beat sync', included: true },
-      { text: 'Watermark removal', included: true },
-      { text: 'Priority processing', included: false },
+      { text: '1,000 credits / month', included: true },
+      { text: 'Unlimited ClipBot + priority AI', included: true },
+      { text: 'GrowthIntel competitor spy', included: true },
+      { text: 'Real-time Trend Radar', included: true },
+      { text: 'Early Access: Video Editor (Q1 2026)', included: true },
+      { text: 'Caption Battle × 3 vote weight', included: true },
     ],
   },
   {
@@ -84,16 +84,16 @@ const plans: Plan[] = [
     name: 'Creator',
     price: 6000,
     priceAnnual: 4800,
-    clips: 'Unlimited',
+    clips: '3,000 credits',
     icon: Crown,
     color: 'text-clip-amber',
     features: [
-      { text: 'Unlimited clips', included: true },
-      { text: 'Advanced AI detection', included: true },
-      { text: '4K export', included: true },
-      { text: 'Beat sync', included: true },
-      { text: 'Watermark removal', included: true },
-      { text: 'Priority processing', included: true },
+      { text: '3,000 credits / month', included: true },
+      { text: 'Exclusive Creator-tier trends', included: true },
+      { text: 'GrowthIntel + monthly strategy call', included: true },
+      { text: 'Caption Battle × 5 vote weight', included: true },
+      { text: 'Early Access: Video Editor (Q1 2026)', included: true },
+      { text: 'Featured on leaderboard + verified badge', included: true },
     ],
   },
 ];
@@ -159,10 +159,10 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-4">
-            Simple, <span className="gradient-text">transparent</span> pricing
+            The AI growth stack for <span className="gradient-text">gaming creators</span>
           </h1>
           <p className="text-clip-muted text-lg max-w-2xl mx-auto">
-            Choose the plan that fits your content creation needs. Upgrade or downgrade anytime.
+            Trend Radar, ViralForge, ClipBot coach, and Caption Battle — built for the games you actually play. Cancel anytime.
           </p>
         </div>
 
@@ -300,7 +300,7 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
                 Referral Program
               </h3>
               <p className="text-clip-muted text-sm">
-                Get 5 free clips for every friend who signs up!
+                Invite a friend — they get 50 credits, you get 50 credits + 200 XP when they upgrade.
               </p>
             </div>
           </div>
@@ -331,20 +331,24 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
           <div className="space-y-4">
             {[
               {
-                q: 'Can I upgrade or downgrade anytime?',
-                a: 'Yes! You can change your plan at any time. Upgrades take effect immediately, and downgrades take effect at the end of your billing cycle.',
+                q: 'What can I do with my credits?',
+                a: 'Spend them on ViralForge (5 cr / generation), ClipBot coaching sessions, and the upcoming video editor. You never lose credits — they roll over month to month.',
+              },
+              {
+                q: 'Is the AI video editor included?',
+                a: 'The video editor launches in Q1 2026. Pro and Creator subscribers get Early Access the moment it ships. Until then, you can use ViralForge, ClipBot, TrendRadar, and Caption Battle.',
               },
               {
                 q: 'What payment methods do you accept?',
-                a: 'We accept all major credit/debit cards and bank transfers via Paystack. All payments are processed securely.',
+                a: 'We accept all major debit cards and bank transfers via Paystack (Naira). All payments are processed securely.',
               },
               {
-                q: 'What happens if I exceed my clip limit?',
-                a: 'You\'ll need to wait until the next month or upgrade your plan. We\'ll notify you when you\'re approaching your limit.',
+                q: 'Can I cancel anytime?',
+                a: 'Yes. Cancel from Settings → Subscription. Your plan stays active until the end of the billing cycle, then you drop back to Free.',
               },
               {
-                q: 'Is there a refund policy?',
-                a: 'Yes, we offer a 7-day money-back guarantee if you\'re not satisfied with your subscription.',
+                q: 'Do credits roll over?',
+                a: 'Yes — unused credits carry over as long as your subscription is active. Free tier credits refresh monthly.',
               },
             ].map((faq, i) => (
               <div key={i} className="card-glass p-5">

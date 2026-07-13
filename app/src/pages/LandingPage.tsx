@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
-import { 
-  Zap, Upload, Brain, Share2, ChevronRight, 
-  Gamepad2, Target, Sparkles, Play 
+import {
+  Zap, Brain, Share2, ChevronRight,
+  Gamepad2, Target, Sparkles, Play,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -101,7 +101,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
           {/* Subheadline */}
           <p className="text-center text-clip-muted text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-8 px-4">
-            ClipAI scans your matches, detects the hype moments, and cuts share-ready clips—in seconds.
+            Your AI growth platform for gaming clips. Spot trending moments, forge viral captions, coach your channel with ClipBot, and climb the CreatorRank leaderboard — all in one place.
           </p>
 
           {/* CTAs */}
@@ -111,7 +111,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               className="btn-primary text-base px-8 py-4 flex items-center gap-2"
             >
               <Zap className="w-5 h-5" />
-              Get Early Access
+              Start Free — 50 Credits
             </Button>
             <button
               onClick={handleWaitlist}
@@ -159,10 +159,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </div>
                 <div>
                   <h3 className="font-display font-semibold text-clip-text mb-1">
-                    Auto-detect kills & clutches
+                    Trend Radar — never miss a meta
                   </h3>
                   <p className="text-clip-muted text-sm">
-                    AI that understands the game—so you don't have to scrub footage.
+                    Live trending hashtags, sounds, and clip formats for Valorant, Apex, Fortnite, COD and more.
                   </p>
                 </div>
               </div>
@@ -175,10 +175,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </div>
                 <div>
                   <h3 className="font-display font-semibold text-clip-text mb-1">
-                    TikTok / Reels / Shorts ready
+                    ViralForge + ClipBot coach
                   </h3>
                   <p className="text-clip-muted text-sm">
-                    Vertical exports, smart captions, and beat-synced cuts.
+                    10 viral title variants per clip, platform-specific captions, hooks, and an AI coach that diagnoses flops.
                   </p>
                 </div>
               </div>
@@ -192,31 +192,31 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-4">
-              Three moves. <span className="gradient-text">Zero editing.</span>
+              Four tools. <span className="gradient-text">Zero guesswork.</span>
             </h2>
             <p className="text-clip-muted text-base sm:text-lg">
-              Upload a match. Pick your moments. Export in seconds.
+              Trend Radar spots the meta. ViralForge writes the hook. ClipBot coaches your channel. CreatorRank keeps you climbing.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {[
               {
-                icon: Upload,
-                title: 'Upload or paste a link',
-                description: 'MP4, YouTube, or stream VOD—ClipAI handles the rest.',
+                icon: Target,
+                title: 'Trend Radar',
+                description: 'Live trending titles, hashtags, sounds, and challenges for the games you play — updated hourly on Pro.',
                 color: 'clip-cyan',
               },
               {
                 icon: Brain,
-                title: 'AI finds the hype',
-                description: 'Detects kills, clutches, comebacks, and crowd-level audio spikes.',
+                title: 'ViralForge + ClipBot',
+                description: 'Generate 10 viral variants per clip in seconds. Ask ClipBot to diagnose flops and craft better hooks.',
                 color: 'clip-amber',
               },
               {
                 icon: Share2,
-                title: 'Export & go viral',
-                description: 'Vertical cuts, captions, and beat sync—ready for TikTok / Reels / Shorts.',
+                title: 'CreatorRank + Battle',
+                description: 'Earn XP for every action, climb tiers from Rookie to GOD TIER, and vote on the community Caption Battle board.',
                 color: 'green-400',
               },
             ].map((feature, i) => (
@@ -249,7 +249,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               Built for the games you play
             </p>
             <div className="flex flex-wrap items-center justify-center gap-6 lg:gap-10">
-              {['Call of Duty', 'Bloodstrike', 'PUBG', 'Mobile Legends', 'Free Fire'].map((game) => (
+              {['Valorant', 'Apex Legends', 'Fortnite', 'Minecraft', 'Roblox', 'Call of Duty'].map((game) => (
                 <span
                   key={game}
                   className="text-clip-muted/60 hover:text-clip-text font-display font-semibold text-sm lg:text-base transition-colors cursor-default"
@@ -265,7 +265,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             <div className="card-glass p-8 lg:p-10 relative">
               <div className="absolute -top-4 left-8 text-6xl text-clip-cyan/20 font-serif">"</div>
               <blockquote className="text-clip-text text-lg lg:text-xl leading-relaxed mb-6 relative z-10">
-                ClipAI turned a 40-minute scrim into three viral clips. My editor quit…and I don't miss him.
+                I dropped 3 clips using ViralForge captions and Trend Radar sounds. Two hit 100K in a week. ClipBot literally rewrote my hook in 5 seconds and the third hit 400K.
               </blockquote>
               <div className="flex items-center gap-4">
                 <img
@@ -275,7 +275,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 />
                 <div>
                   <p className="font-display font-semibold text-clip-text">Tobi</p>
-                  <p className="text-clip-muted text-sm">COD Mobile Creator</p>
+                  <p className="text-clip-muted text-sm">Apex Legends Creator · 280K followers</p>
                 </div>
                 <div className="ml-auto">
                   <span className="hype-badge-gold">98 HYPE</span>
@@ -321,7 +321,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             {/* Content */}
             <div>
               <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-6">
-                Smart cuts. <span className="gradient-text">No guesswork.</span>
+                Smart cuts. <span className="gradient-text">Coming Q1 2026.</span>
               </h2>
               
               <div className="space-y-5 mb-8">
@@ -340,10 +340,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               </div>
 
               <Button
-                onClick={() => onNavigate('auth')}
+                onClick={() => onNavigate('upload')}
                 className="btn-primary flex items-center gap-2"
               >
-                See the Demo
+                Join the Waitlist
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
@@ -361,10 +361,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <div className="max-w-xl mx-auto">
             <div className="card-glass p-8 lg:p-10 border-white/[0.08]">
               <h2 className="font-display font-bold text-2xl sm:text-3xl text-clip-text text-center mb-3">
-                Get early access
+                Get 50 free credits
               </h2>
               <p className="text-clip-muted text-center mb-6">
-                Be the first to auto-edit your highlights. Join the waitlist + get 20% off when we launch.
+                Sign up free, unlock Trend Radar + ViralForge + ClipBot coach + Caption Battle instantly. No card required.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -377,7 +377,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                   onClick={() => onNavigate('auth')}
                   className="btn-primary whitespace-nowrap"
                 >
-                  Join Waitlist
+                  Create Free Account
                 </Button>
               </div>
               

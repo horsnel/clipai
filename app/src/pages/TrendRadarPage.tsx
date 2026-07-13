@@ -31,7 +31,10 @@ interface TrendData {
   game: string;
 }
 
-const GAMES = ['All Games', 'Call of Duty', 'Bloodstrike', 'PUBG', 'Mobile Legends', 'Free Fire'];
+const GAMES = [
+  'All Games', 'Valorant', 'Apex Legends', 'Fortnite',
+  'Minecraft', 'Roblox', 'Call of Duty', 'Warzone',
+];
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -300,18 +303,18 @@ function getFallbackData(game: string): TrendData {
     game: g,
     updatedAt: new Date().toISOString(),
     trends: [
-      { id:'1', name:'1v4 clutch no scope',       category:'title',     game:g, score:97, change:+34, status:'rising',  views:'2.1M',  example:'"1v4 clutch no scope 😤 they thought I was done"' },
-      { id:'2', name:'#gamingafrica',              category:'hashtag',   game:g, score:91, change:+28, status:'rising',  views:'890K',  example:undefined },
-      { id:'3', name:'RAGE QUIT challenge',        category:'challenge', game:g, score:88, change:+19, status:'rising',  views:'1.4M',  example:undefined },
-      { id:'4', name:'POV: you thought you won',   category:'title',     game:g, score:86, change:+22, status:'rising',  views:'3.3M',  example:undefined },
-      { id:'5', name:'Phonk drift sound',          category:'sound',     game:g, score:84, change: +8, status:'peaked',  views:'5.1M',  example:undefined },
-      { id:'6', name:'#naijagamer',               category:'hashtag',   game:g, score:82, change:+15, status:'rising',  views:'340K',  example:undefined },
-      { id:'7', name:'Watch till the end 👀',      category:'title',     game:g, score:79, change: -3, status:'peaked',  views:'1.9M',  example:undefined },
-      { id:'8', name:'They didn\'t see me coming', category:'title',     game:g, score:76, change:+11, status:'rising',  views:'780K',  example:undefined },
-      { id:'9', name:'Subway Surfers split screen',category:'challenge', game:g, score:74, change: -8, status:'falling', views:'4.2M',  example:undefined },
-      { id:'10',name:'#mobilegaming',              category:'hashtag',   game:g, score:72, change: -5, status:'falling', views:'12M',   example:undefined },
-      { id:'11',name:'Savage mode beat drop',      category:'sound',     game:g, score:70, change:+18, status:'rising',  views:'2.7M',  example:undefined },
-      { id:'12',name:'Bro activated cheat codes',  category:'title',     game:g, score:68, change: +6, status:'rising',  views:'560K',  example:undefined },
+      { id:'1',  name:'1v4 clutch no scope',          category:'title',     game:g, score:97, change:+34, status:'rising',  views:'2.1M',  example:'"1v4 clutch no scope they thought I was done 😤"' },
+      { id:'2',  name:'#valorantclips',                category:'hashtag',   game:g, score:91, change:+28, status:'rising',  views:'890K',  example:undefined },
+      { id:'3',  name:'RAGE QUIT challenge',           category:'challenge', game:g, score:88, change:+19, status:'rising',  views:'1.4M',  example:undefined },
+      { id:'4',  name:'POV: you thought you won',      category:'title',     game:g, score:86, change:+22, status:'rising',  views:'3.3M',  example:undefined },
+      { id:'5',  name:'Phonk drift sound',             category:'sound',     game:g, score:84, change: +8, status:'peaked',  views:'5.1M',  example:undefined },
+      { id:'6',  name:'#apexlegends',                  category:'hashtag',   game:g, score:82, change:+15, status:'rising',  views:'340K',  example:undefined },
+      { id:'7',  name:'Watch till the end',            category:'title',     game:g, score:79, change: -3, status:'peaked',  views:'1.9M',  example:undefined },
+      { id:'8',  name:'They didn\'t see me coming',    category:'title',     game:g, score:76, change:+11, status:'rising',  views:'780K',  example:undefined },
+      { id:'9',  name:'Subway Surfers split screen',   category:'challenge', game:g, score:74, change: -8, status:'falling', views:'4.2M',  example:undefined },
+      { id:'10', name:'#minecraftshorts',              category:'hashtag',   game:g, score:72, change: -5, status:'falling', views:'12M',   example:undefined },
+      { id:'11', name:'Savage mode beat drop',         category:'sound',     game:g, score:70, change:+18, status:'rising',  views:'2.7M',  example:undefined },
+      { id:'12', name:'Bro activated cheat codes',     category:'title',     game:g, score:68, change: +6, status:'rising',  views:'560K',  example:undefined },
     ],
   };
 }
