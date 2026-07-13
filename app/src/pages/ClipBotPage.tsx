@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import type { Page } from '../App';
 import { Send, Bot, User, Zap, Sparkles, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
+import { getClipBotHistory, apiClient } from '@/services/api';
 
 interface ClipBotPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -14,8 +16,6 @@ interface Message {
   content: string;
   timestamp: Date;
 }
-
-const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const STARTER_PROMPTS = [
   { emoji: '🎮', text: 'What captions are blowing up for Free Fire this week?' },
@@ -43,6 +43,48 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
 
   const FREE_LIMIT = 10;
   const isAtLimit  = user?.plan === 'free' && msgCount >= FREE_LIMIT;
+
+  // ─── Persist chat history to localStorage (per-user) ─────────────────────
+  const STORAGE_KEY = `clipai_clipbot_history_${user?.email ?? 'anon'}`;
+
+  useEffect(() => {
+    // Restore from localStorage first for instant UX
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed: Message[] = JSON.parse(saved);
+        if (parsed.length > 0) {
+          setMessages(parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) })));
+          setMsgCount(parsed.filter(m => m.role === 'user').length);
+          return;
+        }
+      }
+    } catch {}
+
+    // Then try fetching from backend
+    getClipBotHistory().then((data) => {
+      if (data.history?.length) {
+        const restored: Message[] = [
+          WELCOME_MSG,
+          ...data.history.map((h: any) => ({
+            id: String(h.created_at),
+            role: h.role as 'user' | 'assistant',
+            content: h.content,
+            timestamp: new Date(h.created_at),
+          })),
+        ];
+        setMessages(restored);
+        setMsgCount(data.history.filter((h: any) => h.role === 'user').length);
+      }
+    }).catch(() => {});
+  }, [STORAGE_KEY]);
+
+  // Persist on every message change
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    } catch {}
+  }, [messages, STORAGE_KEY]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -74,20 +116,16 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
         .filter(m => m.id !== 'welcome')
         .map(m => ({ role: m.role, content: m.content }));
 
-      const res = await fetch(`${API_BASE}/clipbot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: content,
-          history,
-          user: { name: user?.name, plan: user?.plan },
-        }),
+      // Use apiClient which automatically includes the Supabase JWT
+      const data = await apiClient.post<{ reply?: string; error?: string }>('/clipbot', {
+        message: content,
+        history,
+        user: { name: user?.name, plan: user?.plan },
       });
 
       let reply: string;
-      if (res.ok) {
-        const data = await res.json();
-        reply = data.reply ?? getFallbackReply(content);
+      if (data.reply) {
+        reply = data.reply;
       } else {
         reply = getFallbackReply(content);
       }
@@ -257,27 +295,27 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
   );
 }
 
-// ── Format markdown-ish bot messages ─────────────────────────────────────────
+// ── Format markdown-ish bot messages (safe, no dangerouslySetInnerHTML) ─────
 
 function FormattedMessage({ content }: { content: string }) {
-  const lines = content.split('\n');
   return (
-    <div className="space-y-1.5 text-sm leading-relaxed">
-      {lines.map((line, i) => {
-        if (!line.trim()) return <div key={i} className="h-1" />;
-        // Bold: **text**
-        const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        // Bullet
-        if (line.startsWith('• ') || line.startsWith('- ')) {
-          return (
-            <div key={i} className="flex gap-2">
+    <div className="text-sm leading-relaxed prose prose-invert prose-sm max-w-none
+                    [&_ul]:space-y-1 [&_ul]:my-1
+                    [&_li]:flex [&_li]:gap-2 [&_li]:items-start
+                    [&_strong]:text-clip-cyan [&_strong]:font-semibold">
+      <ReactMarkdown
+        components={{
+          // Render bullet list items with a Zap icon prefix
+          li: ({ children }) => (
+            <li className="flex gap-2">
               <Zap className="w-3 h-3 text-clip-cyan flex-shrink-0 mt-1" />
-              <span dangerouslySetInnerHTML={{ __html: formatted.replace(/^[•\-]\s/, '') }} />
-            </div>
-          );
-        }
-        return <p key={i} dangerouslySetInnerHTML={{ __html: formatted }} />;
-      })}
+              <span>{children}</span>
+            </li>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

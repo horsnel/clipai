@@ -16,7 +16,7 @@ import {
 import type { DetectedClip, AnalysisOptions } from '../types';
 
 interface UploadPageProps {
-  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
+  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number } | null;
   onNavigate: (page: Page, clips?: DetectedClip[]) => void;
 }
 
@@ -28,6 +28,9 @@ const STEPS = [
   { key: 'caption', label: '✍️  Groq generating captions…'  },
   { key: 'prepare', label: '✂️  Preparing your clips…'       },
 ];
+
+const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024;  // 500 MB
+const MIN_CREDITS_NEEDED  = 15;                   // 10 scan + 5 captions
 
 export function UploadPage({ user, onNavigate }: UploadPageProps) {
   const [activeTab, setActiveTab]             = useState<'upload' | 'youtube'>('upload');
@@ -53,19 +56,36 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault(); setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file?.type.startsWith('video/')) { setSelectedFile(file); toast.success(`"${file.name}" selected`); }
-    else toast.error('Please upload a video file');
+    if (!file) return;
+    if (!file.type.startsWith('video/')) { toast.error('Please upload a video file'); return; }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`File too large. Max 500 MB (yours is ${formatFileSize(file.size)})`);
+      return;
+    }
+    setSelectedFile(file); toast.success(`"${file.name}" selected`);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file?.type.startsWith('video/')) { setSelectedFile(file); toast.success(`"${file.name}" selected`); }
-    else if (file) toast.error('Please upload a video file');
+    if (!file) return;
+    if (!file.type.startsWith('video/')) { toast.error('Please upload a video file'); return; }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`File too large. Max 500 MB (yours is ${formatFileSize(file.size)})`);
+      return;
+    }
+    setSelectedFile(file); toast.success(`"${file.name}" selected`);
   };
 
   const handleAnalyze = async () => {
     if (activeTab === 'upload' && !selectedFile) return toast.error('Please select a video file') as unknown as void;
     if (activeTab === 'youtube' && !youtubeUrl)  return toast.error('Please enter a YouTube URL') as unknown as void;
+    // ─── Client-side credit balance check ──────────────────────────────────
+    const balance = user?.credits ?? 0;
+    if (balance < MIN_CREDITS_NEEDED) {
+      toast.error(`Insufficient credits. Need ${MIN_CREDITS_NEEDED}, have ${balance}.`);
+      onNavigate('pricing');
+      return;
+    }
 
     setIsAnalyzing(true); setError(null);
     setCurrentStepIdx(0); setOverallProgress(0);

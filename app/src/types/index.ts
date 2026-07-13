@@ -57,6 +57,10 @@ export interface ExportOptions {
   captionsEnabled: boolean;
   beatSyncEnabled: boolean;
   watermarkText?: string;
+  // v2: trim slider offsets within the clip
+  trimStart?: number;
+  trimEnd?: number;
+  game?: string;
 }
 
 export interface RenderJob {

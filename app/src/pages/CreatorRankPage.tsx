@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import {
   Flame, Star, Trophy, Zap,
   Crown, ChevronUp, Award, TrendingUp, Lock,
 } from 'lucide-react';
+import { getMyRank } from '@/services/api';
 
 interface CreatorRankPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -49,23 +50,25 @@ const MOCK_TOP: { name: string; rank: string; icon: string; xp: number; streak: 
   { name: 'AbujaGamer99',    rank: 'Highlight Reel', icon: '🎬', xp: 2900,  streak: 9  },
 ];
 
-function getUserXP(plan: string): number {
-  const base = { free: 120, starter: 680, pro: 2200, creator: 5800 };
-  return base[plan as keyof typeof base] ?? 120;
-}
-
-function getStreakCount(plan: string): number {
-  const s = { free: 3, starter: 8, pro: 21, creator: 35 };
-  return s[plan as keyof typeof s] ?? 3;
+function rankFor(xp: number): Rank {
+  return RANKS.find(r => xp >= r.minXP && xp <= r.maxXP) ?? RANKS[0];
 }
 
 export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'ranks' | 'leaderboard' | 'earn'>('profile');
+  const [rankData, setRankData] = useState<any>(null);
+
+  useEffect(() => {
+    getMyRank().then(setRankData).catch(() => {});
+  }, []);
 
   const plan       = user?.plan ?? 'free';
-  const userXP     = getUserXP(plan);
-  const streak     = getStreakCount(plan);
-  const currentRank = RANKS.find(r => userXP >= r.minXP && userXP <= r.maxXP) ?? RANKS[0];
+  const userXP     = rankData?.xp ?? 0;
+  const streak     = rankData?.streakDays ?? 0;
+  const globalRank = rankData?.globalRank ?? 0;
+  const weeklyXP   = rankData?.weeklyXp ?? 0;
+  const clipsDone  = rankData?.clipsAnalysed ?? 0;
+  const currentRank = rankFor(userXP);
   const nextRank    = RANKS[RANKS.indexOf(currentRank) + 1];
   const xpToNext    = nextRank ? nextRank.minXP - userXP : 0;
   const progress    = nextRank
@@ -159,10 +162,10 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
             {/* Stats row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: 'Clips Analysed', value: plan === 'free' ? '3' : plan === 'starter' ? '12' : plan === 'pro' ? '48' : '200+', icon: Star },
-                { label: 'Captions Made', value: plan === 'free' ? '5' : plan === 'starter' ? '28' : plan === 'pro' ? '110' : '500+', icon: Zap },
-                { label: 'Streak Record', value: `${streak + 7} days`, icon: Flame },
-                { label: 'Global Rank',   value: plan === 'free' ? '#4,821' : plan === 'starter' ? '#1,204' : '#312', icon: Trophy },
+                { label: 'Clips Analysed', value: String(clipsDone), icon: Star },
+                { label: 'Weekly XP',     value: weeklyXP.toLocaleString(), icon: Zap },
+                { label: 'Streak Record', value: `${Math.max(streak, 7)} days`, icon: Flame },
+                { label: 'Global Rank',   value: globalRank ? `#${globalRank.toLocaleString()}` : '—', icon: Trophy },
               ].map(stat => (
                 <div key={stat.label} className="card-glass p-4 text-center">
                   <stat.icon className="w-5 h-5 text-clip-cyan mx-auto mb-2" />
@@ -279,7 +282,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
               ))}
               {/* User position */}
               <div className="flex items-center gap-4 px-5 py-4 bg-clip-cyan/5 border-t border-clip-cyan/10">
-                <span className="text-clip-muted font-bold w-8">#847</span>
+                <span className="text-clip-muted font-bold w-8">#{globalRank || '—'}</span>
                 <div className="w-9 h-9 rounded-xl bg-clip-cyan/10 border border-clip-cyan/20 flex items-center justify-center text-sm flex-shrink-0">
                   {currentRank.icon}
                 </div>

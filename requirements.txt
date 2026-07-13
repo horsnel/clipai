@@ -7,3 +7,9 @@ yt-dlp==2024.5.27
 requests==2.32.3
 python-dotenv==1.0.1
 gunicorn==22.0.0
+# v3 — persistence, auth, plan-gating
+supabase==2.7.4
+redis==5.0.7
+psycopg2-binary==2.9.9
+APScheduler==3.10.4
+PyJWT==2.9.0

@@ -17,7 +17,9 @@ import { ClipBotPage } from './pages/ClipBotPage';
 import { CreatorRankPage } from './pages/CreatorRankPage';
 import { GrowthIntelPage } from './pages/GrowthIntelPage';
 import { Toaster } from '@/components/ui/sonner';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import type { DetectedClip, Plan } from './types';
+import { verifyPayment } from './services/api';
 import './App.css';
 
 export type Page =
@@ -33,59 +35,65 @@ interface AppUser {
   credits: number;
   clipsUsed: number;
   referralCode: string;
+  xp?: number;
+  streakDays?: number;
+  avatarUrl?: string;
 }
 
-function App() {
+function AppContent() {
   const [currentPage, setCurrentPage]         = useState<Page>('landing');
-  const [isLoggedIn, setIsLoggedIn]           = useState(false);
-  const [user, setUser]                       = useState<AppUser | null>(null);
   const [detectedClips, setDetectedClips]     = useState<DetectedClip[] | undefined>(undefined);
+  const { user: authUser, session, isLoading, signOut, refreshUser } = useAuth();
 
+  const isLoggedIn = !!authUser;
+  // Adapt AuthContext user → App's legacy user shape (so existing pages keep working)
+  const user: AppUser | null = authUser ? {
+    id: authUser.id,
+    name: authUser.name,
+    email: authUser.email,
+    plan: authUser.plan,
+    credits: authUser.credits,
+    clipsUsed: authUser.clipsUsed,
+    referralCode: authUser.referralCode,
+    xp: authUser.xp,
+    streakDays: authUser.streakDays,
+    avatarUrl: authUser.avatarUrl,
+  } : null;
+
+  // ─── Referral capture + Paystack redirect verification ─────────────────
   useEffect(() => {
-    const savedUser = localStorage.getItem('clipai_user');
-    if (savedUser) {
-      try { setUser(JSON.parse(savedUser)); setIsLoggedIn(true); } catch { /* corrupt */ }
-    }
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) localStorage.setItem('clipai_pending_referral', ref.toUpperCase());
     const paystackRef = params.get('trxref') ?? params.get('reference');
-    if (paystackRef) verifyPaystackPayment(paystackRef);
-  }, []);
+    if (paystackRef && session) {
+      verifyPayment(paystackRef)
+        .then(async (data) => {
+          if (data.success) {
+            await refreshUser();
+            setCurrentPage('dashboard');
+          }
+        })
+        .catch(() => {/* ignore */});
+    }
+  }, [session, refreshUser]);
 
-  const verifyPaystackPayment = async (reference: string) => {
-    try {
-      const API_BASE = import.meta.env.VITE_API_URL ?? '';
-      if (!API_BASE) return;
-      const res = await fetch(`${API_BASE}/payment/verify?reference=${reference}`);
-      const data = await res.json();
-      if (data.success && user) {
-        const upgraded = { ...user, plan: data.plan as Plan };
-        setUser(upgraded);
-        localStorage.setItem('clipai_user', JSON.stringify(upgraded));
+  // ─── Redirect after login ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!isLoading && authUser) {
+      if (currentPage === 'auth' || currentPage === 'landing') {
+        setCurrentPage('dashboard');
       }
-    } catch { /* ignore */ }
-  };
+    }
+  }, [isLoading, authUser]);  // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleLogin = (email: string, name: string) => {
-    const newUser: AppUser = {
-      id: crypto.randomUUID(),
-      email, name,
-      plan: 'free',
-      credits: 50,
-      clipsUsed: 0,
-      referralCode: Math.random().toString(36).slice(2, 8).toUpperCase(),
-    };
-    setUser(newUser);
-    setIsLoggedIn(true);
-    localStorage.setItem('clipai_user', JSON.stringify(newUser));
+  const handleLogin = async (_email: string, _name: string) => {
+    // Real auth handled by AuthContext; just navigate
     setCurrentPage('dashboard');
   };
 
-  const handleLogout = () => {
-    setUser(null);
-    setIsLoggedIn(false);
-    localStorage.removeItem('clipai_user');
+  const handleLogout = async () => {
+    await signOut();
     setCurrentPage('landing');
   };
 
@@ -124,6 +132,15 @@ function App() {
 
   const FOOTER_PAGES: Page[] = ['landing', 'pricing', 'terms', 'privacy'];
 
+  // Loading spinner while auth session resolves
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-clip-dark flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-clip-cyan/30 border-t-clip-cyan rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-clip-dark text-clip-text">
       <div className="grain-overlay" />
@@ -147,6 +164,14 @@ function App() {
         }}
       />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

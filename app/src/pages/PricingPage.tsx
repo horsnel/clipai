@@ -6,9 +6,10 @@ import {
   ArrowRight, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { initPayment, applyReferralCode } from '@/services/api';
 
 interface PricingPageProps {
-  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
+  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; referralCode?: string } | null;
   onNavigate: (page: Page, clips?: unknown[]) => void;
   isLoggedIn: boolean;
 }
@@ -37,9 +38,26 @@ const plans: Plan[] = [
     features: [
       { text: '3 clips per month', included: true },
       { text: 'Basic AI detection', included: true },
-      { text: '720p export', included: true },
+      { text: '480p export', included: true },
       { text: 'Beat sync', included: false },
       { text: 'Watermark removal', included: false },
+      { text: 'Priority processing', included: false },
+    ],
+  },
+  {
+    id: 'starter',
+    name: 'Starter',
+    price: 1000,
+    priceAnnual: 800,
+    clips: '10 clips',
+    icon: Sparkles,
+    color: 'text-blue-400',
+    features: [
+      { text: '10 clips per month', included: true },
+      { text: 'Basic AI detection', included: true },
+      { text: '720p export', included: true },
+      { text: 'Beat sync', included: false },
+      { text: 'Watermark removal', included: true },
       { text: 'Priority processing', included: false },
     ],
   },
@@ -84,6 +102,25 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
   const [isAnnual, setIsAnnual] = useState(false);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState('');
+  const [appliedReferral, setAppliedReferral] = useState<string | null>(null);
+
+  const handleApplyReferral = async () => {
+    if (!referralCode) {
+      toast.error('Please enter a referral code');
+      return;
+    }
+    try {
+      const result = await applyReferralCode(referralCode);
+      if (result.valid) {
+        toast.success(`Referral code valid! ${result.discountPercent}% off your first payment.`);
+        setAppliedReferral(referralCode.toUpperCase());
+      } else {
+        toast.error(result.error || 'Invalid referral code');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not validate code');
+    }
+  };
 
   const handleSubscribe = async (planId: string) => {
     if (!isLoggedIn) {
@@ -91,25 +128,21 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
       onNavigate('auth');
       return;
     }
-
     if (planId === 'free') {
       toast.success('You are already on the Free plan!');
       return;
     }
-
     setIsProcessing(planId);
-    
-    const paystackLinks: Record<string, string> = {
-      pro: 'https://paystack.com/pay/clipai-pro',
-      creator: 'https://paystack.com/pay/clipai-creator',
-    };
-    const link = paystackLinks[planId];
-    if (link) {
-      toast.success('Redirecting to secure payment...');
-      await new Promise(r => setTimeout(r, 800));
-      window.open(link, '_blank');
+    try {
+      const data = await initPayment(planId, isAnnual ? 'annual' : 'monthly', appliedReferral || undefined);
+      toast.success('Redirecting to secure payment…');
+      // Redirect to Paystack
+      window.location.href = data.authorization_url;
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not start payment');
+    } finally {
+      setIsProcessing(null);
     }
-    setIsProcessing(null);
   };
 
   const formatPrice = (price: number) => {
@@ -159,7 +192,7 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-6 mb-16">
           {plans.map((plan) => (
             <div
               key={plan.id}
@@ -281,14 +314,7 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
               className="input-dark flex-1"
             />
             <Button
-              onClick={() => {
-                if (referralCode) {
-                  toast.success('Referral code applied! You got 5 free clips.');
-                  setReferralCode('');
-                } else {
-                  toast.error('Please enter a referral code');
-                }
-              }}
+              onClick={handleApplyReferral}
               className="btn-secondary"
             >
               Apply Code

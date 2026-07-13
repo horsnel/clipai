@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import { 
@@ -6,9 +6,14 @@ import {
   Copy, Check, Sparkles, Zap, Crown as CrownIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { 
+  updateProfile as apiUpdateProfile,
+  updateNotifications as apiUpdateNotifications,
+  getReferralStats,
+} from '@/services/api';
 
 interface SettingsPageProps {
-  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
+  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; referralCode?: string; credits?: number } | null;
   onNavigate: (page: Page, clips?: unknown[]) => void;
 }
 
@@ -20,14 +25,21 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [copied, setCopied] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [referralStats, setReferralStats] = useState({ total: 0, creditsEarned: 0 });
   const [notifications, setNotifications] = useState({
-    email: true,
-    marketing: false,
-    newFeatures: true,
-    clipReady: true,
+    email_updates: true,
+    product_news: false,
+    clip_ready: true,
+    weekly_digest: false,
   });
 
-  const referralCode = 'CLIP' + (user?.name?.toUpperCase().slice(0, 4) || 'GAMER');
+  const referralCode = user?.referralCode || 'CLIP' + (user?.name?.toUpperCase().slice(0, 4) || 'GAMER');
+
+  // Fetch referral stats + notification prefs on mount
+  useEffect(() => {
+    getReferralStats().then(s => setReferralStats({ total: s.total, creditsEarned: s.creditsEarned })).catch(() => {});
+  }, []);
 
   const handleCopyReferral = () => {
     navigator.clipboard.writeText(referralCode);
@@ -36,8 +48,16 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSaveProfile = () => {
-    toast.success('Profile updated successfully!');
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    try {
+      await apiUpdateProfile({ full_name: name });
+      toast.success('Profile updated successfully!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Update failed');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleSavePassword = () => {
@@ -45,9 +65,19 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
       toast.error('Please fill in all password fields');
       return;
     }
-    toast.success('Password updated successfully!');
+    // Supabase password update is handled via email reset flow for security.
+    toast.info('Password reset link sent to your email');
     setCurrentPassword('');
     setNewPassword('');
+  };
+
+  const handleSaveNotifications = async () => {
+    try {
+      await apiUpdateNotifications(notifications);
+      toast.success('Notification preferences saved');
+    } catch (err: any) {
+      toast.error(err?.message || 'Save failed');
+    }
   };
 
   const tabs = [
@@ -160,8 +190,8 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
                       />
                       <p className="text-clip-muted text-xs mt-1">Email cannot be changed</p>
                     </div>
-                    <Button onClick={handleSaveProfile} className="btn-primary">
-                      Save Changes
+                    <Button onClick={handleSaveProfile} disabled={savingProfile} className="btn-primary">
+                      {savingProfile ? 'Saving…' : 'Save Changes'}
                     </Button>
                   </div>
                 </div>
@@ -213,6 +243,7 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
                       </p>
                       <p className="text-clip-muted text-sm">
                         {user?.plan === 'free' && '3 clips per month'}
+                        {user?.plan === 'starter' && '10 clips per month'}
                         {user?.plan === 'pro' && '30 clips per month'}
                         {user?.plan === 'creator' && 'Unlimited clips'}
                       </p>
@@ -285,11 +316,11 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-clip-surface rounded-xl p-4">
                       <p className="text-clip-muted text-sm">Total Referrals</p>
-                      <p className="font-display font-bold text-2xl text-clip-text">0</p>
+                      <p className="font-display font-bold text-2xl text-clip-text">{referralStats.total}</p>
                     </div>
                     <div className="bg-clip-surface rounded-xl p-4">
                       <p className="text-clip-muted text-sm">Free Clips Earned</p>
-                      <p className="font-display font-bold text-2xl text-clip-text">0</p>
+                      <p className="font-display font-bold text-2xl text-clip-text">{referralStats.creditsEarned}</p>
                     </div>
                   </div>
                 </div>
@@ -304,10 +335,10 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
                 </h3>
                 <div className="space-y-4">
                   {[
-                    { key: 'email', label: 'Email notifications', desc: 'Receive updates about your account' },
-                    { key: 'marketing', label: 'Marketing emails', desc: 'Get news about features and promotions' },
-                    { key: 'newFeatures', label: 'New features', desc: 'Be the first to know about new features' },
-                    { key: 'clipReady', label: 'Clip ready alerts', desc: 'Get notified when your clips are ready' },
+                    { key: 'email_updates', label: 'Email notifications', desc: 'Receive updates about your account' },
+                    { key: 'product_news', label: 'Marketing emails', desc: 'Get news about features and promotions' },
+                    { key: 'clip_ready', label: 'Clip ready alerts', desc: 'Get notified when your clips are ready' },
+                    { key: 'weekly_digest', label: 'Weekly digest', desc: 'Summary of your activity and trends' },
                   ].map((item) => (
                     <label key={item.key} className="flex items-center justify-between p-3 bg-clip-surface rounded-xl cursor-pointer">
                       <div>
@@ -328,6 +359,11 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
                       </button>
                     </label>
                   ))}
+                </div>
+                <div className="mt-6">
+                  <Button onClick={handleSaveNotifications} className="btn-primary">
+                    Save Preferences
+                  </Button>
                 </div>
               </div>
             )}

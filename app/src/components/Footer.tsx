@@ -38,13 +38,17 @@ export function Footer({ onNavigate }: FooterProps) {
                 <Twitter className="w-4 h-4" />
               </a>
               <a
-                href="#"
+                href="https://instagram.com/olhmescraxes1"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.06] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
               >
                 <Instagram className="w-4 h-4" />
               </a>
               <a
-                href="#"
+                href="https://github.com/horsnel/clipai"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.06] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
               >
                 <Github className="w-4 h-4" />
@@ -81,12 +85,15 @@ export function Footer({ onNavigate }: FooterProps) {
                 </button>
               </li>
               <li>
-                <a href="#" className="text-clip-muted hover:text-clip-cyan text-sm transition-colors">
+                <button
+                  onClick={() => onNavigate('landing')}
+                  className="text-clip-muted hover:text-clip-cyan text-sm transition-colors"
+                >
                   API
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#" className="text-clip-muted hover:text-clip-cyan text-sm transition-colors">
+                <a href="https://github.com/horsnel/clipai/releases" target="_blank" rel="noopener noreferrer" className="text-clip-muted hover:text-clip-cyan text-sm transition-colors">
                   Changelog
                 </a>
               </li>
@@ -100,17 +107,23 @@ export function Footer({ onNavigate }: FooterProps) {
             </h4>
             <ul className="space-y-3">
               <li>
-                <a href="#" className="text-clip-muted hover:text-clip-cyan text-sm transition-colors">
+                <button
+                  onClick={() => onNavigate('landing')}
+                  className="text-clip-muted hover:text-clip-cyan text-sm transition-colors"
+                >
                   About
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#" className="text-clip-muted hover:text-clip-cyan text-sm transition-colors">
+                <button
+                  onClick={() => onNavigate('landing')}
+                  className="text-clip-muted hover:text-clip-cyan text-sm transition-colors"
+                >
                   Blog
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#" className="text-clip-muted hover:text-clip-cyan text-sm transition-colors">
+                <a href="mailto:support@clipai.com" className="text-clip-muted hover:text-clip-cyan text-sm transition-colors">
                   Contact
                 </a>
               </li>

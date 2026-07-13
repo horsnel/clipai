@@ -102,6 +102,10 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
         captionsEnabled,
         beatSyncEnabled,
         watermarkText:   watermarkEnabled ? watermarkText : undefined,
+        // v2: send trim slider offsets (percentages → seconds within clip)
+        trimStart:       (trimRange[0] / 100) * (selectedClip.endSeconds - selectedClip.startSeconds),
+        trimEnd:         (trimRange[1] / 100) * (selectedClip.endSeconds - selectedClip.startSeconds),
+        game:            selectedClip?.caption ? undefined : undefined,  // hook for future
       });
 
       const job = await waitForRender(jobId, (j) => {
@@ -130,8 +134,11 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
   };
 
   const handleShare = () => {
-    const url = downloadUrl ?? `https://clipsai.pages.dev/c/${selectedClip?.id}`;
-    navigator.clipboard.writeText(url);
+    if (!downloadUrl) {
+      toast.error('Render the clip first to get a shareable link');
+      return;
+    }
+    navigator.clipboard.writeText(downloadUrl);
     toast.success('Link copied to clipboard!');
   };
 
@@ -191,14 +198,33 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
                 {/* Preview */}
                 <div className="card-glass overflow-hidden">
                   <div className="relative aspect-video bg-clip-surface">
-                    <img src={selectedClip.thumbnail} alt="Preview" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/60 via-transparent to-transparent" />
-                    <button onClick={() => setIsPlaying(!isPlaying)}
-                      className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-16 h-16 rounded-full bg-clip-cyan/90 flex items-center justify-center hover:scale-110 transition-transform">
-                        {isPlaying ? <Pause className="w-7 h-7 text-black" /> : <Play className="w-7 h-7 text-black ml-1" />}
-                      </div>
-                    </button>
+                    {downloadUrl ? (
+                      <video
+                        src={downloadUrl}
+                        poster={selectedClip.thumbnail}
+                        controls={isPlaying}
+                        autoPlay={isPlaying}
+                        onPlay={() => setIsPlaying(true)}
+                        onPause={() => setIsPlaying(false)}
+                        onEnded={() => setIsPlaying(false)}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <img src={selectedClip.thumbnail} alt="Preview" className="w-full h-full object-cover" />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/60 via-transparent to-transparent pointer-events-none" />
+                    {!downloadUrl && (
+                      <button onClick={() => {
+                        // Without a rendered clip we can't really play; show a hint
+                        setIsPlaying(!isPlaying);
+                        if (!isPlaying) toast.info('Render the clip to preview the actual video');
+                      }}
+                        className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-16 h-16 rounded-full bg-clip-cyan/90 flex items-center justify-center hover:scale-110 transition-transform">
+                          {isPlaying ? <Pause className="w-7 h-7 text-black" /> : <Play className="w-7 h-7 text-black ml-1" />}
+                        </div>
+                      </button>
+                    )}
                     <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg flex items-center gap-2">
                       <Smartphone className="w-4 h-4 text-clip-cyan" />
                       <span className="text-xs font-medium uppercase">{format}</span>

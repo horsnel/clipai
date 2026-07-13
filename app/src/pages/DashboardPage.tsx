@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -7,9 +7,10 @@ import {
   ExternalLink, Sparkles, Radio, Flame, Bot,
   Trophy, BarChart2, Scissors, ChevronRight,
 } from 'lucide-react';
+import { listClips } from '@/services/api';
 
 interface DashboardPageProps {
-  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
+  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number; clipsUsed?: number; xp?: number } | null;
   onNavigate: (page: Page, clips?: unknown[]) => void;
   onLogout?: () => void;
 }
@@ -19,7 +20,7 @@ interface Clip {
   hypeScore: number; duration: string; createdAt: string; status: 'ready' | 'processing';
 }
 
-const MOCK_CLIPS: Clip[] = [
+const FALLBACK_CLIPS: Clip[] = [
   { id:'1', thumbnail:'/gameplay-thumb-1.jpg', title:'Epic Multi-Kill',          game:'Call of Duty',   hypeScore:96, duration:'0:32', createdAt:'2 hours ago',  status:'ready' },
   { id:'2', thumbnail:'/gameplay-thumb-2.jpg', title:'Clutch Victory',           game:'Bloodstrike',    hypeScore:88, duration:'0:45', createdAt:'5 hours ago',  status:'ready' },
   { id:'3', thumbnail:'/gameplay-thumb-3.jpg', title:'Team Fight Domination',    game:'Mobile Legends', hypeScore:92, duration:'0:28', createdAt:'1 day ago',    status:'ready' },
@@ -98,7 +99,27 @@ const FEATURE_CARDS: FeatureCard[] = [
 ];
 
 export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: DashboardPageProps) {
-  const [clips] = useState<Clip[]>(MOCK_CLIPS);
+  const [clips, setClips] = useState<Clip[]>(FALLBACK_CLIPS);
+
+  // ─── Fetch real clips from worker ────────────────────────────────────────
+  useEffect(() => {
+    let mounted = true;
+    listClips().then((data) => {
+      if (!mounted || !data.clips?.length) return;
+      const mapped: Clip[] = data.clips.slice(0, 3).map(c => ({
+        id: c.id,
+        thumbnail: '/gameplay-thumb-' + (((parseInt(c.id.slice(0, 2), 16) || 0) % 3) + 1) + '.jpg',
+        title: c.title || 'Untitled clip',
+        game: c.game || 'Gaming',
+        hypeScore: c.hype_score || 80,
+        duration: c.duration_seconds ? `${Math.floor(c.duration_seconds / 60)}:${String(c.duration_seconds % 60).padStart(2, '0')}` : '0:30',
+        createdAt: new Date(c.created_at).toLocaleDateString(),
+        status: c.status === 'ready' ? 'ready' : 'processing',
+      }));
+      setClips(mapped);
+    }).catch(() => {/* fallback stays */});
+    return () => { mounted = false; };
+  }, []);
 
   const PLAN_LIMITS = {
     free:    { clips: 3,        label: 'Free'    },
@@ -108,9 +129,9 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
   };
 
   const currentPlan  = PLAN_LIMITS[user?.plan ?? 'free'];
-  const clipsUsed    = clips.length;
+  const clipsUsed    = user?.clipsUsed ?? clips.length;
   const usagePercent = currentPlan.clips === Infinity ? 0 : (clipsUsed / currentPlan.clips) * 100;
-  const remaining    = currentPlan.clips === Infinity ? '∞' : currentPlan.clips - clipsUsed;
+  const remaining    = currentPlan.clips === Infinity ? '∞' : Math.max(0, currentPlan.clips - clipsUsed);
 
   const getHypeBadge = (score: number) => {
     if (score >= 90) return <span className="hype-badge-gold">{score} HYPE</span>;

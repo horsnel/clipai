@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import type { Page } from '../App';
-import {
-  Zap, Copy, ThumbsUp, RefreshCw,
+import { Zap, Copy, ThumbsUp, RefreshCw,
   Hash, Type, Sparkles, ChevronRight, CheckCheck,
   TrendingUp, Flame,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { voteOnCaption } from '@/services/api';
 
 interface ViralForgePageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -337,7 +337,13 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                               <div className="flex items-center gap-3 mt-2">
                                 <ViralPill score={cap.viralScore} />
                                 <span className="text-clip-muted text-xs">{cap.vibe}</span>
-                                <button onClick={() => { setTitles([]); setCaptions(prev => prev.map(c => c.id === cap.id ? {...c, votes: c.votes + 1} : c)); toast.success('Liked!'); }}
+                                <button onClick={async () => {
+                                  setCaptions(prev => prev.map(c => c.id === cap.id ? {...c, votes: c.votes + 1} : c));
+                                  toast.success('Liked!');
+                                  try {
+                                    await voteOnCaption(cap.text, 1, selectedGame, selectedVibe);
+                                  } catch {/* silent */}
+                                }}
                                   className="flex items-center gap-1 text-clip-muted hover:text-clip-cyan text-xs transition-colors">
                                   <ThumbsUp className="w-3 h-3" /> {cap.votes}
                                 </button>

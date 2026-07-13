@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { 
   Trophy, Medal, Crown, Flame, 
   ChevronRight, Sparkles 
 } from 'lucide-react';
+import { getLeaderboard } from '@/services/api';
 
 interface LeaderboardPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -23,7 +24,7 @@ interface Player {
   isYou?: boolean;
 }
 
-const mockAllTimePlayers: Player[] = [
+const FALLBACK_PLAYERS: Player[] = [
   { rank: 1, name: 'Tobi', avatar: 'T', plan: 'creator', game: 'COD Mobile', hypeScore: 15420, clipCount: 87 },
   { rank: 2, name: 'ViperX', avatar: 'V', plan: 'creator', game: 'Bloodstrike', hypeScore: 12850, clipCount: 64 },
   { rank: 3, name: 'NinjaPro', avatar: 'N', plan: 'pro', game: 'PUBG', hypeScore: 11200, clipCount: 52 },
@@ -36,30 +37,44 @@ const mockAllTimePlayers: Player[] = [
   { rank: 10, name: 'Reaper', avatar: 'R', plan: 'pro', game: 'Mobile Legends', hypeScore: 5800, clipCount: 31 },
 ];
 
-const mockWeeklyPlayers: Player[] = [
-  { rank: 1, name: 'ViperX', avatar: 'V', plan: 'creator', game: 'Bloodstrike', hypeScore: 2840, clipCount: 18 },
-  { rank: 2, name: 'Tobi', avatar: 'T', plan: 'creator', game: 'COD Mobile', hypeScore: 2650, clipCount: 15 },
-  { rank: 3, name: 'Storm', avatar: 'S', plan: 'creator', game: 'Mobile Legends', hypeScore: 2100, clipCount: 12 },
-  { rank: 4, name: 'AceGamer', avatar: 'A', plan: 'pro', game: 'Free Fire', hypeScore: 1850, clipCount: 10 },
-  { rank: 5, name: 'Phoenix', avatar: 'P', plan: 'pro', game: 'COD Mobile', hypeScore: 1620, clipCount: 8 },
-  { rank: 6, name: 'Blaze', avatar: 'B', plan: 'pro', game: 'PUBG', hypeScore: 1400, clipCount: 7 },
-  { rank: 7, name: 'Shadow', avatar: 'S', plan: 'free', game: 'Bloodstrike', hypeScore: 1200, clipCount: 5 },
-  { rank: 8, name: 'Ghost', avatar: 'G', plan: 'free', game: 'Free Fire', hypeScore: 980, clipCount: 4 },
-  { rank: 9, name: 'Reaper', avatar: 'R', plan: 'pro', game: 'Mobile Legends', hypeScore: 850, clipCount: 4 },
-  { rank: 10, name: 'NinjaPro', avatar: 'N', plan: 'pro', game: 'PUBG', hypeScore: 720, clipCount: 3 },
-];
-
-const currentUserRank = 47;
-const currentUserScore = 2450;
-const nextRankScore = 2800;
-const pointsNeeded = nextRankScore - currentUserScore;
+const FALLBACK_ME = { rank: 47, hype_score: 2450 };
 
 export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('alltime');
-  
-  const players = activeTab === 'alltime' ? mockAllTimePlayers : mockWeeklyPlayers;
+  const [players, setPlayers] = useState<Player[]>(FALLBACK_PLAYERS);
+  const [me, setMe] = useState<{ rank: number; hype_score: number } | null>(FALLBACK_ME);
+
+  useEffect(() => {
+    getLeaderboard(activeTab)
+      .then((data) => {
+        if (data.players?.length) {
+          setPlayers(data.players.map((p: any) => ({
+            rank: p.rank,
+            name: p.full_name || 'Gamer',
+            avatar: (p.full_name || 'G')[0].toUpperCase(),
+            plan: p.plan || 'free',
+            game: '—',
+            hypeScore: p.hype_score ?? p.weekly_xp ?? 0,
+            clipCount: p.clip_count ?? 0,
+            isYou: p.id === (user as any)?.id,
+          })));
+        }
+        if (data.currentUser) {
+          setMe({
+            rank: data.currentUser.rank,
+            hype_score: data.currentUser.hype_score ?? data.currentUser.weekly_xp ?? 0,
+          });
+        }
+      })
+      .catch(() => {/* fallback stays */});
+  }, [activeTab, user]);
+
   const top3 = players.slice(0, 3);
   const rest = players.slice(3);
+  const currentUserRank = me?.rank ?? 47;
+  const currentUserScore = me?.hype_score ?? 0;
+  const nextRankScore = currentUserScore + 350;
+  const pointsNeeded = Math.max(0, nextRankScore - currentUserScore);
 
   const getPlanBadge = (plan: string) => {
     if (plan === 'creator') return <span className="text-[10px] px-1.5 py-0.5 bg-clip-amber text-black rounded font-bold">CREATOR</span>;

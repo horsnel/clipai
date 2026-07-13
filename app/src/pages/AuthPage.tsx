@@ -8,16 +8,18 @@ import {
   Chrome, Eye, EyeOff, Gift 
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AuthPageProps {
   onNavigate: (page: Page, clips?: unknown[]) => void;
   onLogin: (email: string, name: string) => void;
 }
 
-export function AuthPage({ onNavigate, onLogin }: AuthPageProps) {
+export function AuthPage({ onNavigate }: AuthPageProps) {
   const [isLogin, setIsLogin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const { signIn, signUp, signInWithGoogle, isConfigured } = useAuth();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -29,25 +31,27 @@ export function AuthPage({ onNavigate, onLogin }: AuthPageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    if (!isLogin) {
-      // Signup
-      toast.success('Account created successfully! Welcome to ClipAI.');
-      onLogin(formData.email, formData.name || 'Gamer');
-    } else {
-      // Login
-      toast.success('Welcome back!');
-      onLogin(formData.email, 'Gamer');
+    try {
+      if (isLogin) {
+        await signIn(formData.email, formData.password);
+        toast.success('Welcome back!');
+      } else {
+        await signUp(formData.email, formData.password, formData.name || 'Gamer', formData.referralCode || undefined);
+        toast.success('Account created! Check your email to confirm, then sign in.');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Authentication failed');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
-  const handleGoogleAuth = () => {
-    toast.info('Google OAuth coming soon!');
+  const handleGoogleAuth = async () => {
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      toast.error(err?.message || 'Google sign-in failed');
+    }
   };
 
   return (
@@ -221,10 +225,15 @@ export function AuthPage({ onNavigate, onLogin }: AuthPageProps) {
         {/* Terms */}
         <p className="text-center text-clip-muted text-xs mt-6">
           By continuing, you agree to our{' '}
-          <a href="#" className="text-clip-cyan hover:underline">Terms of Service</a>
+          <button type="button" onClick={() => onNavigate('terms')} className="text-clip-cyan hover:underline">Terms of Service</button>
           {' '}and{' '}
-          <a href="#" className="text-clip-cyan hover:underline">Privacy Policy</a>.
+          <button type="button" onClick={() => onNavigate('privacy')} className="text-clip-cyan hover:underline">Privacy Policy</button>.
         </p>
+        {!isConfigured && (
+          <p className="text-center text-amber-500 text-xs mt-3">
+            Supabase not configured — auth will not work until env vars are set.
+          </p>
+        )}
       </div>
     </div>
   );
