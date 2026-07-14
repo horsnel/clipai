@@ -3,7 +3,8 @@
  * instead of a blank white screen. Also logs the error to /api/log.
  */
 
-import { Component, ErrorInfo, ReactNode } from 'react';
+import { Component } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
 import { logger } from '../lib/logger';
 import { Logo } from './Logo';
 
