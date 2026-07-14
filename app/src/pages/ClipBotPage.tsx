@@ -116,8 +116,11 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
         .filter(m => m.id !== 'welcome')
         .map(m => ({ role: m.role, content: m.content }));
 
-      // Use apiClient which automatically includes the Supabase JWT
-      const data = await apiClient.post<{ reply?: string; error?: string }>('/clipbot', {
+      // Use apiClient which automatically includes the Supabase JWT.
+      // If the user is out of credits, the apiClient fires the UPGRADE_REQUIRED
+      // event and the global modal appears - we just remove the user's message
+      // and bail out (no fallback reply, since the user didn't get a real answer).
+      const data = await apiClient.post<{ reply?: string; error?: string; credits_remaining?: number }>('/clipbot', {
         message: content,
         history,
         user: { name: user?.name, plan: user?.plan },
@@ -137,7 +140,15 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botMsg]);
-    } catch {
+    } catch (e: any) {
+      // 402 = out of credits or daily limit - apiClient has already opened the
+      // UpgradeModal. Roll back the user message we just appended.
+      if (e?.status === 402) {
+        setMessages(prev => prev.filter(m => m.id !== userMsg.id));
+        setMsgCount(n => Math.max(0, n - 1));
+        setIsTyping(false);
+        return;
+      }
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',

@@ -4,6 +4,7 @@ import {
   Loader2, TrendingUp, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiClient } from '@/services/api';
 import type { TrendItem } from '../pages/TrendRadarPage';
 
 interface TrendCardModalProps {
@@ -20,9 +21,8 @@ interface TrendAssets {
   game?: string;
   platform?: string;
   generatedAt?: string;
+  credits_remaining?: number;
 }
-
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 // In-memory cache so re-clicking a trend is instant.
 // Keyed by `${trend.name}|${trend.game}|${trend.platform}`.
@@ -60,27 +60,33 @@ export function TrendCardModal({ trend, onClose }: TrendCardModalProps) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/trends/assets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trend: trend.name,
-          game: trend.game || 'Gaming',
-          platform: trend.platform ?? 'tiktok',
-          category: trend.category,
-        }),
+      // Use apiClient so the auth header is sent + 402s auto-trigger the UpgradeModal.
+      const data = await apiClient.post<TrendAssets>('/trends/assets', {
+        trend: trend.name,
+        game: trend.game || 'Gaming',
+        platform: trend.platform ?? 'tiktok',
+        category: trend.category,
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
       assetsCache.set(cacheKey, data);
       setAssets(data);
     } catch (e: any) {
+      // If the error is a 402 (insufficient credits / plan required), the
+      // apiClient has already dispatched the UPGRADE_REQUIRED event and the
+      // global modal will appear. We just close this modal silently.
+      if (e?.status === 402) {
+        onClose();
+        return;
+      }
+      // 401 = not logged in. Show a friendly message pointing to login.
+      if (e?.status === 401) {
+        setError('Please sign in to generate content packs. It only takes 10 seconds and you get 50 free credits.');
+        return;
+      }
       setError(e.message || 'Failed to generate assets');
     } finally {
       setIsLoading(false);
     }
-  }, [cacheKey, trend]);
+  }, [cacheKey, trend, onClose]);
 
   useEffect(() => { fetchAssets(); }, [fetchAssets]);
 

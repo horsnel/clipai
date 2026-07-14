@@ -1,5 +1,5 @@
 /**
- * api.ts  –  ClipAI frontend ↔ Railway worker bridge
+ * api.ts  -  ClipAI frontend <-> worker bridge
  *
  * v2 changes:
  *  - Class-based client with settable Authorization token (Supabase JWT)
@@ -8,6 +8,10 @@
  *                   /payment/init, /forge/vote, /forge/top-captions,
  *                   /clipbot/history, /settings/profile, /settings/notifications,
  *                   /clips
+ *  - Credit gating: every tool response may include `credits_remaining`.
+ *    On 402 with `insufficient_credits` or `plan_required`, a custom event is
+ *    dispatched so the UpgradeModal can pop up automatically. The AuthContext
+ *    listens to the same event to update its local credit balance.
  */
 
 import type {
@@ -20,6 +24,40 @@ import type {
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
+
+// ─── Credit / upgrade events ─────────────────────────────────────────────────
+// These are window-level CustomEvents so the apiClient (which is framework-
+// agnostic) can communicate with the React side without circular imports.
+
+export interface CreditUpdateDetail {
+  credits: number;
+  source?: string; // e.g. 'forge_titles' - for analytics
+}
+
+export interface UpgradeRequiredDetail {
+  reason: 'no_credits' | 'plan_required';
+  required?: number;
+  current?: number;
+  requiredPlan?: string;
+  tool?: string;
+}
+
+/** Dispatched whenever a successful API response includes `credits_remaining`. */
+export const CREDIT_UPDATE_EVENT = 'clipai:credit-update';
+/** Dispatched whenever the API returns 402 with insufficient_credits or plan_required. */
+export const UPGRADE_REQUIRED_EVENT = 'clipai:upgrade-required';
+
+function dispatchCreditUpdate(credits: number, source?: string) {
+  window.dispatchEvent(new CustomEvent<CreditUpdateDetail>(CREDIT_UPDATE_EVENT, {
+    detail: { credits, source },
+  }));
+}
+
+function dispatchUpgradeRequired(detail: UpgradeRequiredDetail) {
+  window.dispatchEvent(new CustomEvent<UpgradeRequiredDetail>(UPGRADE_REQUIRED_EVENT, {
+    detail,
+  }));
+}
 
 // ─── Client ─────────────────────────────────────────────────────────────────
 class ApiClient {
@@ -45,29 +83,70 @@ class ApiClient {
       const msg = e instanceof Error ? e.message : String(e);
       throw new Error(`Could not reach server: ${msg}`);
     }
+
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
-      const e = new Error(err.error ?? err.message ?? `HTTP ${res.status}`) as Error & { status?: number; body?: any };
+      // ─── Credit / plan gate ─────────────────────────────────────────────
+      // 402 means the user can't use this tool right now. We dispatch an event
+      // so the global UpgradeModal pops up. The thrown error still carries
+      // `.status` and `.body` for callers that want to handle it themselves.
+      if (res.status === 402) {
+        if (err.insufficient_credits) {
+          dispatchUpgradeRequired({
+            reason: 'no_credits',
+            required: err.required,
+            current: err.current,
+            tool: err.tool,
+          });
+        } else if (err.plan_required || err.required_plan) {
+          dispatchUpgradeRequired({
+            reason: 'plan_required',
+            requiredPlan: err.required_plan,
+            tool: err.tool,
+          });
+        } else if (err.upgrade_required) {
+          // Legacy ClipBot daily-limit response
+          dispatchUpgradeRequired({
+            reason: 'plan_required',
+            requiredPlan: 'pro',
+            tool: 'ClipBot',
+          });
+        }
+      }
+      const e = new Error(err.error ?? err.message ?? `HTTP ${res.status}`) as Error & {
+        status?: number; body?: any;
+      };
       e.status = res.status; e.body = err;
       throw e;
     }
-    return res.json();
+
+    const data = await res.json();
+    // ─── Auto-sync credits ──────────────────────────────────────────────────
+    // If the response includes `credits_remaining`, dispatch an event so the
+    // AuthContext can update its local user state (Navbar chip + Dashboard card).
+    if (data && typeof data.credits_remaining === 'number') {
+      dispatchCreditUpdate(data.credits_remaining, path);
+    }
+    return data as T;
   }
 
   get<T>(path: string): Promise<T> {
     return this.request<T>(path, { method: 'GET' });
   }
+
   post<T>(path: string, body?: unknown): Promise<T> {
     const init: RequestInit = body instanceof FormData
       ? { method: 'POST', body }
       : { method: 'POST', body: body ? JSON.stringify(body) : undefined };
     return this.request<T>(path, init);
   }
+
   patch<T>(path: string, body?: unknown): Promise<T> {
     return this.request<T>(path, {
       method: 'PATCH', body: body ? JSON.stringify(body) : undefined,
     });
   }
+
   // Helper to upload with progress + auth header
   uploadWithProgress(
     path: string, formData: FormData,
@@ -82,10 +161,36 @@ class ApiClient {
       };
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(JSON.parse(xhr.responseText));
+          try {
+            const data = JSON.parse(xhr.responseText);
+            if (data && typeof data.credits_remaining === 'number') {
+              dispatchCreditUpdate(data.credits_remaining, path);
+            }
+            resolve(data);
+          } catch {
+            resolve(undefined);
+          }
         } else {
-          try { reject(JSON.parse(xhr.responseText)); }
-          catch { reject(new Error(`Upload failed: ${xhr.statusText}`)); }
+          try {
+            const err = JSON.parse(xhr.responseText);
+            if (xhr.status === 402) {
+              if (err.insufficient_credits) {
+                dispatchUpgradeRequired({
+                  reason: 'no_credits',
+                  required: err.required,
+                  current: err.current,
+                });
+              } else if (err.plan_required || err.required_plan) {
+                dispatchUpgradeRequired({
+                  reason: 'plan_required',
+                  requiredPlan: err.required_plan,
+                });
+              }
+            }
+            reject(err);
+          } catch {
+            reject(new Error(`Upload failed: ${xhr.statusText}`));
+          }
         }
       };
       xhr.onerror = () => reject(new Error('Upload network error'));

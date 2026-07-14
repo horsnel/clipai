@@ -17,8 +17,10 @@ import { CreatorRankPage } from './pages/CreatorRankPage';
 import { GrowthIntelPage } from './pages/GrowthIntelPage';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { UpgradeModalProvider, useUpgradeModal } from '@/components/UpgradeModalContext';
 import type { Plan } from './types';
-import { verifyPayment } from './services/api';
+import { verifyPayment, UPGRADE_REQUIRED_EVENT } from './services/api';
+import type { UpgradeRequiredDetail } from './services/api';
 import './App.css';
 
 export type Page =
@@ -75,6 +77,47 @@ function AppContent() {
         .catch(() => {/* ignore */});
     }
   }, [session, refreshUser]);
+
+  // ─── Auto-show UpgradeModal when apiClient fires the upgrade-required event
+  // The apiClient dispatches this whenever a 402 response comes back with
+  // `insufficient_credits` or `plan_required`. The UpgradeModalContext's
+  // showUpgrade() opens the modal with the right headline + tier options.
+  const { showUpgrade } = useUpgradeModal();
+  useEffect(() => {
+    // Map current page → friendly tool name for the modal headline
+    const TOOL_LABELS: Record<Page, string> = {
+      landing: 'ClipAI',
+      auth: 'ClipAI',
+      dashboard: 'Dashboard',
+      upload: 'Video Editor',
+      results: 'Video Editor',
+      pricing: 'ClipAI',
+      settings: 'Settings',
+      terms: 'ClipAI',
+      privacy: 'ClipAI',
+      leaderboard: 'Leaderboard',
+      trends: 'Trend Radar',
+      forge: 'Viral Forge',
+      clipbot: 'ClipBot',
+      rank: 'Creator Rank',
+      growth: 'Growth Intel',
+    };
+    const onUpgradeRequired = (e: Event) => {
+      const detail = (e as CustomEvent<UpgradeRequiredDetail>).detail;
+      if (!detail) return;
+      // If the backend didn't include a tool label, infer it from the current page.
+      const tool = detail.tool ?? TOOL_LABELS[currentPage];
+      showUpgrade({
+        reason: detail.reason,
+        requiredCredits: detail.required,
+        currentCredits: detail.current,
+        requiredPlan: detail.requiredPlan,
+        tool,
+      });
+    };
+    window.addEventListener(UPGRADE_REQUIRED_EVENT, onUpgradeRequired);
+    return () => window.removeEventListener(UPGRADE_REQUIRED_EVENT, onUpgradeRequired);
+  }, [showUpgrade, currentPage]);
 
   // ─── Redirect after login ───────────────────────────────────────────────
   useEffect(() => {
@@ -139,28 +182,30 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-clip-dark text-clip-text">
-      <div className="grain-overlay" />
-      <Navbar
-        currentPage={currentPage}
-        onNavigate={navigateTo}
-        isLoggedIn={isLoggedIn}
-        user={user}
-        onLogout={handleLogout}
-      />
-      <main className="relative">{renderPage()}</main>
-      {FOOTER_PAGES.includes(currentPage) && <Footer onNavigate={navigateTo} />}
-      <Toaster
-        position="bottom-right"
-        toastOptions={{
-          style: {
-            background: '#121216',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: '#F4F6FA',
-          },
-        }}
-      />
-    </div>
+    <UpgradeModalProvider onNavigate={navigateTo}>
+      <div className="min-h-screen bg-clip-dark text-clip-text">
+        <div className="grain-overlay" />
+        <Navbar
+          currentPage={currentPage}
+          onNavigate={navigateTo}
+          isLoggedIn={isLoggedIn}
+          user={user}
+          onLogout={handleLogout}
+        />
+        <main className="relative">{renderPage()}</main>
+        {FOOTER_PAGES.includes(currentPage) && <Footer onNavigate={navigateTo} />}
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: '#121216',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#F4F6FA',
+            },
+          }}
+        />
+      </div>
+    </UpgradeModalProvider>
   );
 }
 

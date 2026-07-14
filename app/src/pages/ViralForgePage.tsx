@@ -5,7 +5,7 @@ import { Zap, Copy, ThumbsUp, RefreshCw,
   TrendingUp, Flame, Trophy, Crown,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { voteOnCaption, getTopCaptions } from '@/services/api';
+import { voteOnCaption, getTopCaptions, apiClient } from '@/services/api';
 
 interface ViralForgePageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -35,16 +35,9 @@ const GAMES = ['Call of Duty', 'Bloodstrike', 'PUBG', 'Mobile Legends', 'Free Fi
 const VIBES = ['Hype 🔥', 'Funny 😂', 'Savage 💀', 'Mysterious 👀', 'Wholesome 🥹'];
 const PLATFORMS = ['TikTok', 'YouTube Shorts', 'Instagram Reels'];
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
-
-async function callForge(endpoint: string, body: object) {
-  const res = await fetch(`${API_BASE}${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error('Request failed');
-  return res.json();
+// Use the shared apiClient so auth header is sent + 402s auto-trigger UpgradeModal.
+async function callForge(endpoint: string, body: object): Promise<any> {
+  return apiClient.post(endpoint, body);
 }
 
 export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {

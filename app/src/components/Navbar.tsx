@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
-import { Zap, Menu, X, User, LogOut } from 'lucide-react';
+import { Zap, Menu, X, User, LogOut, Coins } from 'lucide-react';
 
 interface NavbarProps {
   currentPage: Page;
   onNavigate: (page: Page, clips?: unknown[]) => void;
   isLoggedIn: boolean;
-  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
+  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number } | null;
   onLogout: () => void;
 }
 
@@ -98,15 +98,32 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
           {/* Auth Buttons */}
           <div className="hidden lg:flex items-center gap-3">
             {isLoggedIn ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* Credits chip — always visible while logged in */}
+                <button
+                  onClick={() => onNavigate('pricing')}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all flex-shrink-0 ${
+                    (user?.credits ?? 0) <= 5
+                      ? 'border-clip-amber/40 bg-clip-amber/10 hover:bg-clip-amber/20'
+                      : 'border-clip-cyan/30 bg-clip-cyan/10 hover:bg-clip-cyan/20'
+                  }`}
+                  title="Your credit balance - click to upgrade"
+                  aria-label={`${user?.credits ?? 0} credits available`}
+                >
+                  <Coins className={`w-3.5 h-3.5 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
+                  <span className={`text-xs font-bold tabular-nums ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`}>
+                    {user?.credits ?? 0}
+                  </span>
+                </button>
+
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-clip-surface rounded-lg border border-white/[0.06] min-w-0 max-w-[200px]">
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center flex-shrink-0">
                     <User className="w-3.5 h-3.5 text-black" />
                   </div>
                   <span className="text-sm font-medium truncate">{user?.name}</span>
                   <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${
-                    user?.plan === 'creator' 
-                      ? 'bg-clip-amber text-black' 
+                    user?.plan === 'creator'
+                      ? 'bg-clip-amber text-black'
                       : user?.plan === 'pro'
                       ? 'bg-clip-cyan text-black'
                       : 'bg-clip-surface text-clip-muted border border-white/[0.08]'
@@ -174,10 +191,25 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center">
                       <User className="w-4 h-4 text-black" />
                     </div>
-                    <div>
-                      <p className="text-sm font-medium">{user?.name}</p>
-                      <p className="text-xs text-clip-muted">{user?.email}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{user?.name}</p>
+                      <p className="text-xs text-clip-muted truncate">{user?.email}</p>
                     </div>
+                    {/* Credit chip on mobile */}
+                    <button
+                      onClick={() => handleNavClick('pricing')}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all flex-shrink-0 ${
+                        (user?.credits ?? 0) <= 5
+                          ? 'border-clip-amber/40 bg-clip-amber/10'
+                          : 'border-clip-cyan/30 bg-clip-cyan/10'
+                      }`}
+                      aria-label={`${user?.credits ?? 0} credits available`}
+                    >
+                      <Coins className={`w-3.5 h-3.5 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
+                      <span className={`text-xs font-bold tabular-nums ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`}>
+                        {user?.credits ?? 0}
+                      </span>
+                    </button>
                   </div>
                   <button
                     onClick={onLogout}

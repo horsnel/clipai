@@ -21,16 +21,17 @@
  *   PATCH /settings/notifications  (require_auth)
  *   POST /forge/vote               (require_auth)
  *   GET  /forge/top-captions
- *   POST /forge/titles             (require_auth)
- *   POST /forge/captions           (require_auth)
- *   POST /forge/hashtags           (require_auth)
- *   POST /forge/hooks              (require_auth)
- *   POST /clipbot                  (require_auth)
+ *   POST /forge/titles             (require_auth + 2 credits)
+ *   POST /forge/captions           (require_auth + 2 credits)
+ *   POST /forge/hashtags           (require_auth + 2 credits)
+ *   POST /forge/hooks              (require_auth + 2 credits)
+ *   POST /clipbot                  (require_auth + 1 credit + daily limit)
  *   GET  /clipbot/history          (require_auth)
  *   GET  /trends                   (5-platform multi-source)
- *   POST /intel/spy                (require_auth + plan=pro|creator)
- *   POST /intel/timing             (require_auth)
- *   POST /intel/abtitle            (require_auth)
+ *   POST /trends/assets            (require_auth + 1 credit)
+ *   POST /intel/spy                (require_auth + plan=pro|creator + 5 credits)
+ *   POST /intel/timing             (require_auth + 1 credit)
+ *   POST /intel/abtitle            (require_auth + 1 credit)
  */
 import { Hono } from 'hono';
 import { jwtVerify, decodeJwt } from 'jose';
@@ -282,10 +283,50 @@ function requirePlan(...plans: string[]) {
         error: 'Plan upgrade required',
         required_plan: plans[0],
         current_plan: profile.plan || 'free',
+        plan_required: true,
       }, 402);
     }
     await next();
   };
+}
+
+// ─── Credit gating ──────────────────────────────────────────────────────────
+// Checks that the user has at least `n` credits. Returns 402 with
+// `insufficient_credits: true` if not — the frontend listens for this and
+// shows the UpgradeModal automatically.
+function requireCredits(n: number) {
+  return async (c: any, next: any) => {
+    const profile = c.get('profile') as Profile;
+    const current = profile.credits || 0;
+    if (current < n) {
+      return json({
+        error: 'Insufficient credits',
+        insufficient_credits: true,
+        required: n,
+        current,
+        plan: profile.plan || 'free',
+      }, 402);
+    }
+    await next();
+  };
+}
+
+// Deducts `n` credits from the user's balance and returns the new balance.
+// Logs a row to `credit_transactions` for audit. Idempotent — if the user
+// profile can't be loaded we just return the original balance.
+async function spendCredits(env: Env, userId: string, n: number, reason: string): Promise<number> {
+  const p = await fetchProfile(env, userId);
+  if (!p) return 0;
+  const newBalance = Math.max(0, (p.credits || 0) - n);
+  await updateProfile(env, userId, { credits: newBalance });
+  try {
+    await sbFetch(env, 'credit_transactions', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ user_id: userId, delta: -n, reason }),
+    });
+  } catch {}
+  return newBalance;
 }
 
 // ─── LLM helpers (SiliconFlow primary, Mistral fallback, Groq last) ────────
@@ -826,8 +867,9 @@ app.get('/forge/top-captions', async (c) => {
 });
 
 // ─── Forge tools (Groq) ──────────────────────────────────────────────────────
-app.post('/forge/titles', requireAuth, async (c) => {
+app.post('/forge/titles', requireAuth, requireCredits(2), async (c) => {
   const env = c.env as Env;
+  const userId = c.get('userId') as string;
   const body = await c.req.json().catch(() => ({}));
   const desc = body.description || '';
   const game = body.game || 'Gaming';
@@ -859,14 +901,17 @@ Rules:
 - Rank by viralScore descending
 - Make them feel authentic, not corporate`;
   try {
-    return json(await llmJson(env, prompt, system));
+    const data: any = await llmJson(env, prompt, system);
+    data.credits_remaining = await spendCredits(env, userId, 2, 'forge_titles');
+    return json(data);
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
 });
 
-app.post('/forge/captions', requireAuth, async (c) => {
+app.post('/forge/captions', requireAuth, requireCredits(2), async (c) => {
   const env = c.env as Env;
+  const userId = c.get('userId') as string;
   const body = await c.req.json().catch(() => ({}));
   const desc = body.description || '';
   const game = body.game || 'Gaming';
@@ -896,14 +941,17 @@ Rules:
 - Reference Nigerian gaming culture where natural
 - No corporate language`;
   try {
-    return json(await llmJson(env, prompt, system));
+    const data: any = await llmJson(env, prompt, system);
+    data.credits_remaining = await spendCredits(env, userId, 2, 'forge_captions');
+    return json(data);
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
 });
 
-app.post('/forge/hashtags', requireAuth, async (c) => {
+app.post('/forge/hashtags', requireAuth, requireCredits(2), async (c) => {
   const env = c.env as Env;
+  const userId = c.get('userId') as string;
   const body = await c.req.json().catch(() => ({}));
   const desc = body.description || '';
   const game = body.game || 'Gaming';
@@ -922,14 +970,17 @@ Requirements:
 - Include #naijagamer and #gamingafrica
 - All lowercase, no spaces`;
   try {
-    return json(await llmJson(env, prompt, system));
+    const data: any = await llmJson(env, prompt, system);
+    data.credits_remaining = await spendCredits(env, userId, 2, 'forge_hashtags');
+    return json(data);
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
 });
 
-app.post('/forge/hooks', requireAuth, async (c) => {
+app.post('/forge/hooks', requireAuth, requireCredits(2), async (c) => {
   const env = c.env as Env;
+  const userId = c.get('userId') as string;
   const body = await c.req.json().catch(() => ({}));
   const desc = body.description || '';
   const game = body.game || 'Gaming';
@@ -946,14 +997,16 @@ Rules:
 - Optimised for TikTok/Reels viewer psychology
 - Reference ${game} naturally`;
   try {
-    return json(await llmJson(env, prompt, system));
+    const data: any = await llmJson(env, prompt, system);
+    data.credits_remaining = await spendCredits(env, userId, 2, 'forge_hooks');
+    return json(data);
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
 });
 
 // ─── ClipBot ─────────────────────────────────────────────────────────────────
-app.post('/clipbot', requireAuth, async (c) => {
+app.post('/clipbot', requireAuth, requireCredits(1), async (c) => {
   const env = c.env as Env;
   const userId = c.get('userId') as string;
   const profile = c.get('profile') as Profile;
@@ -972,6 +1025,7 @@ app.post('/clipbot', requireAuth, async (c) => {
         error: 'Daily message limit reached',
         limit: dailyLimit, used: usedToday,
         upgrade_required: true,
+        plan_required: true,
       }, 402);
     }
   }
@@ -990,7 +1044,8 @@ app.post('/clipbot', requireAuth, async (c) => {
       });
     }
     await awardXp(env, userId, 'chat_message', XP_REWARDS.chat_message);
-    return json({ reply });
+    const creditsRemaining = await spendCredits(env, userId, 1, 'clipbot_message');
+    return json({ reply, credits_remaining: creditsRemaining });
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
@@ -1622,9 +1677,10 @@ Rules:
 //   - captions: 3 captions (under 120 chars, with emojis + comment bait)
 //   - hashtags: 12-15 hashtags (mix of mega/mid/niche, always includes #naijagamer + #gamingafrica)
 //
-// Public (no auth) — same as /trends. One LLM call returns all 4 sections.
-app.post('/trends/assets', async (c) => {
+// Auth required, 1 credit per asset pack. One LLM call returns all 4 sections.
+app.post('/trends/assets', requireAuth, requireCredits(1), async (c) => {
   const env = c.env as Env;
+  const userId = c.get('userId') as string;
   const body = await c.req.json().catch(() => ({}));
   const trend = (body.trend || '').trim();
   const game = (body.game || 'Gaming').trim();
@@ -1686,6 +1742,7 @@ Rules:
     data.game = game;
     data.platform = platform;
     data.generatedAt = new Date().toISOString();
+    data.credits_remaining = await spendCredits(env, userId, 1, 'trends_assets');
     return json(data);
   } catch (e: any) {
     return json({ error: e.message }, 500);
@@ -1693,8 +1750,9 @@ Rules:
 });
 
 // ─── Growth Intel ────────────────────────────────────────────────────────────
-app.post('/intel/spy', requireAuth, requirePlan('pro', 'creator'), async (c) => {
+app.post('/intel/spy', requireAuth, requirePlan('pro', 'creator'), requireCredits(5), async (c) => {
   const env = c.env as Env;
+  const userId = c.get('userId') as string;
   const body = await c.req.json().catch(() => ({}));
   const channelUrl = body.channelUrl || '';
   const game = body.game || '';
@@ -1724,14 +1782,17 @@ Return JSON:
   "recommendation": "<2-3 sentences on how to compete with or beat them>"
 }`;
   try {
-    return json(await llmJson(env, prompt, system));
+    const data: any = await llmJson(env, prompt, system);
+    data.credits_remaining = await spendCredits(env, userId, 5, 'intel_spy');
+    return json(data);
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
 });
 
-app.post('/intel/timing', requireAuth, async (c) => {
+app.post('/intel/timing', requireAuth, requireCredits(1), async (c) => {
   const env = c.env as Env;
+  const userId = c.get('userId') as string;
   const body = await c.req.json().catch(() => ({}));
   const platform = body.platform || 'TikTok';
   const game = body.game || 'gaming';
@@ -1749,14 +1810,17 @@ Return JSON:
   "insight": "<2-3 sentence actionable insight specific to Nigerian ${game} creators>"
 }`;
   try {
-    return json(await llmJson(env, prompt, system));
+    const data: any = await llmJson(env, prompt, system);
+    data.credits_remaining = await spendCredits(env, userId, 1, 'intel_timing');
+    return json(data);
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
 });
 
-app.post('/intel/abtitle', requireAuth, async (c) => {
+app.post('/intel/abtitle', requireAuth, requireCredits(1), async (c) => {
   const env = c.env as Env;
+  const userId = c.get('userId') as string;
   const body = await c.req.json().catch(() => ({}));
   const titleA = body.titleA || '';
   const titleB = body.titleB || '';
@@ -1783,7 +1847,9 @@ Return JSON:
 
 The winner must have a higher score. Scores must differ by at least 5.`;
   try {
-    return json(await llmJson(env, prompt, system));
+    const data: any = await llmJson(env, prompt, system);
+    data.credits_remaining = await spendCredits(env, userId, 1, 'intel_abtitle');
+    return json(data);
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }

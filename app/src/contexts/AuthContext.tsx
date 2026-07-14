@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { apiClient } from '@/services/api';
+import { apiClient, CREDIT_UPDATE_EVENT } from '@/services/api';
+import type { CreditUpdateDetail } from '@/services/api';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 export type Plan = 'free' | 'starter' | 'pro' | 'creator';
@@ -113,6 +114,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
+
+  // ─── Live credit updates ─────────────────────────────────────────────────
+  // Whenever the apiClient receives a response with `credits_remaining`, it
+  // dispatches a window event. We listen here and patch the user object so the
+  // Navbar chip + Dashboard card update instantly without a full /auth/me refetch.
+  useEffect(() => {
+    const onCreditUpdate = (e: Event) => {
+      const detail = (e as CustomEvent<CreditUpdateDetail>).detail;
+      if (!detail || typeof detail.credits !== 'number') return;
+      setUser((prev) => prev ? { ...prev, credits: detail.credits } : prev);
+    };
+    window.addEventListener(CREDIT_UPDATE_EVENT, onCreditUpdate);
+    return () => window.removeEventListener(CREDIT_UPDATE_EVENT, onCreditUpdate);
+  }, []);
 
   // ─── Actions ────────────────────────────────────────────────────────────
   const signIn = useCallback(async (email: string, password: string) => {

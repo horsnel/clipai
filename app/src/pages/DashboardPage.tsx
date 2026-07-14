@@ -3,9 +3,9 @@ import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
-  Zap, Upload, Crown, TrendingUp, Clock, Play,
+  Zap, Upload, TrendingUp, Clock, Play,
   ExternalLink, Sparkles, Radio, Flame, Bot,
-  Trophy, BarChart2, Scissors, ChevronRight,
+  Trophy, BarChart2, Scissors, ChevronRight, Coins, ArrowRight,
 } from 'lucide-react';
 import { listClips } from '@/services/api';
 
@@ -203,21 +203,49 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
             </p>
           </div>
 
-          <div className="card-glass p-5 sm:p-6">
-            <div className="flex items-center gap-3 mb-2 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-clip-amber/10 flex items-center justify-center flex-shrink-0">
-                <Crown className="w-5 h-5 text-clip-amber" />
+          {/* Credits card — replaces "Current Plan" (plan name already shown in chip on card 1) */}
+          <div className={`card-glass p-5 sm:p-6 relative overflow-hidden ${
+            (user?.credits ?? 0) <= 5
+              ? 'border-clip-amber/30 bg-clip-amber/5'
+              : 'border-clip-cyan/20 bg-clip-cyan/5'
+          }`}>
+            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  (user?.credits ?? 0) <= 5 ? 'bg-clip-amber/15' : 'bg-clip-cyan/15'
+                }`}>
+                  <Coins className={`w-5 h-5 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-clip-muted text-sm">Credits Balance</p>
+                  <p className={`font-display font-bold text-2xl tabular-nums ${
+                    (user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-text'
+                  }`}>
+                    {user?.credits ?? 0}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-clip-muted text-sm">Current Plan</p>
-                <p className="font-display font-semibold text-xl text-clip-text capitalize">{user?.plan ?? 'Free'}</p>
-              </div>
+              <span className={`text-xs px-2 py-1 rounded font-medium capitalize flex-shrink-0 ${
+                user?.plan === 'creator' ? 'bg-clip-amber text-black' :
+                user?.plan === 'pro'     ? 'bg-clip-cyan text-black' :
+                user?.plan === 'starter' ? 'bg-blue-400/20 text-blue-400' :
+                'bg-clip-surface text-clip-muted border border-white/[0.08]'
+              }`}>
+                {(user?.plan ?? 'free')} plan
+              </span>
             </div>
-            {(!user?.plan || user.plan === 'free') && (
+            {(user?.credits ?? 0) <= 5 ? (
               <button onClick={() => onNavigate('pricing')}
-                className="text-clip-cyan text-xs hover:underline flex items-center gap-1">
-                <Sparkles className="w-3 h-3 flex-shrink-0" /> Upgrade to Pro
+                className="w-full mt-2 px-3 py-2 rounded-lg bg-clip-amber text-black text-sm font-semibold hover:brightness-110 flex items-center justify-center gap-2 transition-all">
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                Get more credits
+                <ArrowRight className="w-4 h-4 flex-shrink-0" />
               </button>
+            ) : (
+              <p className="text-clip-muted text-xs mt-1 flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-clip-cyan flex-shrink-0" />
+                1 credit = 1 trend pack or ClipBot msg · 2 = ViralForge
+              </p>
             )}
           </div>
         </div>

@@ -5,6 +5,7 @@ import {
   Eye, RefreshCw, AlertCircle, CheckCircle, Trophy,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiClient } from '@/services/api';
 
 interface GrowthIntelPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -12,8 +13,6 @@ interface GrowthIntelPageProps {
 }
 
 type ActiveTool = 'spy' | 'timing' | 'abtitle';
-
-const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 interface SpyResult {
   channelName: string;
@@ -72,14 +71,12 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
     if (!channelUrl.trim()) return toast.error('Enter a YouTube channel URL');
     setSpyLoading(true); setSpyResult(null);
     try {
-      const res = await fetch(`${API_BASE}/intel/spy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channelUrl, game: spyGame }),
-      });
-      if (res.ok) { setSpyResult(await res.json()); }
-      else throw new Error();
-    } catch {
+      const data = await apiClient.post<SpyResult>('/intel/spy', { channelUrl, game: spyGame });
+      setSpyResult(data);
+    } catch (e: any) {
+      // 402 = insufficient credits / plan required - apiClient has already
+      // fired the UPGRADE_REQUIRED event, so the modal will appear.
+      if (e?.status === 402) { setSpyLoading(false); return; }
       setSpyResult(getFallbackSpy(channelUrl));
     } finally { setSpyLoading(false); }
   };
@@ -89,14 +86,12 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
   const runTiming = async () => {
     setTimingLoading(true); setTimingResult(null);
     try {
-      const res = await fetch(`${API_BASE}/intel/timing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ platform: timingPlatform, game: timingGame }),
+      const data = await apiClient.post<TimingResult>('/intel/timing', {
+        platform: timingPlatform, game: timingGame,
       });
-      if (res.ok) { setTimingResult(await res.json()); }
-      else throw new Error();
-    } catch {
+      setTimingResult(data);
+    } catch (e: any) {
+      if (e?.status === 402) { setTimingLoading(false); return; }
       setTimingResult(getFallbackTiming(timingPlatform, timingGame));
     } finally { setTimingLoading(false); }
   };
@@ -107,14 +102,12 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
     if (!titleA.trim() || !titleB.trim()) return toast.error('Enter both titles');
     setAbLoading(true); setAbResult(null);
     try {
-      const res = await fetch(`${API_BASE}/intel/abtitle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titleA, titleB, game: abGame }),
+      const data = await apiClient.post<ABResult>('/intel/abtitle', {
+        titleA, titleB, game: abGame,
       });
-      if (res.ok) { setAbResult(await res.json()); }
-      else throw new Error();
-    } catch {
+      setAbResult(data);
+    } catch (e: any) {
+      if (e?.status === 402) { setAbLoading(false); return; }
       setAbResult(getFallbackAB(titleA, titleB));
     } finally { setAbLoading(false); }
   };
