@@ -3,6 +3,7 @@ name: Deploy ClipAI
 on:
   push:
     branches: [main]
+  workflow_dispatch:  # Allow manual triggering from GitHub UI
 
 jobs:
   deploy-frontend:
@@ -29,15 +30,37 @@ jobs:
       - name: Build
         run: npm run build
         env:
+          # VITE_ vars are baked into the bundle at build time
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Deploy to Cloudflare Pages
+        id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy dist --project-name=clipai
           workingDirectory: app
+
+      - name: Health check
+        if: success()
+        run: |
+          sleep 15  # give CF a moment to propagate
+          URL="${{ steps.deploy.outputs.deployment-url }}"
+          if [ -z "$URL" ]; then URL="https://clipai-bqo.pages.dev"; fi
+          echo "Health-checking $URL/api/health ..."
+          curl -sf --max-time 30 "$URL/api/health" | python3 -c "import json,sys; d=json.load(sys.stdin); print('Status:', d['status']); print('Checks:', {k:v['status'] for k,v in d['checks'].items()}); sys.exit(0 if d['status']=='ok' else 1)"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::warning::Deploy failed. Check:"
+          echo "  1. CLOUDFLARE_API_TOKEN is set + not expired"
+          echo "  2. CLOUDFLARE_ACCOUNT_ID is set"
+          echo "  3. VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY secrets are set"
+          echo "  4. Cloudflare Pages project 'clipai' exists"
 
   verify-worker:
     runs-on: ubuntu-latest
