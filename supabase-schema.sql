@@ -400,3 +400,38 @@ create policy waitlist_self_select on public.waitlist
 -- ============================================================================
 -- Done. Verify with: select * from public.profiles limit 5;
 -- ============================================================================
+
+-- ============================================================================
+-- ERROR LOG (Phase 4 — production hardening)
+-- ============================================================================
+-- Frontend posts errors/warnings here via /api/log (rate-limited 10/min/IP).
+-- Worker writes using the service key (bypasses RLS).
+
+create table if not exists public.error_log (
+  id          bigint generated always as identity primary key,
+  created_at  timestamptz not null default now(),
+  level       text not null default 'error' check (level in ('error','warn','info')),
+  message     text not null,
+  stack       text,
+  url         text,
+  user_agent  text,
+  user_id     uuid references auth.users(id) on delete set null,
+  ip          text,
+  extras      jsonb
+);
+
+create index if not exists error_log_created_at_idx on public.error_log (created_at desc);
+create index if not exists error_log_user_idx       on public.error_log (user_id, created_at desc);
+create index if not exists error_log_level_idx      on public.error_log (level, created_at desc);
+
+-- Disable RLS so the service role can write; reads restricted to service role only
+alter table public.error_log enable row level security;
+drop policy if exists "error_log_deny_all" on public.error_log;
+create policy error_log_deny_all on public.error_log
+  for all using (false) with check (false);
+-- Note: writes go through the service key, which bypasses RLS. Reads also
+-- require the service key (dashboard-only access).
+
+-- ============================================================================
+-- Done. Verify with: select * from public.profiles limit 5;
+-- ============================================================================

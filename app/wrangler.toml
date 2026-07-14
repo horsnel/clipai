@@ -1,0 +1,31 @@
+name = "clipai-v2"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "dist"
+
+# ─── KV Namespaces ───────────────────────────────────────────────────────────
+# Create these in the Cloudflare dashboard (Storage & Databases > KV) and bind
+# them to the Pages project under Settings > Functions > KV namespace bindings.
+#
+# Or via CLI:
+#   wrangler kv:namespace create CACHE
+#   wrangler kv:namespace create RATELIMIT
+#
+# Then bind via dashboard, OR uncomment the [[kv_namespaces]] blocks below and
+# run `wrangler pages deploy` instead of `npx wrangler pages deploy`.
+
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "REPLACE_WITH_CACHE_KV_ID"
+
+[[kv_namespaces]]
+binding = "RATELIMIT_KV"
+id = "REPLACE_WITH_RATELIMIT_KV_ID"
+
+# ─── Environment variables ────────────────────────────────────────────────────
+# Secrets (Supabase service key, Paystack secret, LLM keys, etc.) should be set
+# via `wrangler pages secret put NAME` or in the dashboard. They are NOT safe
+# to commit to this file.
+#
+# Non-secret vars can be set here:
+[vars]
+LLM_MODEL = ""

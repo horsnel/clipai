@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
-import { Zap, Menu, X, User, LogOut, Coins } from 'lucide-react';
+import { Menu, X, User, LogOut, Coins } from 'lucide-react';
+import { Logo } from './Logo';
 
 interface NavbarProps {
   currentPage: Page;
@@ -70,12 +71,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
             onClick={() => onNavigate(isLoggedIn ? 'dashboard' : 'landing')}
             className="flex items-center gap-2 group"
           >
-            <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-lg bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center group-hover:shadow-glow-cyan transition-shadow">
-              <Zap className="w-4 h-4 lg:w-5 lg:h-5 text-black" />
-            </div>
-            <span className="font-display font-bold text-lg lg:text-xl text-clip-text">
-              ClipAI
-            </span>
+            <Logo size="sm" showWord />
           </button>
 
           {/* Desktop Navigation */}

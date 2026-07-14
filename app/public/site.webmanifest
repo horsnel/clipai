@@ -1,0 +1,24 @@
+{
+  "name": "ClipAI — AI Growth Platform for Gaming Creators",
+  "short_name": "ClipAI",
+  "description": "Trend Radar, Viral Forge, ClipBot coach, and Growth Intel. Built for gaming creators. Made in Lagos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0B0D",
+  "theme_color": "#0B0B0D",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "entertainment", "social"],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Trend Radar", "url": "/#trends", "description": "See what's trending across YouTube, Reddit, TikTok, X" },
+    { "name": "Viral Forge", "url": "/#forge", "description": "Generate viral titles, captions, hashtags, hooks" },
+    { "name": "ClipBot", "url": "/#clipbot", "description": "Chat with your AI gaming content coach" },
+    { "name": "Growth Intel", "url": "/#intel", "description": "Spy on competitors, best posting times, A/B test titles" }
+  ]
+}

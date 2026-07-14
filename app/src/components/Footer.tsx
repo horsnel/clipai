@@ -1,5 +1,6 @@
 import type { Page } from '../App';
-import { Zap, Github, Twitter, Instagram } from 'lucide-react';
+import { Github, Twitter, Instagram } from 'lucide-react';
+import { Logo } from './Logo';
 
 interface FooterProps {
   onNavigate: (page: Page, clips?: unknown[]) => void;
@@ -18,12 +19,7 @@ export function Footer({ onNavigate }: FooterProps) {
               onClick={() => onNavigate('landing')}
               className="flex items-center gap-2 group mb-4"
             >
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center group-hover:shadow-glow-cyan transition-shadow">
-                <Zap className="w-5 h-5 text-black" />
-              </div>
-              <span className="font-display font-bold text-xl text-clip-text">
-                ClipAI
-              </span>
+              <Logo size="sm" showWord />
             </button>
             <p className="text-clip-muted text-sm leading-relaxed max-w-sm mb-6">
               The AI growth platform for gaming creators. Trend Radar, ViralForge, ClipBot coach, and Caption Battle — built for the games you actually play. Made in Lagos.

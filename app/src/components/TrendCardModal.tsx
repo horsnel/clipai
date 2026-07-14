@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   X, Search, Type, MessageCircle, Hash, Copy, Check,
-  Loader2, TrendingUp, Sparkles,
+  TrendingUp, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/services/api';
+import { ParticleLoader } from './Loading';
 import type { TrendItem } from '../pages/TrendRadarPage';
 
 interface TrendCardModalProps {
@@ -169,11 +170,14 @@ export function TrendCardModal({ trend, onClose }: TrendCardModalProps) {
         {/* Body — scrollable */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {isLoading && (
-            <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Loader2 className="w-8 h-8 text-clip-cyan animate-spin" />
-              <p className="text-clip-muted text-sm">Generating content pack...</p>
-              <p className="text-clip-muted text-xs">Keywords, titles, captions & hashtags</p>
-            </div>
+            <ParticleLoader
+              stages={[
+                'Decoding the trend…',
+                'Writing scroll-stopping titles…',
+                'Crafting captions + hashtags…',
+              ]}
+              stageIntervalMs={1300}
+            />
           )}
 
           {error && !isLoading && (

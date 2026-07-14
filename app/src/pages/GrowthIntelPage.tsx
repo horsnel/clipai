@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/services/api';
+import { ParticleLoader } from '../components/Loading';
 
 interface GrowthIntelPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -179,6 +180,17 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
               </button>
             </div>
 
+            {spyLoading && (
+              <ParticleLoader
+                stages={[
+                  'Scraping channel data…',
+                  'Analysing top videos…',
+                  'Reverse-engineering their formula…',
+                ]}
+                stageIntervalMs={1500}
+              />
+            )}
+
             {spyResult && (
               <div className="space-y-4">
                 <div className="card-glass p-5 border-clip-cyan/20 bg-clip-cyan/5">
@@ -265,6 +277,17 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
               </button>
             </div>
 
+            {timingLoading && (
+              <ParticleLoader
+                stages={[
+                  'Analysing Nigerian audience activity…',
+                  'Cross-referencing platform peaks…',
+                  'Computing optimal slots…',
+                ]}
+                stageIntervalMs={1400}
+              />
+            )}
+
             {timingResult && (
               <div className="space-y-4">
                 <div className="card-glass overflow-hidden">
@@ -329,6 +352,17 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                 {abLoading ? <><RefreshCw className="w-4 h-4 animate-spin" /> Predicting…</> : <><Zap className="w-4 h-4" /> Predict Winner</>}
               </button>
             </div>
+
+            {abLoading && (
+              <ParticleLoader
+                stages={[
+                  'Scoring hook strength…',
+                  'Measuring scroll-stop power…',
+                  'Comparing CTR potential…',
+                ]}
+                stageIntervalMs={1300}
+              />
+            )}
 
             {abResult && (
               <div className="space-y-4">

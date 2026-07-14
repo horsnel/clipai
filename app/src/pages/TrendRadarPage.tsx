@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TrendCardModal } from '../components/TrendCardModal';
+import { ParticleLoader } from '../components/Loading';
 
 interface TrendRadarPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -249,7 +250,18 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
           </div>
 
           <div className="divide-y divide-white/[0.04]">
-            {filtered.length === 0 && !isLoading ? (
+            {isLoading ? (
+              <ParticleLoader
+                stages={[
+                  'Scanning YouTube trending…',
+                  'Mining Reddit gaming subs…',
+                  'Pulling Google Trends…',
+                  'Searching TikTok + X…',
+                  'Synthesizing top trends…',
+                ]}
+                stageIntervalMs={1400}
+              />
+            ) : filtered.length === 0 ? (
               <div className="p-12 text-center text-clip-muted">
                 <TrendingUp className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p>No trends found for this filter.</p>

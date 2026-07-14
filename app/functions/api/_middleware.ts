@@ -57,6 +57,12 @@ interface Env {
   PAYSTACK_SECRET_KEY: string;
   // Worker
   WORKER_SECRET: string;
+  // Cache (Cloudflare KV namespace — optional but recommended)
+  CACHE_KV?: KVNamespace;
+  // Rate limiting (Cloudflare KV namespace — optional)
+  RATELIMIT_KV?: KVNamespace;
+  // Sentry DSN (optional)
+  SENTRY_DSN?: string;
 }
 
 type Profile = {
@@ -141,13 +147,31 @@ const json = (data: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-// ─── CORS ────────────────────────────────────────────────────────────────────
+// ─── CORS + Security headers + Rate limiting ────────────────────────────────
 app.use('*', async (c, next) => {
   const origin = c.req.header('Origin') || '*';
   c.header('Access-Control-Allow-Origin', origin);
   c.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Paystack-Signature');
+  // Security headers (CSP is loose because the SPA is on a different origin; tighten after custom domain)
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  c.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  // HSTS — tell browsers to always use HTTPS for the next 2 years
+  c.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
   if (c.req.method === 'OPTIONS') return new Response(null, { status: 204 });
+
+  // Rate limit: 60 req/min per IP (skips webhooks + health to avoid breaking monitors)
+  const path = new URL(c.req.url).pathname;
+  const skipRl = path === '/api/health' || path === '/api/payment/webhook';
+  if (!skipRl) {
+    const ip = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    const ok = await rateLimit(c.env, `ip:${ip}`, 60, 60);
+    if (!ok) {
+      return json({ error: 'Rate limit exceeded. Try again in a minute.', retry_after: 60 }, 429);
+    }
+  }
   await next();
 });
 
@@ -493,18 +517,208 @@ async function hmacSha512(secret: string, body: ArrayBuffer): Promise<string> {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// CACHE LAYER (L1 in-memory + L2 Cloudflare KV + single-flight + stale-while-error)
+// ════════════════════════════════════════════════════════════════════════════
+// L1: Per-isolate Map. Survives across requests in the same isolate (minutes-hours).
+// L2: Cloudflare KV namespace `CACHE_KV`. Globally replicated, eventually consistent.
+// Single-flight: when N concurrent requests hit the same key, only one upstream
+//   call fires — the rest await the same promise.
+// Stale-while-error: if upstream throws AND we have any cached value (even
+//   expired), serve the stale value rather than erroring. This keeps the app
+//   resilient during LLM/Serper/Reddit outages.
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __clipaiL1: Map<string, { data: any; expires: number }> | undefined;
+  // eslint-disable-next-line no-var
+  var __clipaiInflight: Map<string, Promise<any>> | undefined;
+}
+const l1Cache: Map<string, { data: any; expires: number }> =
+  (globalThis as any).__clipaiL1 ?? new Map();
+(globalThis as any).__clipaiL1 = l1Cache;
+const inflight: Map<string, Promise<any>> =
+  (globalThis as any).__clipaiInflight ?? new Map();
+(globalThis as any).__clipaiInflight = inflight;
+
+const STALE_WINDOW = 24 * 60 * 60; // 24h stale fallback window (KV TTL)
+
+async function cacheRead<T>(env: Env, key: string): Promise<{ data: T; fresh: boolean } | null> {
+  // L1
+  const l1 = l1Cache.get(key);
+  if (l1) {
+    if (l1.expires > Date.now()) return { data: l1.data as T, fresh: true };
+    // expired L1 — keep for fallback but treat as miss
+  }
+  // L2 (KV)
+  if (env.CACHE_KV) {
+    try {
+      const raw = await env.CACHE_KV.get<any>(`c:${key}`, 'json');
+      if (raw) {
+        const fresh = raw.expires > Date.now();
+        // promote to L1 (even if stale, for fast fallback)
+        l1Cache.set(key, { data: raw.data, expires: raw.expires });
+        return { data: raw.data as T, fresh };
+      }
+    } catch (e) {
+      console.warn('[cache] KV read failed:', (e as Error).message);
+    }
+  }
+  return null;
+}
+
+async function cacheWrite<T>(env: Env, key: string, data: T, ttl: number): Promise<void> {
+  const expires = Date.now() + ttl * 1000;
+  l1Cache.set(key, { data, expires });
+  // Light L1 GC: if L1 is over 300 entries, drop the 100 oldest
+  if (l1Cache.size > 300) {
+    const entries = [...l1Cache.entries()].sort((a, b) => a[1].expires - b[1].expires);
+    for (let i = 0; i < 100; i++) l1Cache.delete(entries[i][0]);
+  }
+  if (env.CACHE_KV) {
+    try {
+      await env.CACHE_KV.put(`c:${key}`, JSON.stringify({ data, expires }), {
+        expirationTtl: ttl + STALE_WINDOW,
+      });
+    } catch (e) {
+      console.warn('[cache] KV write failed:', (e as Error).message);
+    }
+  }
+}
+
+async function cacheReadStale<T>(env: Env, key: string): Promise<T | null> {
+  const l1 = l1Cache.get(key);
+  if (l1) return l1.data as T;
+  if (env.CACHE_KV) {
+    try {
+      const raw = await env.CACHE_KV.get<any>(`c:${key}`, 'json');
+      if (raw) return raw.data as T;
+    } catch {}
+  }
+  return null;
+}
+
+/**
+ * Wrap a function with cache.
+ *  1. Return fresh cache if present.
+ *  2. Otherwise single-flight the upstream call (dedupe concurrent requests).
+ *  3. On upstream error, serve stale if available (never error if we have anything).
+ */
+async function withCache<T>(
+  env: Env,
+  key: string,
+  ttl: number,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const cached = await cacheRead<T>(env, key);
+  if (cached && cached.fresh) return cached.data;
+
+  // Single-flight
+  const existing = inflight.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const p = (async () => {
+    try {
+      const data = await fn();
+      await cacheWrite(env, key, data, ttl);
+      return data;
+    } catch (e: any) {
+      const stale = await cacheReadStale<T>(env, key);
+      if (stale !== null) {
+        console.warn(`[cache] upstream failed, serving stale for ${key}: ${e.message}`);
+        return stale;
+      }
+      throw e;
+    } finally {
+      // Briefly retain the promise to absorb concurrent bursts
+      setTimeout(() => inflight.delete(key), 200);
+    }
+  })();
+  inflight.set(key, p);
+  return p;
+}
+
+async function hashKey(...parts: (string | number | undefined)[]): Promise<string> {
+  const input = parts.filter(p => p !== undefined).join('|').toLowerCase().trim();
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
+  return Array.from(new Uint8Array(buf)).slice(0, 10).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// RATE LIMITING (token bucket via Cloudflare KV)
+// ════════════════════════════════════════════════════════════════════════════
+// Default: 30 requests per minute per user (or per IP if not authed).
+// KV-backed so the limit is global, not per-isolate. Falls open if RATELIMIT_KV
+// is not bound (so dev mode still works).
+
+async function rateLimit(env: Env, key: string, limit = 30, windowSec = 60): Promise<boolean> {
+  if (!env.RATELIMIT_KV) return true; // fail open in dev
+  const kvKey = `rl:${key}:${Math.floor(Date.now() / (windowSec * 1000))}`;
+  try {
+    const cur = parseInt((await env.RATELIMIT_KV.get(kvKey)) || '0', 10);
+    if (cur >= limit) return false;
+    await env.RATELIMIT_KV.put(kvKey, String(cur + 1), { expirationTtl: windowSec + 5 });
+    return true;
+  } catch {
+    return true; // fail open
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // ROUTES
 // ════════════════════════════════════════════════════════════════════════════
 
-// ─── Health ──────────────────────────────────────────────────────────────────
-app.get('/health', (c) => json({
-  status: 'ok',
-  service: 'clipai-worker',
-  version: '4.6-cf',
-  runtime: 'cloudflare-pages',
-  supabase: !!c.env.SUPABASE_URL,
-  llm: c.env.SILICONFLOW_API_KEY ? 'siliconflow' : (c.env.MISTRAL_API_KEY ? 'mistral' : (c.env.GROQ_API_KEY ? 'groq' : 'none')),
-}));
+// ─── Health (rich — pings every upstream dependency) ─────────────────────────
+app.get('/health', async (c) => {
+  const env = c.env as Env;
+  const checks: Record<string, { status: string; latency_ms?: number; detail?: string }> = {};
+
+  // L1 cache size
+  checks.l1_cache = { status: 'ok', detail: `${l1Cache.size} entries, ${inflight.size} inflight` };
+
+  // KV binding
+  checks.kv = { status: env.CACHE_KV ? 'ok' : 'unbound' };
+  checks.ratelimit_kv = { status: env.RATELIMIT_KV ? 'ok' : 'unbound' };
+
+  // Supabase ping (5s timeout)
+  const sbStart = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const r = await fetch(`${env.SUPABASE_URL}/rest/v1/`, {
+      headers: { apikey: env.SUPABASE_ANON_KEY },
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    checks.supabase = { status: r.ok ? 'ok' : 'degraded', latency_ms: Date.now() - sbStart, detail: `HTTP ${r.status}` };
+  } catch (e: any) {
+    checks.supabase = { status: 'down', latency_ms: Date.now() - sbStart, detail: e.message };
+  }
+
+  // LLM provider configured?
+  const llmProvider = env.SILICONFLOW_API_KEY ? 'siliconflow'
+    : env.MISTRAL_API_KEY ? 'mistral'
+    : env.GROQ_API_KEY ? 'groq' : 'none';
+  checks.llm = { status: llmProvider !== 'none' ? 'ok' : 'down', detail: llmProvider };
+
+  // Serper (just check key presence — actual ping costs quota)
+  checks.serper = { status: env.SERPER_API_KEY ? 'ok' : 'unbound' };
+
+  // Paystack
+  checks.paystack = { status: env.PAYSTACK_SECRET_KEY ? 'ok' : 'unbound' };
+
+  // Aggregate status
+  const allOk = Object.values(checks).every(c => c.status === 'ok' || c.status === 'unbound');
+  const degraded = !allOk && Object.values(checks).some(c => c.status === 'ok');
+
+  return json({
+    status: allOk ? 'ok' : (degraded ? 'degraded' : 'down'),
+    service: 'clipai-worker',
+    version: '5.0-cf',
+    runtime: 'cloudflare-pages',
+    timestamp: new Date().toISOString(),
+    checks,
+  }, allOk ? 200 : 503);
+});
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 app.get('/auth/me', requireAuth, async (c) => {
@@ -620,14 +834,20 @@ app.get('/leaderboard', requireAuth, async (c) => {
   const userId = c.get('userId') as string;
   const type = c.req.query('type') === 'weekly' ? 'weekly' : 'alltime';
   const view = type === 'alltime' ? 'leaderboard_alltime' : 'leaderboard_weekly';
-  const rows = await sbFetch<any[]>(env, `${view}?order=rank.asc&limit=100`);
-  if (!rows) return json({ players: [], currentUser: null });
-  let me = rows.find((r) => r.id === userId) || null;
+
+  // 5min cache per type — leaderboard is global, doesn't need to be realtime
+  const cacheKey = `leaderboard:${type}`;
+  const data = await withCache(env, cacheKey, 5 * 60, async () => {
+    const rows = await sbFetch<any[]>(env, `${view}?order=rank.asc&limit=100`);
+    return { rows: rows || [] };
+  });
+
+  let me = data.rows.find((r: any) => r.id === userId) || null;
   if (!me) {
     const myRow = await sbFetch<any[]>(env, `${view}?id=eq.${userId}`);
     me = myRow && myRow.length > 0 ? myRow[0] : { rank: 999, id: userId, xp: 0 };
   }
-  return json({ players: rows, currentUser: me });
+  return json({ players: data.rows, currentUser: me });
 });
 
 // ─── Rank ────────────────────────────────────────────────────────────────────
@@ -853,17 +1073,21 @@ app.post('/forge/vote', requireAuth, async (c) => {
 
 app.get('/forge/top-captions', async (c) => {
   const env = c.env as Env;
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
-  const rows = await sbFetch<any[]>(env, `caption_votes?created_at=gt.${weekAgo}&select=caption_text,vote,game,vibe&order=created_at.desc&limit=50`);
-  if (!rows) return json({ captions: [] });
-  const agg: Record<string, any> = {};
-  for (const r of rows) {
-    const t = r.caption_text;
-    if (!agg[t]) agg[t] = { caption: t, score: 0, game: r.game, vibe: r.vibe };
-    agg[t].score += r.vote;
-  }
-  const top = Object.values(agg).sort((a: any, b: any) => b.score - a.score).slice(0, 10);
-  return json({ captions: top });
+  // 5min cache — top captions change slowly
+  const data = await withCache(env, 'forge_top_captions', 5 * 60, async () => {
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+    const rows = await sbFetch<any[]>(env, `caption_votes?created_at=gt.${weekAgo}&select=caption_text,vote,game,vibe&order=created_at.desc&limit=50`);
+    if (!rows) return { captions: [] };
+    const agg: Record<string, any> = {};
+    for (const r of rows) {
+      const t = r.caption_text;
+      if (!agg[t]) agg[t] = { caption: t, score: 0, game: r.game, vibe: r.vibe };
+      agg[t].score += r.vote;
+    }
+    const top = Object.values(agg).sort((a: any, b: any) => b.score - a.score).slice(0, 10);
+    return { captions: top };
+  });
+  return json(data);
 });
 
 // ─── Forge tools (Groq) ──────────────────────────────────────────────────────
@@ -874,8 +1098,15 @@ app.post('/forge/titles', requireAuth, requireCredits(2), async (c) => {
   const desc = body.description || '';
   const game = body.game || 'Gaming';
   const platform = body.platform || 'TikTok';
-  const system = 'You are a viral gaming content strategist. Return ONLY valid JSON.';
-  const prompt = `Generate 7 viral title options for this gaming clip:
+
+  // 7d cache — deterministic per (desc, game, platform)
+  const cacheKey = await hashKey('forge_titles', desc, game, platform);
+
+  let data: any;
+  try {
+    data = await withCache(env, cacheKey, 7 * 24 * 60 * 60, async () => {
+      const system = 'You are a viral gaming content strategist. Return ONLY valid JSON.';
+      const prompt = `Generate 7 viral title options for this gaming clip:
 Description: "${desc}"
 Game: ${game}
 Platform: ${platform}
@@ -900,13 +1131,13 @@ Rules:
 - Optimise for ${platform} algorithm
 - Rank by viralScore descending
 - Make them feel authentic, not corporate`;
-  try {
-    const data: any = await llmJson(env, prompt, system);
-    data.credits_remaining = await spendCredits(env, userId, 2, 'forge_titles');
-    return json(data);
+      return await llmJson(env, prompt, system);
+    });
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
+  data.credits_remaining = await spendCredits(env, userId, 2, 'forge_titles');
+  return json(data);
 });
 
 app.post('/forge/captions', requireAuth, requireCredits(2), async (c) => {
@@ -917,8 +1148,15 @@ app.post('/forge/captions', requireAuth, requireCredits(2), async (c) => {
   const game = body.game || 'Gaming';
   const vibe = body.vibe || 'Hype';
   const platform = body.platform || 'TikTok';
-  const system = 'You are a viral gaming caption writer who knows what Nigerian teens love. Return ONLY valid JSON.';
-  const prompt = `Write 6 viral captions for this gaming clip:
+
+  // 7d cache — deterministic
+  const cacheKey = await hashKey('forge_captions', desc, game, vibe, platform);
+
+  let data: any;
+  try {
+    data = await withCache(env, cacheKey, 7 * 24 * 60 * 60, async () => {
+      const system = 'You are a viral gaming caption writer who knows what Nigerian teens love. Return ONLY valid JSON.';
+      const prompt = `Write 6 viral captions for this gaming clip:
 Description: "${desc}"
 Game: ${game}, Vibe: ${vibe}, Platform: ${platform}
 
@@ -940,13 +1178,13 @@ Rules:
 - Include comment bait (ask viewers to react)
 - Reference Nigerian gaming culture where natural
 - No corporate language`;
-  try {
-    const data: any = await llmJson(env, prompt, system);
-    data.credits_remaining = await spendCredits(env, userId, 2, 'forge_captions');
-    return json(data);
+      return await llmJson(env, prompt, system);
+    });
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
+  data.credits_remaining = await spendCredits(env, userId, 2, 'forge_captions');
+  return json(data);
 });
 
 app.post('/forge/hashtags', requireAuth, requireCredits(2), async (c) => {
@@ -956,8 +1194,15 @@ app.post('/forge/hashtags', requireAuth, requireCredits(2), async (c) => {
   const desc = body.description || '';
   const game = body.game || 'Gaming';
   const platform = body.platform || 'TikTok';
-  const system = 'You are a hashtag strategist for gaming creators. Return ONLY valid JSON.';
-  const prompt = `Generate the perfect hashtag set for:
+
+  // 7d cache
+  const cacheKey = await hashKey('forge_hashtags', desc, game, platform);
+
+  let data: any;
+  try {
+    data = await withCache(env, cacheKey, 7 * 24 * 60 * 60, async () => {
+      const system = 'You are a hashtag strategist for gaming creators. Return ONLY valid JSON.';
+      const prompt = `Generate the perfect hashtag set for:
 Description: "${desc}", Game: ${game}, Platform: ${platform}
 
 Return JSON: {"hashtags": ["#tag1", "#tag2", ...]}
@@ -969,13 +1214,13 @@ Requirements:
 - Last 6-10: niche (under 1M) — game specific + Nigerian gaming
 - Include #naijagamer and #gamingafrica
 - All lowercase, no spaces`;
-  try {
-    const data: any = await llmJson(env, prompt, system);
-    data.credits_remaining = await spendCredits(env, userId, 2, 'forge_hashtags');
-    return json(data);
+      return await llmJson(env, prompt, system);
+    });
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
+  data.credits_remaining = await spendCredits(env, userId, 2, 'forge_hashtags');
+  return json(data);
 });
 
 app.post('/forge/hooks', requireAuth, requireCredits(2), async (c) => {
@@ -984,8 +1229,15 @@ app.post('/forge/hooks', requireAuth, requireCredits(2), async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const desc = body.description || '';
   const game = body.game || 'Gaming';
-  const system = 'You are a viral short-form video scriptwriter. Return ONLY valid JSON.';
-  const prompt = `Write 8 killer opening hook lines for this ${game} gaming clip:
+
+  // 7d cache
+  const cacheKey = await hashKey('forge_hooks', desc, game);
+
+  let data: any;
+  try {
+    data = await withCache(env, cacheKey, 7 * 24 * 60 * 60, async () => {
+      const system = 'You are a viral short-form video scriptwriter. Return ONLY valid JSON.';
+      const prompt = `Write 8 killer opening hook lines for this ${game} gaming clip:
 "${desc}"
 
 Return JSON: {"hooks": ["hook1", "hook2", ...]}
@@ -996,13 +1248,13 @@ Rules:
 - Mix formats: POV, question, statement, challenge
 - Optimised for TikTok/Reels viewer psychology
 - Reference ${game} naturally`;
-  try {
-    const data: any = await llmJson(env, prompt, system);
-    data.credits_remaining = await spendCredits(env, userId, 2, 'forge_hooks');
-    return json(data);
+      return await llmJson(env, prompt, system);
+    });
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
+  data.credits_remaining = await spendCredits(env, userId, 2, 'forge_hooks');
+  return json(data);
 });
 
 // ─── ClipBot ─────────────────────────────────────────────────────────────────
@@ -1540,67 +1792,69 @@ app.get('/trends', async (c) => {
   const gameLabel = game || 'All';
   const debug = c.req.query('debug') === '1';
 
-  const [ytResults, redditResults, trendsResults, tiktokResults, twitterResults] = await Promise.all([
-    ytTrending(env, game || 'gaming', 10),
-    redditTop(env, game, 8),
-    googleTrends(env, game, 6),
-    serpTiktok(env, game, 6),
-    serpTwitter(env, game, 6),
-  ]);
+  // Cache key — 30min TTL, shared across all users (trends are global)
+  const cacheKey = `trends:${gameLabel.toLowerCase()}`;
 
-  // Debug mode: return raw per-platform payloads without calling Groq.
-  // Useful for verifying each trend source independently (e.g. before GROQ_API_KEY
-  // is set, or to inspect which Google Trends layer produced results).
-  if (debug) {
-    return json({
-      debug: true,
-      game: gameLabel,
-      generatedAt: new Date().toISOString(),
-      sources: {
-        youtube: ytResults.length,
-        reddit: redditResults.length,
-        google_trends: trendsResults.length,
-        tiktok: tiktokResults.length,
-        twitter: twitterResults.length,
-      },
-      raw: {
-        youtube: ytResults,
-        reddit: redditResults,
-        google_trends: trendsResults,
-        tiktok: tiktokResults,
-        twitter: twitterResults,
-      },
-    });
-  }
+  const data = await withCache(env, cacheKey, 30 * 60, async () => {
+    const [ytResults, redditResults, trendsResults, tiktokResults, twitterResults] = await Promise.all([
+      ytTrending(env, game || 'gaming', 10),
+      redditTop(env, game, 8),
+      googleTrends(env, game, 6),
+      serpTiktok(env, game, 6),
+      serpTwitter(env, game, 6),
+    ]);
 
-  const ytTitles = ytResults.slice(0, 8).map((it: any) =>
-    `- ${it?.snippet?.title || ''} (channel: ${it?.snippet?.channelTitle || ''})`
-  ).join('\n') || 'No YouTube data available.';
-
-  const redditBlock = redditResults.slice(0, 6).map((r: any) =>
-    `- ${r.title} (r/${r.subreddit}, score: ${r.score})`
-  ).join('\n') || 'No Reddit data available.';
-
-  const gtrendsBlock = trendsResults.slice(0, 5).map((t: any) => {
-    if (t.layer === 'google_news_rss' && t.source) {
-      return `- ${t.title} (via ${t.source}, recency ${t.value})`;
+    // Debug mode: return raw per-platform payloads without calling Groq.
+    if (debug) {
+      return {
+        debug: true,
+        game: gameLabel,
+        generatedAt: new Date().toISOString(),
+        sources: {
+          youtube: ytResults.length,
+          reddit: redditResults.length,
+          google_trends: trendsResults.length,
+          tiktok: tiktokResults.length,
+          twitter: twitterResults.length,
+        },
+        raw: {
+          youtube: ytResults,
+          reddit: redditResults,
+          google_trends: trendsResults,
+          tiktok: tiktokResults,
+          twitter: twitterResults,
+        },
+      };
     }
-    if (t.layer === 'serper_news' && t.source) {
-      return `- ${t.title} (via ${t.source}, ${t.publishedAt || 'recent'})`;
-    }
-    return `- ${t.title} (+${t.value}% growth)`;
-  }).join('\n') || 'No Google Trends data available.';
 
-  const tiktokBlock = tiktokResults.slice(0, 5).map((t: any) =>
-    `- ${t.title} (${t.url || 'no url'})`
-  ).join('\n') || 'No TikTok data available (Serper key missing or quota exhausted).';
+    const ytTitles = ytResults.slice(0, 8).map((it: any) =>
+      `- ${it?.snippet?.title || ''} (channel: ${it?.snippet?.channelTitle || ''})`
+    ).join('\n') || 'No YouTube data available.';
 
-  const twitterBlock = twitterResults.slice(0, 5).map((t: any) =>
-    `- ${t.title} (${t.url || 'no url'})`
-  ).join('\n') || 'No Twitter data available (Serper key missing or quota exhausted).';
+    const redditBlock = redditResults.slice(0, 6).map((r: any) =>
+      `- ${r.title} (r/${r.subreddit}, score: ${r.score})`
+    ).join('\n') || 'No Reddit data available.';
 
-  const system = 'You are a viral gaming content trend analyst. Return ONLY valid JSON.';
-  const prompt = `Synthesize these live cross-platform signals into the TOP 12 trending items
+    const gtrendsBlock = trendsResults.slice(0, 5).map((t: any) => {
+      if (t.layer === 'google_news_rss' && t.source) {
+        return `- ${t.title} (via ${t.source}, recency ${t.value})`;
+      }
+      if (t.layer === 'serper_news' && t.source) {
+        return `- ${t.title} (via ${t.source}, ${t.publishedAt || 'recent'})`;
+      }
+      return `- ${t.title} (+${t.value}% growth)`;
+    }).join('\n') || 'No Google Trends data available.';
+
+    const tiktokBlock = tiktokResults.slice(0, 5).map((t: any) =>
+      `- ${t.title} (${t.url || 'no url'})`
+    ).join('\n') || 'No TikTok data available (Serper key missing or quota exhausted).';
+
+    const twitterBlock = twitterResults.slice(0, 5).map((t: any) =>
+      `- ${t.title} (${t.url || 'no url'})`
+    ).join('\n') || 'No Twitter data available (Serper key missing or quota exhausted).';
+
+    const system = 'You are a viral gaming content trend analyst. Return ONLY valid JSON.';
+    const prompt = `Synthesize these live cross-platform signals into the TOP 12 trending items
 for gaming content creators right now. Each trend MUST tag the platform where it
 originated so the frontend can render a badge.
 
@@ -1654,20 +1908,19 @@ Rules:
 - Make trends specific, actionable, and relevant to Nigerian/African gaming creators.
 - Prefer rising trends over peaked ones (>=60% should be 'rising').`;
 
-  try {
-    const data: any = await llmJson(env, prompt, system, 8000);
-    data.updatedAt = new Date().toISOString();
-    data.sources = data.sources || {
+    const llmData: any = await llmJson(env, prompt, system, 8000);
+    llmData.updatedAt = new Date().toISOString();
+    llmData.sources = llmData.sources || {
       youtube: ytResults.length,
       reddit: redditResults.length,
       google_trends: trendsResults.length,
       tiktok: tiktokResults.length,
       twitter: twitterResults.length,
     };
-    return json(data);
-  } catch (e: any) {
-    return json({ error: e.message }, 500);
-  }
+    return llmData;
+  });
+
+  return json(data);
 });
 
 // ─── Trend Assets (per-trend copyable content) ──────────────────────────────
@@ -1689,8 +1942,15 @@ app.post('/trends/assets', requireAuth, requireCredits(1), async (c) => {
 
   if (!trend) return json({ error: 'trend is required' }, 400);
 
-  const system = 'You are a viral gaming content strategist for African creators. Return ONLY valid JSON.';
-  const prompt = `For this trending topic, generate ready-to-use content assets a creator can copy-paste.
+  // Cache key — 24h TTL. Same trend+game+platform → identical LLM output.
+  // Note: we cache the LLM output, NOT the credits_remaining (that's appended below).
+  const cacheKey = await hashKey('trends_assets', trend, game, platform, category);
+
+  let data: any;
+  try {
+    data = await withCache(env, cacheKey, 24 * 60 * 60, async () => {
+      const system = 'You are a viral gaming content strategist for African creators. Return ONLY valid JSON.';
+      const prompt = `For this trending topic, generate ready-to-use content assets a creator can copy-paste.
 
 Trend: "${trend}"
 Game: ${game}
@@ -1731,22 +1991,26 @@ Rules:
 - All hashtags lowercase, no spaces, start with #.
 - Do not wrap the JSON in markdown fences. Return ONLY the JSON object.`;
 
-  try {
-    const data: any = await llmJson(env, prompt, system, 2000);
-    // Defensive defaults in case the LLM omits a field
-    data.keywords = Array.isArray(data.keywords) ? data.keywords.slice(0, 4) : [];
-    data.titles = Array.isArray(data.titles) ? data.titles.slice(0, 3) : [];
-    data.captions = Array.isArray(data.captions) ? data.captions.slice(0, 3) : [];
-    data.hashtags = Array.isArray(data.hashtags) ? data.hashtags.slice(0, 18) : [];
-    data.trend = trend;
-    data.game = game;
-    data.platform = platform;
-    data.generatedAt = new Date().toISOString();
-    data.credits_remaining = await spendCredits(env, userId, 1, 'trends_assets');
-    return json(data);
+      const llmData: any = await llmJson(env, prompt, system, 2000);
+      // Defensive defaults in case the LLM omits a field
+      llmData.keywords = Array.isArray(llmData.keywords) ? llmData.keywords.slice(0, 4) : [];
+      llmData.titles = Array.isArray(llmData.titles) ? llmData.titles.slice(0, 3) : [];
+      llmData.captions = Array.isArray(llmData.captions) ? llmData.captions.slice(0, 3) : [];
+      llmData.hashtags = Array.isArray(llmData.hashtags) ? llmData.hashtags.slice(0, 18) : [];
+      llmData.trend = trend;
+      llmData.game = game;
+      llmData.platform = platform;
+      llmData.generatedAt = new Date().toISOString();
+      return llmData;
+    });
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
+
+  // Spend credits AFTER cache lookup — every call charges, even cache hits,
+  // because the user gets the same value (instant response).
+  data.credits_remaining = await spendCredits(env, userId, 1, 'trends_assets');
+  return json(data);
 });
 
 // ─── Growth Intel ────────────────────────────────────────────────────────────
@@ -1760,6 +2024,12 @@ app.post('/intel/spy', requireAuth, requirePlan('pro', 'creator'), requireCredit
     ? channelUrl.split('@').pop()!.split('/')[0]
     : 'unknown';
 
+  // 12h cache — channel strategy doesn't shift fast, and Serper quota is expensive
+  const cacheKey = await hashKey('intel_spy', channelUrl, game);
+
+  let data: any;
+  try {
+    data = await withCache(env, cacheKey, 12 * 60 * 60, async () => {
   const serp = await serpSearch(env, `site:youtube.com ${channelName} gaming ${game} most popular videos`, 8, 'google');
   const context = serp.slice(0, 6).map((r: any) => `- ${r.title || ''}: ${r.snippet || ''}`).join('\n');
   const system = 'You are a YouTube channel analyst. Return ONLY valid JSON.';
@@ -1781,13 +2051,13 @@ Return JSON:
   "topFormulas": ["<formula1>", "<formula2>", "<formula3>", "<formula4>", "<formula5>"],
   "recommendation": "<2-3 sentences on how to compete with or beat them>"
 }`;
-  try {
-    const data: any = await llmJson(env, prompt, system);
-    data.credits_remaining = await spendCredits(env, userId, 5, 'intel_spy');
-    return json(data);
+      return await llmJson(env, prompt, system);
+    });
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
+  data.credits_remaining = await spendCredits(env, userId, 5, 'intel_spy');
+  return json(data);
 });
 
 app.post('/intel/timing', requireAuth, requireCredits(1), async (c) => {
@@ -1796,8 +2066,15 @@ app.post('/intel/timing', requireAuth, requireCredits(1), async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const platform = body.platform || 'TikTok';
   const game = body.game || 'gaming';
-  const system = 'You are a social media timing expert. Return ONLY valid JSON.';
-  const prompt = `What are the best times to post ${game} gaming content on ${platform} for Nigerian creators?
+
+  // 24h cache — posting-time windows change slowly
+  const cacheKey = await hashKey('intel_timing', platform, game);
+
+  let data: any;
+  try {
+    data = await withCache(env, cacheKey, 24 * 60 * 60, async () => {
+      const system = 'You are a social media timing expert. Return ONLY valid JSON.';
+      const prompt = `What are the best times to post ${game} gaming content on ${platform} for Nigerian creators?
 Use WAT (West Africa Time = UTC+1) timezone.
 
 Return JSON:
@@ -1809,13 +2086,13 @@ Return JSON:
   ],
   "insight": "<2-3 sentence actionable insight specific to Nigerian ${game} creators>"
 }`;
-  try {
-    const data: any = await llmJson(env, prompt, system);
-    data.credits_remaining = await spendCredits(env, userId, 1, 'intel_timing');
-    return json(data);
+      return await llmJson(env, prompt, system);
+    });
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
+  data.credits_remaining = await spendCredits(env, userId, 1, 'intel_timing');
+  return json(data);
 });
 
 app.post('/intel/abtitle', requireAuth, requireCredits(1), async (c) => {
@@ -1825,8 +2102,15 @@ app.post('/intel/abtitle', requireAuth, requireCredits(1), async (c) => {
   const titleA = body.titleA || '';
   const titleB = body.titleB || '';
   const game = body.game || 'gaming';
-  const system = 'You are a YouTube CTR and title optimisation expert. Return ONLY valid JSON.';
-  const prompt = `Predict which title will perform better for a ${game} gaming video:
+
+  // 7d cache — same titles + game = same analysis (deterministic)
+  const cacheKey = await hashKey('intel_abtitle', titleA, titleB, game);
+
+  let data: any;
+  try {
+    data = await withCache(env, cacheKey, 7 * 24 * 60 * 60, async () => {
+      const system = 'You are a YouTube CTR and title optimisation expert. Return ONLY valid JSON.';
+      const prompt = `Predict which title will perform better for a ${game} gaming video:
 
 Title A: "${titleA}"
 Title B: "${titleB}"
@@ -1846,17 +2130,107 @@ Return JSON:
 }
 
 The winner must have a higher score. Scores must differ by at least 5.`;
-  try {
-    const data: any = await llmJson(env, prompt, system);
-    data.credits_remaining = await spendCredits(env, userId, 1, 'intel_abtitle');
-    return json(data);
+      return await llmJson(env, prompt, system);
+    });
   } catch (e: any) {
     return json({ error: e.message }, 500);
   }
+  data.credits_remaining = await spendCredits(env, userId, 1, 'intel_abtitle');
+  return json(data);
+});
+
+// ─── Error logging (frontend → Supabase) ────────────────────────────────────
+// Simple Sentry alternative. Frontend posts errors here; we store them in
+// the `error_log` table for later triage. Rate-limited to 10/min per IP.
+app.post('/log', async (c) => {
+  const env = c.env as Env;
+  const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+  const ok = await rateLimit(env, `log:${ip}`, 10, 60);
+  if (!ok) return json({ ok: false, reason: 'rate_limited' }, 429);
+
+  const body = await c.req.json().catch(() => ({}));
+  const { level = 'error', message, stack, url, userAgent, userId, extras } = body;
+  if (!message || typeof message !== 'string' || message.length > 2000) {
+    return json({ ok: false, reason: 'invalid message' }, 400);
+  }
+  try {
+    await sbFetch(env, 'error_log', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        level: String(level).slice(0, 16),
+        message: message.slice(0, 2000),
+        stack: stack ? String(stack).slice(0, 8000) : null,
+        url: url ? String(url).slice(0, 500) : null,
+        user_agent: userAgent ? String(userAgent).slice(0, 500) : null,
+        user_id: userId || null,
+        extras: extras || null,
+        ip: ip.slice(0, 64),
+      }),
+    });
+  } catch (e) {
+    // If error_log table doesn't exist, just swallow — don't fail the request
+    console.warn('[log] failed to persist error:', (e as Error).message);
+  }
+  return json({ ok: true });
+});
+
+// ─── Cron: daily free-tier credit refill ─────────────────────────────────────
+// Called by an external cron (cron-job.org / UptimeRobot) once per day at
+// midnight WAT. Hits /api/cron/refill?secret=WORKER_SECRET to authenticate.
+// Resets all free-tier users back to 50 credits if their balance is below 50.
+app.get('/cron/refill', async (c) => {
+  const env = c.env as Env;
+  const secret = c.req.query('secret');
+  if (!secret || secret !== env.WORKER_SECRET) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
+  // Find all free-tier users with credits < 50
+  const users = await sbFetch<any[]>(
+    env,
+    'profiles?plan=eq.free&credits=lt.50&select=id,credits',
+  );
+  if (!users || users.length === 0) {
+    return json({ refilled: 0, message: 'no users need refill' });
+  }
+
+  let refilled = 0;
+  for (const u of users) {
+    const newBalance = 50;
+    await sbFetch(env, `profiles?id=eq.${u.id}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ credits: newBalance }),
+    });
+    await sbFetch(env, 'credit_transactions', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        user_id: u.id,
+        delta: newBalance - (u.credits || 0),
+        reason: 'daily_refill',
+      }),
+    });
+    refilled++;
+  }
+  return json({ refilled, total_checked: users.length });
 });
 
 // ─── 404 fallback ────────────────────────────────────────────────────────────
 app.all('*', (c) => json({ error: 'Not found', path: c.req.path }, 404));
+
+// ─── Global error handler ────────────────────────────────────────────────────
+// Catches any unhandled exception thrown by route handlers. Logs to console
+// (visible in Cloudflare dashboard) + returns a clean 500 to the client.
+app.onError((err, c) => {
+  console.error('[unhandled]', err?.message, err?.stack);
+  return json({
+    error: 'Internal server error',
+    message: err?.message || 'Unknown error',
+    request_id: c.req.header('cf-ray') || null,
+  }, 500);
+});
 
 // ─── Export for Cloudflare Pages _middleware ─────────────────────────────────
 // Cloudflare Pages passes a single context object; Hono expects (request, env, ctx).

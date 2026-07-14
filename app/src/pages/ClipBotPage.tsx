@@ -4,6 +4,7 @@ import { Send, Bot, User, Zap, Sparkles, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { getClipBotHistory, apiClient } from '@/services/api';
+import { TypingDots } from '../components/Loading';
 
 interface ClipBotPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -240,10 +241,8 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
               <div className="w-8 h-8 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
                 <Bot className="w-4 h-4 text-clip-cyan" />
               </div>
-              <div className="bg-clip-surface border border-white/[0.06] rounded-2xl px-4 py-3 flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-clip-muted animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 rounded-full bg-clip-muted animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 rounded-full bg-clip-muted animate-bounce" style={{ animationDelay: '300ms' }} />
+              <div className="bg-clip-surface border border-white/[0.06] rounded-2xl px-4 py-3">
+                <TypingDots />
               </div>
             </div>
           )}

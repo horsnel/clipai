@@ -18,6 +18,8 @@ import { GrowthIntelPage } from './pages/GrowthIntelPage';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { UpgradeModalProvider, useUpgradeModal } from '@/components/UpgradeModalContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { setLoggerUser } from './lib/logger';
 import type { Plan } from './types';
 import { verifyPayment, UPGRADE_REQUIRED_EVENT } from './services/api';
 import type { UpgradeRequiredDetail } from './services/api';
@@ -59,6 +61,11 @@ function AppContent() {
     streakDays: authUser.streakDays,
     avatarUrl: authUser.avatarUrl,
   } : null;
+
+  // Sync user ID with the error logger so server-side logs are attributable
+  useEffect(() => {
+    setLoggerUser(authUser?.id);
+  }, [authUser?.id]);
 
   // ─── Referral capture + Paystack redirect verification ─────────────────
   useEffect(() => {
@@ -211,9 +218,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

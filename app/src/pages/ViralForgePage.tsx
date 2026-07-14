@@ -6,6 +6,7 @@ import { Zap, Copy, ThumbsUp, RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { voteOnCaption, getTopCaptions, apiClient } from '@/services/api';
+import { ParticleLoader } from '../components/Loading';
 
 interface ViralForgePageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -301,7 +302,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             {activeTool === 'titles' && (
               <div className="space-y-3">
                 {!hasResults ? (
-                  <EmptyState label="titles" />
+                  <EmptyState label="titles" loading={isLoading} />
                 ) : titles.map((title, i) => (
                   <div key={title.id} className="card-glass p-4 hover:border-white/[0.12] transition-all group">
                     <div className="flex items-start gap-3">
@@ -332,7 +333,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             {activeTool === 'captions' && (
               <div className="space-y-4">
                 {!hasResults ? (
-                  <EmptyState label="captions" />
+                  <EmptyState label="captions" loading={isLoading} />
                 ) : (
                   <>
                     {battlePair && !battleWinner && (
@@ -409,7 +410,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             {activeTool === 'hashtags' && (
               <div>
                 {!hasResults ? (
-                  <EmptyState label="hashtags" />
+                  <EmptyState label="hashtags" loading={isLoading} />
                 ) : (
                   <div className="card-glass p-5">
                     <div className="flex items-center justify-between mb-4">
@@ -447,7 +448,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             {activeTool === 'hooks' && (
               <div className="space-y-3">
                 {!hasResults ? (
-                  <EmptyState label="hooks" />
+                  <EmptyState label="hooks" loading={isLoading} />
                 ) : hooks.map((hook, i) => (
                   <div key={i} className="card-glass p-4 group hover:border-white/[0.12] transition-all">
                     <div className="flex items-start gap-3">
@@ -571,7 +572,21 @@ function ViralPill({ score }: { score: number }) {
   );
 }
 
-function EmptyState({ label }: { label: string }) {
+function EmptyState({ label, loading }: { label: string; loading?: boolean }) {
+  if (loading) {
+    return (
+      <div className="card-glass p-8">
+        <ParticleLoader
+          stages={[
+            `Crafting ${label}…`,
+            'Optimising for virality…',
+            'Ranking by viral score…',
+          ]}
+          stageIntervalMs={1500}
+        />
+      </div>
+    );
+  }
   return (
     <div className="card-glass p-12 text-center">
       <Sparkles className="w-10 h-10 mx-auto mb-3 text-clip-muted opacity-40" />
