@@ -296,7 +296,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
             </div>
           )}
           <p className="text-clip-muted text-xs mt-2 text-center">
-            Powered by Groq Llama 3.3 70B · ClipBot knows gaming content inside out
+            ClipBot knows gaming content inside out
           </p>
         </div>
 

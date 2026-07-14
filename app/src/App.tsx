@@ -47,6 +47,47 @@ function AppContent() {
   const [currentPage, setCurrentPage]         = useState<Page>('landing');
   const { user: authUser, session, isLoading, signOut, refreshUser } = useAuth();
 
+  const navigateTo = (page: Page, _clips?: unknown[]) => {
+    setCurrentPage(page);
+    window.scrollTo(0, 0);
+  };
+
+  // NOTE: <UpgradeModalProvider> must wrap the children that call
+  // useUpgradeModal(). AppContent itself is rendered ABOVE the provider, so
+  // it CANNOT call useUpgradeModal() directly — doing so throws
+  // "useUpgradeModal must be used within an UpgradeModalProvider" because the
+  // context is still undefined at that point. The consumer logic lives in
+  // <AppContentInner> below, which is rendered INSIDE the provider.
+  return (
+    <UpgradeModalProvider onNavigate={navigateTo}>
+      <AppContentInner
+        currentPage={currentPage}
+        authUser={authUser}
+        session={session}
+        isLoading={isLoading}
+        signOut={signOut}
+        refreshUser={refreshUser}
+        setCurrentPage={setCurrentPage}
+        navigateTo={navigateTo}
+      />
+    </UpgradeModalProvider>
+  );
+}
+
+interface AppContentInnerProps {
+  currentPage: Page;
+  authUser: ReturnType<typeof useAuth>['user'];
+  session: ReturnType<typeof useAuth>['session'];
+  isLoading: boolean;
+  signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  setCurrentPage: (page: Page) => void;
+  navigateTo: (page: Page, clips?: unknown[]) => void;
+}
+
+function AppContentInner({
+  currentPage, authUser, session, isLoading, signOut, refreshUser, setCurrentPage, navigateTo,
+}: AppContentInnerProps) {
   const isLoggedIn = !!authUser;
   // Adapt AuthContext user → App's legacy user shape (so existing pages keep working)
   const user: AppUser | null = authUser ? {
@@ -145,11 +186,6 @@ function AppContent() {
     setCurrentPage('landing');
   };
 
-  const navigateTo = (page: Page, _clips?: unknown[]) => {
-    setCurrentPage(page);
-    window.scrollTo(0, 0);
-  };
-
   // Pages that require login. 'upload' + 'results' now route to the v3 waitlist (no auth required).
   const PROTECTED: Page[] = ['dashboard','settings','trends','forge','clipbot','rank','growth'];
 
@@ -189,30 +225,28 @@ function AppContent() {
   }
 
   return (
-    <UpgradeModalProvider onNavigate={navigateTo}>
-      <div className="min-h-screen bg-clip-dark text-clip-text">
-        <div className="grain-overlay" />
-        <Navbar
-          currentPage={currentPage}
-          onNavigate={navigateTo}
-          isLoggedIn={isLoggedIn}
-          user={user}
-          onLogout={handleLogout}
-        />
-        <main className="relative">{renderPage()}</main>
-        {FOOTER_PAGES.includes(currentPage) && <Footer onNavigate={navigateTo} />}
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            style: {
-              background: '#121216',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: '#F4F6FA',
-            },
-          }}
-        />
-      </div>
-    </UpgradeModalProvider>
+    <div className="min-h-screen bg-clip-dark text-clip-text">
+      <div className="grain-overlay" />
+      <Navbar
+        currentPage={currentPage}
+        onNavigate={navigateTo}
+        isLoggedIn={isLoggedIn}
+        user={user}
+        onLogout={handleLogout}
+      />
+      <main className="relative">{renderPage()}</main>
+      {FOOTER_PAGES.includes(currentPage) && <Footer onNavigate={navigateTo} />}
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: '#121216',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: '#F4F6FA',
+          },
+        }}
+      />
+    </div>
   );
 }
 

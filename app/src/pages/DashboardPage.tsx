@@ -254,7 +254,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
         <div className="mb-10">
           <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
             <h2 className="font-display font-semibold text-xl text-clip-text">AI Tools</h2>
-            <span className="text-clip-muted text-xs sm:text-sm">All powered by Groq + Gemini + SerpAPI</span>
+            <span className="text-clip-muted text-xs sm:text-sm">All powered by ClipAI</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURE_CARDS.map(card => (

@@ -679,13 +679,16 @@ app.get('/health', async (c) => {
   checks.kv = { status: env.CACHE_KV ? 'ok' : 'unbound' };
   checks.ratelimit_kv = { status: env.RATELIMIT_KV ? 'ok' : 'unbound' };
 
-  // Supabase ping (5s timeout)
+  // Supabase ping (5s timeout, uses service_role key — same key as backend ops)
   const sbStart = Date.now();
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 5000);
     const r = await fetch(`${env.SUPABASE_URL}/rest/v1/`, {
-      headers: { apikey: env.SUPABASE_ANON_KEY },
+      headers: {
+        apikey: env.SUPABASE_SERVICE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+      },
       signal: ctrl.signal,
     });
     clearTimeout(t);
@@ -694,11 +697,11 @@ app.get('/health', async (c) => {
     checks.supabase = { status: 'down', latency_ms: Date.now() - sbStart, detail: e.message };
   }
 
-  // LLM provider configured?
+  // LLM provider configured? (Don't leak which one in the public response.)
   const llmProvider = env.SILICONFLOW_API_KEY ? 'siliconflow'
     : env.MISTRAL_API_KEY ? 'mistral'
     : env.GROQ_API_KEY ? 'groq' : 'none';
-  checks.llm = { status: llmProvider !== 'none' ? 'ok' : 'down', detail: llmProvider };
+  checks.llm = { status: llmProvider !== 'none' ? 'ok' : 'down', detail: llmProvider !== 'none' ? 'configured' : 'none' };
 
   // Serper (just check key presence — actual ping costs quota)
   checks.serper = { status: env.SERPER_API_KEY ? 'ok' : 'unbound' };
@@ -1657,8 +1660,13 @@ async function serpTwitter(env: Env, game: string, limit = 6): Promise<any[]> {
 app.get('/trends/_diag', async (c) => {
   // Diagnostic endpoint — pings each keyless platform directly and reports
   // raw HTTP status + first 200 chars of body. Helps isolate which layer
-  // is failing from Cloudflare's egress IP. NOT for production use.
+  // is failing from Cloudflare's egress IP. Requires WORKER_SECRET to access
+  // (don't expose provider/key presence publicly).
   const env = c.env as Env;
+  const secret = c.req.query('secret');
+  if (!env.WORKER_SECRET || secret !== env.WORKER_SECRET) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
   const game = (c.req.query('game') || 'valorant').trim();
   const out: any = {
     generatedAt: new Date().toISOString(),

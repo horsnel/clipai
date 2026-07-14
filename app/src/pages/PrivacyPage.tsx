@@ -108,7 +108,7 @@ export function PrivacyPage({ onNavigate }: PrivacyPageProps) {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-clip-cyan mt-1">•</span>
-                <span><strong className="text-clip-text">Google Gemini AI:</strong> For video analysis and clip detection</span>
+                <span><strong className="text-clip-text">AI Models:</strong> For video analysis, content generation, and clip detection</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-clip-cyan mt-1">•</span>

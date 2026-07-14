@@ -1,25 +1,24 @@
-name = "clipai-v2"
+name = "clipai"
 compatibility_date = "2024-09-23"
 pages_build_output_dir = "dist"
 
 # ─── KV Namespaces ───────────────────────────────────────────────────────────
-# DO NOT configure KV bindings here for Cloudflare Pages — Pages ignores
-# kv_namespaces in wrangler.toml. Bind them in the dashboard instead:
-#   Workers & Pages → clipai-v2 → Settings → Functions → KV namespace bindings
-#
-# Add two bindings:
-#   - Variable name: CACHE_KV      → KV namespace: CACHE
-#   - Variable name: RATELIMIT_KV  → KV namespace: RATELIMIT
-#
-# (Create the namespaces first under Storage & Databases → KV)
-#
-# If you don't bind them, the app still works — it just fails open
-# (no caching, no rate limiting). Strongly recommended for production.
+# Bound via wrangler.toml (supported by wrangler 3.x+ for Pages projects).
+# These two namespaces power the L1+L2 cache layer + KV-backed rate limiter.
+# If you ever need to rebind, edit the IDs below and re-run `wrangler pages deploy`.
+
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "a674234abe5a49a6969f62de599698cd"        # CACHE namespace
+
+[[kv_namespaces]]
+binding = "RATELIMIT_KV"
+id = "89b1c95ef8314b11b9bfdf7a15469833"        # RATELIMIT namespace
 
 # ─── Environment variables ────────────────────────────────────────────────────
-# Secrets (Supabase service key, Paystack secret, LLM keys, etc.) should be set
-# via `wrangler pages secret put NAME` or in the dashboard. They are NOT safe
-# to commit to this file.
+# Secrets (Supabase service key, Paystack secret, LLM keys, WORKER_SECRET, etc.)
+# are set via `wrangler pages secret put NAME` or in the dashboard. They are
+# NOT safe to commit to this file.
 #
 # Non-secret vars can be set here:
 [vars]

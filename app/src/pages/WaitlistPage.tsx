@@ -86,7 +86,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
         {/* What's coming grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
           {[
-            { icon: Zap,      title: 'Auto-Cut AI',      desc: 'Gemini 2.5 finds your hype moments and snaps cuts to action beats.' },
+            { icon: Zap,      title: 'Auto-Cut AI',      desc: 'AI finds your hype moments and snaps cuts to action beats.' },
             { icon: Sparkles, title: 'Beat-Sync Renders', desc: 'Transitions land on the drop. Vertical 9:16 by default.' },
             { icon: Bell,     title: 'One-Tap Export',    desc: 'TikTok, Reels, Shorts — watermark-free on paid plans.' },
           ].map((f) => (

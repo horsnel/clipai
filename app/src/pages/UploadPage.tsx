@@ -24,8 +24,8 @@ const GAMES = ['Call of Duty', 'Bloodstrike', 'PUBG', 'Mobile Legends', 'Free Fi
 
 const STEPS = [
   { key: 'upload',  label: '📤 Uploading video…'            },
-  { key: 'scan',    label: '🔍 Gemini scanning highlights…' },
-  { key: 'caption', label: '✍️  Groq generating captions…'  },
+  { key: 'scan',    label: '🔍 AI scanning highlights…' },
+  { key: 'caption', label: '✍️  AI generating captions…'  },
   { key: 'prepare', label: '✂️  Preparing your clips…'       },
 ];
 
@@ -107,7 +107,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
       }
       setOverallProgress(30);
 
-      // Step 1: Gemini scan
+      // Step 1: AI scan
       setCurrentStepIdx(1);
       const analysisResult = activeTab === 'youtube'
         ? await analyseYouTube(youtubeUrl, opts)
@@ -115,7 +115,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
       if (!analysisResult.success) throw new Error(analysisResult.error ?? 'Analysis failed');
       setOverallProgress(65);
 
-      // Step 2: Groq captions
+      // Step 2: AI captions
       setCurrentStepIdx(2);
       let clips = analysisResult.clips;
       if (captionsEnabled && clips.length > 0) {
@@ -225,7 +225,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
             Upload Your <span className="gradient-text">Gameplay</span>
           </h1>
           <p className="text-clip-muted max-w-lg mx-auto">
-            Gemini 2.5 Flash scans for hype moments. Groq Llama 3.3 writes viral captions.
+            AI scans for hype moments. AI writes viral captions.
           </p>
         </div>
 
@@ -285,7 +285,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
                     onChange={(e) => setYoutubeUrl(e.target.value)} className="input-dark pl-12 w-full" />
                 </div>
                 <p className="text-clip-muted text-xs mt-2">
-                  The worker downloads and analyses it via yt-dlp + Gemini.
+                  The worker downloads and analyses it via yt-dlp + AI.
                 </p>
               </div>
             )}
@@ -327,7 +327,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
                 </div>
                 <div className="space-y-3">
                   {[
-                    { label: 'Auto Captions (Groq)', value: captionsEnabled, set: setCaptionsEnabled },
+                    { label: 'Auto Captions', value: captionsEnabled, set: setCaptionsEnabled },
                     { label: 'Beat Sync',             value: beatSyncEnabled, set: setBeatSyncEnabled },
                   ].map(({ label, value, set }) => (
                     <label key={label} className="flex items-center justify-between cursor-pointer group">
@@ -357,8 +357,8 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
             <div className="card-glass p-4">
               <p className="text-xs text-clip-muted mb-2 font-medium uppercase tracking-wider">Credit Cost</p>
               <div className="space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-clip-muted">Gemini scan</span><span className="text-clip-text">10 cr</span></div>
-                <div className="flex justify-between"><span className="text-clip-muted">Groq captions</span><span className="text-clip-text">{captionsEnabled ? '5 cr' : '—'}</span></div>
+                <div className="flex justify-between"><span className="text-clip-muted">AI scan</span><span className="text-clip-text">10 cr</span></div>
+                <div className="flex justify-between"><span className="text-clip-muted">AI captions</span><span className="text-clip-text">{captionsEnabled ? '5 cr' : '—'}</span></div>
                 <div className="border-t border-white/[0.06] mt-2 pt-2 flex justify-between font-medium">
                   <span className="text-clip-muted">Total</span>
                   <span className="text-clip-cyan">{captionsEnabled ? 15 : 10} cr</span>
@@ -374,7 +374,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
             className="btn-primary text-lg px-12 py-5 disabled:opacity-50 disabled:cursor-not-allowed">
             <Zap className="w-6 h-6 mr-2" /> ANALYZE WITH AI
           </Button>
-          <p className="text-clip-muted text-sm mt-3">Powered by Gemini 2.5 Flash · Groq Llama 3.3 70B</p>
+          <p className="text-clip-muted text-sm mt-3">Powered by ClipAI</p>
         </div>
       </div>
     </div>
