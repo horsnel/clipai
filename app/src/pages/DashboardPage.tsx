@@ -157,21 +157,21 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className="card-glass p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-10">
+          <div className="card-glass p-5 sm:p-6">
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
                   <Zap className="w-5 h-5 text-clip-cyan" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-clip-muted text-sm">Clips This Month</p>
                   <p className="font-display font-semibold text-clip-text">
                     {clipsUsed} / {currentPlan.clips === Infinity ? '∞' : currentPlan.clips}
                   </p>
                 </div>
               </div>
-              <span className={`text-xs px-2 py-1 rounded font-medium ${
+              <span className={`text-xs px-2 py-1 rounded font-medium flex-shrink-0 ${
                 user?.plan === 'creator' ? 'bg-clip-amber text-black' :
                 user?.plan === 'pro'     ? 'bg-clip-cyan text-black' :
                 user?.plan === 'starter' ? 'bg-blue-400/20 text-blue-400' :
@@ -188,27 +188,27 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
             </p>
           </div>
 
-          <div className="card-glass p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+          <div className="card-glass p-5 sm:p-6">
+            <div className="flex items-center gap-3 mb-2 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
                 <TrendingUp className="w-5 h-5 text-green-400" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-clip-muted text-sm">Total Views</p>
                 <p className="font-display font-semibold text-2xl text-clip-text">24.5K</p>
               </div>
             </div>
             <p className="text-green-400 text-xs flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> +12% from last week
+              <TrendingUp className="w-3 h-3 flex-shrink-0" /> +12% from last week
             </p>
           </div>
 
-          <div className="card-glass p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-clip-amber/10 flex items-center justify-center">
+          <div className="card-glass p-5 sm:p-6">
+            <div className="flex items-center gap-3 mb-2 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-clip-amber/10 flex items-center justify-center flex-shrink-0">
                 <Crown className="w-5 h-5 text-clip-amber" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-clip-muted text-sm">Current Plan</p>
                 <p className="font-display font-semibold text-xl text-clip-text capitalize">{user?.plan ?? 'Free'}</p>
               </div>
@@ -216,7 +216,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
             {(!user?.plan || user.plan === 'free') && (
               <button onClick={() => onNavigate('pricing')}
                 className="text-clip-cyan text-xs hover:underline flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> Upgrade to Pro
+                <Sparkles className="w-3 h-3 flex-shrink-0" /> Upgrade to Pro
               </button>
             )}
           </div>
@@ -224,9 +224,9 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
 
         {/* ── Feature Grid ── */}
         <div className="mb-10">
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
             <h2 className="font-display font-semibold text-xl text-clip-text">AI Tools</h2>
-            <span className="text-clip-muted text-sm">All powered by Groq + Gemini + SerpAPI</span>
+            <span className="text-clip-muted text-xs sm:text-sm">All powered by Groq + Gemini + SerpAPI</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURE_CARDS.map(card => (
@@ -241,7 +241,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
               >
                 {/* Badge */}
                 {card.badge && (
-                  <span className={`absolute top-3 right-3 text-xs px-1.5 py-0.5 rounded border font-bold ${card.badgeColor}`}>
+                  <span className={`absolute top-3 right-3 text-xs px-1.5 py-0.5 rounded border font-bold flex-shrink-0 z-10 ${card.badgeColor}`}>
                     {card.badge}
                   </span>
                 )}
@@ -249,7 +249,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.iconBg}`}>
                   <card.icon className={`w-5 h-5 ${card.iconColor}`} />
                 </div>
-                <p className="font-display font-semibold text-clip-text mb-1 group-hover:text-clip-cyan transition-colors">
+                <p className="font-display font-semibold text-clip-text mb-1 group-hover:text-clip-cyan transition-colors pr-10">
                   {card.label}
                 </p>
                 <p className="text-clip-muted text-sm leading-snug">{card.desc}</p>
@@ -266,10 +266,10 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
 
         {/* Recent Clips */}
         <div>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 gap-4">
             <h2 className="font-display font-semibold text-xl text-clip-text">Recent Clips</h2>
             <button onClick={() => onNavigate('results')}
-              className="text-clip-cyan text-sm hover:underline flex items-center gap-1">
+              className="text-clip-cyan text-sm hover:underline flex items-center gap-1 flex-shrink-0">
               View All <ExternalLink className="w-4 h-4" />
             </button>
           </div>
@@ -306,9 +306,9 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
                   </div>
                   <div className="p-4">
                     <h3 className="font-display font-medium text-clip-text mb-1 truncate">{clip.title}</h3>
-                    <div className="flex items-center justify-between">
-                      <span className="text-clip-muted text-sm">{clip.game}</span>
-                      <span className="text-clip-muted text-xs flex items-center gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-clip-muted text-sm truncate">{clip.game}</span>
+                      <span className="text-clip-muted text-xs flex items-center gap-1 flex-shrink-0">
                         <Clock className="w-3 h-3" /> {clip.createdAt}
                       </span>
                     </div>

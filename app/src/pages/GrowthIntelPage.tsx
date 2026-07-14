@@ -139,7 +139,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
         </div>
 
         {/* Tool tabs */}
-        <div className="grid grid-cols-3 gap-3 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
           {TOOLS.map(t => (
             <button key={t.key} onClick={() => { if (!t.locked) setActiveTool(t.key); else onNavigate('pricing'); }}
               className={`p-4 rounded-xl border text-left transition-all relative ${
@@ -150,10 +150,12 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                   : 'border-white/[0.06] bg-clip-surface hover:border-white/[0.12]'
               }`}>
               {t.locked && (
-                <span className="absolute top-2 right-2 text-xs px-1.5 py-0.5 bg-clip-amber/10 text-clip-amber rounded border border-clip-amber/20">PRO</span>
+                <span className="absolute top-2 right-2 text-xs px-1.5 py-0.5 bg-clip-amber/10 text-clip-amber rounded border border-clip-amber/20 flex-shrink-0">PRO</span>
               )}
-              <t.icon className={`w-5 h-5 mb-2 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-muted'}`} />
-              <p className={`text-sm font-medium ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
+              <div className="flex items-center gap-2 mb-2 pr-10">
+                <t.icon className={`w-5 h-5 flex-shrink-0 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-muted'}`} />
+                <p className={`text-sm font-medium ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
+              </div>
             </button>
           ))}
         </div>
@@ -278,15 +280,15 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                   </div>
                   <div className="divide-y divide-white/[0.04]">
                     {timingResult.slots.map((slot, i) => (
-                      <div key={i} className="flex items-center gap-4 px-5 py-3">
-                        <span className="text-clip-muted text-sm w-20 font-medium">{slot.day}</span>
-                        <span className="text-clip-text font-mono text-sm">{slot.time} WAT</span>
-                        <div className="flex-1 mx-4 h-2 bg-clip-surface rounded-full overflow-hidden">
+                      <div key={i} className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3">
+                        <span className="text-clip-muted text-xs sm:text-sm w-16 sm:w-20 font-medium flex-shrink-0">{slot.day}</span>
+                        <span className="text-clip-text font-mono text-xs sm:text-sm flex-shrink-0 whitespace-nowrap">{slot.time} WAT</span>
+                        <div className="flex-1 mx-2 sm:mx-4 h-2 bg-clip-surface rounded-full overflow-hidden min-w-0">
                           <div className={`h-full rounded-full ${
                             slot.score >= 85 ? 'bg-clip-cyan' : slot.score >= 70 ? 'bg-green-400' : 'bg-clip-amber'
                           }`} style={{ width: `${slot.score}%` }} />
                         </div>
-                        <span className={`text-xs font-medium flex-shrink-0 px-2 py-0.5 rounded ${
+                        <span className={`text-xs font-medium flex-shrink-0 px-2 py-0.5 rounded whitespace-nowrap ${
                           slot.label === 'PEAK' ? 'bg-clip-cyan/10 text-clip-cyan' :
                           slot.label === 'GREAT' ? 'bg-green-400/10 text-green-400' :
                           'bg-clip-amber/10 text-clip-amber'
@@ -338,30 +340,32 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             {abResult && (
               <div className="space-y-4">
                 {/* Winner banner */}
-                <div className={`card-glass p-5 border-clip-${abResult.winner === 'A' ? 'cyan' : 'amber'}/30 bg-clip-${abResult.winner === 'A' ? 'cyan' : 'amber'}/5 flex items-center gap-4`}>
+                <div className={`card-glass p-5 flex items-center gap-4 ${
+                  abResult.winner === 'A' ? 'border-clip-cyan/30 bg-clip-cyan/5' : 'border-clip-amber/30 bg-clip-amber/5'
+                }`}>
                   <CheckCircle className="w-6 h-6 text-clip-cyan flex-shrink-0" />
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-clip-cyan font-bold">Title {abResult.winner} wins! 🏆</p>
-                    <p className="text-clip-text text-sm mt-1">"{abResult.winner === 'A' ? abResult.titleA : abResult.titleB}"</p>
+                    <p className="text-clip-text text-sm mt-1 break-words">"{abResult.winner === 'A' ? abResult.titleA : abResult.titleB}"</p>
                   </div>
                 </div>
 
                 {/* Scores */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
                     { label: 'Title A', title: abResult.titleA, score: abResult.scoreA, winner: abResult.winner === 'A' },
                     { label: 'Title B', title: abResult.titleB, score: abResult.scoreB, winner: abResult.winner === 'B' },
                   ].map(s => (
                     <div key={s.label} className={`card-glass p-4 ${s.winner ? 'border-clip-cyan/30' : ''}`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={`text-sm font-bold ${s.winner ? 'text-clip-cyan' : 'text-clip-muted'}`}>{s.label}</span>
-                        <span className={`text-lg font-display font-bold ${s.winner ? 'text-clip-cyan' : 'text-clip-muted'}`}>{s.score}</span>
+                      <div className="flex items-center justify-between mb-2 gap-2">
+                        <span className={`text-sm font-bold flex-shrink-0 ${s.winner ? 'text-clip-cyan' : 'text-clip-muted'}`}>{s.label}</span>
+                        <span className={`text-lg font-display font-bold flex-shrink-0 ${s.winner ? 'text-clip-cyan' : 'text-clip-muted'}`}>{s.score}</span>
                       </div>
                       <div className="h-2 bg-clip-surface rounded-full overflow-hidden mb-3">
                         <div className={`h-full rounded-full ${s.winner ? 'bg-clip-cyan' : 'bg-clip-muted/30'}`}
                           style={{ width: `${s.score}%` }} />
                       </div>
-                      <p className="text-clip-muted text-xs leading-snug truncate">{s.title}</p>
+                      <p className="text-clip-muted text-xs leading-snug line-clamp-2 break-words">{s.title}</p>
                     </div>
                   ))}
                 </div>

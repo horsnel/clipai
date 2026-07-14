@@ -79,12 +79,12 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
           </button>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-1">
+          <div className="hidden lg:flex items-center gap-0.5 xl:gap-1">
             {navLinks.map((link) => (
               <button
                 key={link.label}
                 onClick={() => handleNavClick(link.page, link.hash)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                className={`px-2.5 xl:px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
                   currentPage === link.page
                     ? 'text-clip-cyan bg-clip-cyan/10'
                     : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.05]'
@@ -96,15 +96,15 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
           </div>
 
           {/* Auth Buttons */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             {isLoggedIn ? (
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-clip-surface rounded-lg border border-white/[0.06]">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-clip-surface rounded-lg border border-white/[0.06] min-w-0 max-w-[200px]">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center flex-shrink-0">
                     <User className="w-3.5 h-3.5 text-black" />
                   </div>
-                  <span className="text-sm font-medium">{user?.name}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                  <span className="text-sm font-medium truncate">{user?.name}</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${
                     user?.plan === 'creator' 
                       ? 'bg-clip-amber text-black' 
                       : user?.plan === 'pro'
@@ -142,7 +142,8 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 text-clip-text hover:bg-white/[0.05] rounded-lg transition-colors"
+            className="lg:hidden p-2 text-clip-text hover:bg-white/[0.05] rounded-lg transition-colors"
+            aria-label="Toggle menu"
           >
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
@@ -151,7 +152,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden bg-clip-dark/98 backdrop-blur-lg border-b border-white/[0.06]">
+        <div className="lg:hidden bg-clip-dark/98 backdrop-blur-lg border-b border-white/[0.06] max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="px-4 py-4 space-y-2">
             {navLinks.map((link) => (
               <button

@@ -267,18 +267,18 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <blockquote className="text-clip-text text-lg lg:text-xl leading-relaxed mb-6 relative z-10">
                 I dropped 3 clips using ViralForge captions and Trend Radar sounds. Two hit 100K in a week. ClipBot literally rewrote my hook in 5 seconds and the third hit 400K.
               </blockquote>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
                 <img
                   src="/avatar-tobi.jpg"
                   alt="Tobi"
-                  className="w-12 h-12 rounded-xl object-cover border border-white/[0.08]"
+                  className="w-12 h-12 rounded-xl object-cover border border-white/[0.08] flex-shrink-0"
                 />
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="font-display font-semibold text-clip-text">Tobi</p>
-                  <p className="text-clip-muted text-sm">Apex Legends Creator · 280K followers</p>
+                  <p className="text-clip-muted text-sm break-words">Apex Legends Creator · 280K followers</p>
                 </div>
-                <div className="ml-auto">
-                  <span className="hype-badge-gold">98 HYPE</span>
+                <div className="flex-shrink-0 w-full sm:w-auto sm:ml-auto">
+                  <span className="hype-badge-gold inline-block">98 HYPE</span>
                 </div>
               </div>
             </div>

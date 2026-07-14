@@ -167,15 +167,16 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
         </div>
 
         {/* Annual Toggle */}
-        <div className="flex items-center justify-center gap-4 mb-12">
-          <span className={`text-sm ${!isAnnual ? 'text-clip-text' : 'text-clip-muted'}`}>
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mb-12">
+          <span className={`text-sm whitespace-nowrap ${!isAnnual ? 'text-clip-text' : 'text-clip-muted'}`}>
             Monthly
           </span>
           <button
             onClick={() => setIsAnnual(!isAnnual)}
-            className={`w-14 h-7 rounded-full transition-colors relative ${
+            className={`w-14 h-7 rounded-full transition-colors relative flex-shrink-0 ${
               isAnnual ? 'bg-clip-cyan' : 'bg-clip-surface'
             }`}
+            aria-label="Toggle annual billing"
           >
             <div
               className={`absolute top-0.5 w-6 h-6 rounded-full bg-black transition-transform ${
@@ -183,10 +184,10 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
               }`}
             />
           </button>
-          <span className={`text-sm ${isAnnual ? 'text-clip-text' : 'text-clip-muted'}`}>
+          <span className={`text-sm whitespace-nowrap ${isAnnual ? 'text-clip-text' : 'text-clip-muted'}`}>
             Annual
           </span>
-          <span className="bg-clip-amber text-black text-xs font-bold px-2 py-1 rounded">
+          <span className="bg-clip-amber text-black text-xs font-bold px-2 py-1 rounded whitespace-nowrap">
             SAVE 20%
           </span>
         </div>
@@ -198,14 +199,14 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
               key={plan.id}
               className={`relative card-glass p-6 lg:p-8 flex flex-col ${
                 plan.popular 
-                  ? 'border-clip-cyan/50 ring-1 ring-clip-cyan/30 scale-105 z-10' 
+                  ? 'border-clip-cyan/50 ring-1 ring-clip-cyan/30 md:scale-105 z-10 pt-8 sm:pt-6 lg:pt-8' 
                   : 'hover:border-white/[0.12]'
               } transition-all duration-300`}
             >
               {/* Popular badge */}
               {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                  <span className="bg-clip-cyan text-black text-xs font-bold px-4 py-1.5 rounded-full">
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
+                  <span className="bg-clip-cyan text-black text-xs font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-glow-cyan">
                     MOST POPULAR
                   </span>
                 </div>
@@ -224,12 +225,12 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
 
               {/* Price */}
               <div className="text-center mb-6">
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="font-display font-bold text-4xl text-clip-text">
+                <div className="flex items-baseline justify-center gap-1 flex-wrap">
+                  <span className="font-display font-bold text-3xl sm:text-4xl text-clip-text break-words">
                     {plan.price === 0 ? 'Free' : formatPrice(isAnnual ? plan.priceAnnual : plan.price)}
                   </span>
                   {plan.price > 0 && (
-                    <span className="text-clip-muted text-sm">/mo</span>
+                    <span className="text-clip-muted text-sm whitespace-nowrap">/mo</span>
                   )}
                 </div>
                 {isAnnual && plan.price > 0 && (

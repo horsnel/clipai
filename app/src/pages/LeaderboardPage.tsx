@@ -136,53 +136,53 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
         </div>
 
         {/* Top 3 Podium */}
-        <div className="grid grid-cols-3 gap-4 mb-10">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-10">
           {/* 2nd Place */}
-          <div className="flex flex-col items-center justify-end order-1">
+          <div className="flex flex-col items-center justify-end order-1 min-w-0">
             <div className="relative mb-3">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-black font-display font-bold text-xl sm:text-2xl">
+              <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-black font-display font-bold text-lg sm:text-2xl">
                 {top3[1].avatar}
               </div>
-              <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center">
-                <span className="text-black font-bold text-sm">2</span>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-gray-300 flex items-center justify-center">
+                <span className="text-black font-bold text-xs sm:text-sm">2</span>
               </div>
             </div>
-            <p className="font-display font-semibold text-clip-text text-sm sm:text-base">{top3[1].name}</p>
+            <p className="font-display font-semibold text-clip-text text-xs sm:text-base text-center truncate w-full">{top3[1].name}</p>
             <div className="mb-1">{getPlanBadge(top3[1].plan)}</div>
-            <p className="text-clip-cyan font-mono font-bold text-sm">{top3[1].hypeScore.toLocaleString()} hype</p>
-            <div className="w-full h-20 sm:h-24 bg-gradient-to-t from-gray-500/20 to-transparent rounded-t-lg mt-3" />
+            <p className="text-clip-cyan font-mono font-bold text-xs sm:text-sm text-center">{top3[1].hypeScore.toLocaleString()} hype</p>
+            <div className="w-full h-16 sm:h-24 bg-gradient-to-t from-gray-500/20 to-transparent rounded-t-lg mt-3" />
           </div>
 
           {/* 1st Place */}
-          <div className="flex flex-col items-center justify-end order-2">
+          <div className="flex flex-col items-center justify-end order-2 min-w-0">
             <div className="relative mb-3">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-clip-amber to-orange-500 flex items-center justify-center text-black font-display font-bold text-2xl sm:text-3xl ring-4 ring-clip-amber/30">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-clip-amber to-orange-500 flex items-center justify-center text-black font-display font-bold text-xl sm:text-3xl ring-4 ring-clip-amber/30">
                 {top3[0].avatar}
               </div>
-              <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-clip-amber flex items-center justify-center">
-                <Crown className="w-4 h-4 text-black" />
+              <div className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-clip-amber flex items-center justify-center">
+                <Crown className="w-3 h-3 sm:w-4 sm:h-4 text-black" />
               </div>
             </div>
-            <p className="font-display font-bold text-clip-text text-lg sm:text-xl">{top3[0].name}</p>
+            <p className="font-display font-bold text-clip-text text-sm sm:text-xl text-center truncate w-full">{top3[0].name}</p>
             <div className="mb-1">{getPlanBadge(top3[0].plan)}</div>
-            <p className="text-clip-amber font-mono font-bold text-base">{top3[0].hypeScore.toLocaleString()} hype</p>
-            <div className="w-full h-28 sm:h-32 bg-gradient-to-t from-clip-amber/20 to-transparent rounded-t-lg mt-3" />
+            <p className="text-clip-amber font-mono font-bold text-sm sm:text-base text-center">{top3[0].hypeScore.toLocaleString()} hype</p>
+            <div className="w-full h-20 sm:h-32 bg-gradient-to-t from-clip-amber/20 to-transparent rounded-t-lg mt-3" />
           </div>
 
           {/* 3rd Place */}
-          <div className="flex flex-col items-center justify-end order-3">
+          <div className="flex flex-col items-center justify-end order-3 min-w-0">
             <div className="relative mb-3">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-amber-700 to-amber-800 flex items-center justify-center text-white font-display font-bold text-xl sm:text-2xl">
+              <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-amber-700 to-amber-800 flex items-center justify-center text-white font-display font-bold text-lg sm:text-2xl">
                 {top3[2].avatar}
               </div>
-              <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-amber-700 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">3</span>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-700 flex items-center justify-center">
+                <span className="text-white font-bold text-xs sm:text-sm">3</span>
               </div>
             </div>
-            <p className="font-display font-semibold text-clip-text text-sm sm:text-base">{top3[2].name}</p>
+            <p className="font-display font-semibold text-clip-text text-xs sm:text-base text-center truncate w-full">{top3[2].name}</p>
             <div className="mb-1">{getPlanBadge(top3[2].plan)}</div>
-            <p className="text-clip-cyan font-mono font-bold text-sm">{top3[2].hypeScore.toLocaleString()} hype</p>
-            <div className="w-full h-16 sm:h-20 bg-gradient-to-t from-amber-700/20 to-transparent rounded-t-lg mt-3" />
+            <p className="text-clip-cyan font-mono font-bold text-xs sm:text-sm text-center">{top3[2].hypeScore.toLocaleString()} hype</p>
+            <div className="w-full h-12 sm:h-20 bg-gradient-to-t from-amber-700/20 to-transparent rounded-t-lg mt-3" />
           </div>
         </div>
 
@@ -201,28 +201,28 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
             {rest.map((player) => (
               <div 
                 key={player.rank} 
-                className="flex items-center p-4 hover:bg-white/[0.02] transition-colors"
+                className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 hover:bg-white/[0.02] transition-colors"
               >
-                <div className="w-12 flex items-center">
+                <div className="w-8 sm:w-12 flex items-center flex-shrink-0">
                   {getRankIcon(player.rank)}
                 </div>
-                <div className="flex-1 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-clip-surface flex items-center justify-center text-clip-text font-bold text-sm">
+                <div className="flex-1 flex items-center gap-2 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-clip-surface flex items-center justify-center text-clip-text font-bold text-sm flex-shrink-0">
                     {player.avatar}
                   </div>
-                  <div>
-                    <p className="font-medium text-clip-text text-sm">{player.name}</p>
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-clip-text text-sm truncate">{player.name}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
                       {getPlanBadge(player.plan)}
-                      <span className="text-clip-muted text-xs">{player.game}</span>
+                      <span className="text-clip-muted text-xs truncate">{player.game}</span>
                     </div>
                   </div>
                 </div>
-                <div className="w-20 text-right text-clip-muted text-sm hidden sm:block">
+                <div className="w-16 sm:w-20 text-right text-clip-muted text-sm hidden sm:block flex-shrink-0">
                   {player.clipCount}
                 </div>
-                <div className="w-24 text-right">
-                  <span className="font-mono font-bold text-clip-cyan">{player.hypeScore.toLocaleString()}</span>
+                <div className="w-20 sm:w-24 text-right flex-shrink-0">
+                  <span className="font-mono font-bold text-clip-cyan text-sm sm:text-base">{player.hypeScore.toLocaleString()}</span>
                 </div>
               </div>
             ))}
@@ -230,13 +230,13 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
         </div>
 
         {/* Your Rank Card */}
-        <div className="card-glass p-5 border-clip-cyan/30 mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center">
+        <div className="card-glass p-4 sm:p-5 border-clip-cyan/30 mb-6">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center flex-shrink-0">
               <span className="text-black font-bold">{user?.name?.[0] || 'Y'}</span>
             </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <p className="font-display font-semibold text-clip-text">Your Rank</p>
                 <span className="text-xs px-2 py-0.5 bg-clip-cyan text-black rounded font-bold">#{currentUserRank}</span>
               </div>
@@ -244,8 +244,8 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
                 {pointsNeeded} more hype points to reach rank #{currentUserRank - 1}
               </p>
             </div>
-            <div className="text-right">
-              <p className="font-mono font-bold text-clip-cyan text-lg">{currentUserScore.toLocaleString()}</p>
+            <div className="text-right flex-shrink-0">
+              <p className="font-mono font-bold text-clip-cyan text-base sm:text-lg">{currentUserScore.toLocaleString()}</p>
               <p className="text-clip-muted text-xs">hype score</p>
             </div>
           </div>
@@ -263,12 +263,12 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
 
         {/* Upgrade CTA for Free Users */}
         {user?.plan === 'free' && (
-          <div className="card-glass p-5 bg-gradient-to-r from-clip-amber/10 to-transparent border-clip-amber/30">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-clip-amber/20 flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-clip-amber" />
+          <div className="card-glass p-4 sm:p-5 bg-gradient-to-r from-clip-amber/10 to-transparent border-clip-amber/30">
+            <div className="flex items-center gap-3 sm:gap-4 flex-col sm:flex-row text-center sm:text-left">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-clip-amber/20 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-clip-amber" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <p className="font-display font-semibold text-clip-text mb-1">
                   Unlock More Clips
                 </p>
@@ -278,7 +278,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
               </div>
               <button
                 onClick={() => onNavigate('pricing')}
-                className="btn-primary flex items-center gap-2"
+                className="btn-primary flex items-center gap-2 flex-shrink-0"
               >
                 Upgrade
                 <ChevronRight className="w-4 h-4" />

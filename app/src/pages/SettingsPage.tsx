@@ -138,12 +138,12 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
             {/* User Card */}
             <div className="card-glass p-4 mt-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center flex-shrink-0">
                   <User className="w-5 h-5 text-black" />
                 </div>
-                <div>
-                  <p className="font-medium text-clip-text">{user?.name}</p>
-                  <p className="text-clip-muted text-xs">{user?.email}</p>
+                <div className="min-w-0">
+                  <p className="font-medium text-clip-text truncate">{user?.name}</p>
+                  <p className="text-clip-muted text-xs truncate">{user?.email}</p>
                 </div>
               </div>
               <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded font-medium ${
@@ -340,14 +340,14 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
                     { key: 'clip_ready', label: 'Clip ready alerts', desc: 'Get notified when your clips are ready' },
                     { key: 'weekly_digest', label: 'Weekly digest', desc: 'Summary of your activity and trends' },
                   ].map((item) => (
-                    <label key={item.key} className="flex items-center justify-between p-3 bg-clip-surface rounded-xl cursor-pointer">
-                      <div>
+                    <label key={item.key} className="flex items-center justify-between p-3 bg-clip-surface rounded-xl cursor-pointer gap-3">
+                      <div className="min-w-0">
                         <p className="text-clip-text font-medium">{item.label}</p>
                         <p className="text-clip-muted text-xs">{item.desc}</p>
                       </div>
                       <button
                         onClick={() => setNotifications(prev => ({ ...prev, [item.key]: !prev[item.key as keyof typeof notifications] }))}
-                        className={`w-12 h-6 rounded-full transition-colors relative ${
+                        className={`w-12 h-6 rounded-full transition-colors relative flex-shrink-0 ${
                           notifications[item.key as keyof typeof notifications] ? 'bg-clip-cyan' : 'bg-clip-surface border border-white/[0.08]'
                         }`}
                       >

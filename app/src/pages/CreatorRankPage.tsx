@@ -207,7 +207,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
             </h1>
             <p className="text-clip-muted mt-1">Level up. Earn XP. Become a GOD TIER creator.</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={generateShareCard}
               disabled={shareLoading}
@@ -219,9 +219,9 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
             </button>
             <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${currentRank.borderColor} ${currentRank.bgColor}`}>
               <span className="text-2xl">{currentRank.icon}</span>
-              <div>
-                <p className={`font-display font-bold ${currentRank.color}`}>{currentRank.name}</p>
-                <p className="text-clip-muted text-xs">{userXP.toLocaleString()} XP</p>
+              <div className="min-w-0">
+                <p className={`font-display font-bold truncate ${currentRank.color}`}>{currentRank.name}</p>
+                <p className="text-clip-muted text-xs whitespace-nowrap">{userXP.toLocaleString()} XP</p>
               </div>
             </div>
           </div>
@@ -248,23 +248,23 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
         {activeTab === 'profile' && (
           <div className="space-y-6">
             {/* XP card */}
-            <div className="card-glass p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-6 mb-6">
-                <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-4xl ${currentRank.bgColor} border ${currentRank.borderColor} flex-shrink-0`}>
+            <div className="card-glass p-5 sm:p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-6">
+                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl ${currentRank.bgColor} border ${currentRank.borderColor} flex-shrink-0 mx-auto sm:mx-0`}>
                   {currentRank.icon}
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-1">
-                    <h2 className={`font-display font-bold text-2xl ${currentRank.color}`}>{currentRank.name}</h2>
-                    {plan !== 'free' && <span className="text-xs px-2 py-0.5 bg-clip-cyan/10 text-clip-cyan rounded-full border border-clip-cyan/20">VERIFIED</span>}
+                <div className="flex-1 text-center sm:text-left min-w-0">
+                  <div className="flex items-center gap-3 mb-1 justify-center sm:justify-start flex-wrap">
+                    <h2 className={`font-display font-bold text-xl sm:text-2xl ${currentRank.color}`}>{currentRank.name}</h2>
+                    {plan !== 'free' && <span className="text-xs px-2 py-0.5 bg-clip-cyan/10 text-clip-cyan rounded-full border border-clip-cyan/20 flex-shrink-0">VERIFIED</span>}
                   </div>
                   <p className="text-clip-text font-medium">{user?.name ?? 'Creator'}</p>
                   <p className="text-clip-muted text-sm">{userXP.toLocaleString()} XP total</p>
                 </div>
-                <div className="text-right">
-                  <div className="flex items-center gap-2 justify-end">
+                <div className="text-center sm:text-right flex-shrink-0">
+                  <div className="flex items-center gap-2 justify-center sm:justify-end">
                     <Flame className="w-5 h-5 text-clip-amber" />
-                    <span className="font-display font-bold text-3xl text-clip-amber">{streak}</span>
+                    <span className="font-display font-bold text-2xl sm:text-3xl text-clip-amber">{streak}</span>
                   </div>
                   <p className="text-clip-muted text-xs">day streak 🔥</p>
                 </div>
@@ -344,21 +344,21 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
               const isCurrent = rank.id === currentRank.id;
               const isUnlocked = userXP >= rank.minXP;
               return (
-                <div key={rank.id} className={`card-glass p-5 border transition-all ${
+                <div key={rank.id} className={`card-glass p-4 sm:p-5 border transition-all ${
                   isCurrent ? `${rank.borderColor} ${rank.bgColor}` : isUnlocked ? 'border-white/[0.08]' : 'border-white/[0.04] opacity-60'
                 }`}>
-                  <div className="flex items-center gap-4">
-                    <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 ${
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center text-xl sm:text-2xl flex-shrink-0 ${
                       isUnlocked ? rank.bgColor : 'bg-clip-surface'
                     } border ${isUnlocked ? rank.borderColor : 'border-white/[0.04]'}`}>
                       {isUnlocked ? rank.icon : <Lock className="w-5 h-5 text-clip-muted" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className={`font-display font-bold text-lg ${isUnlocked ? rank.color : 'text-clip-muted'}`}>
+                        <h3 className={`font-display font-bold text-base sm:text-lg ${isUnlocked ? rank.color : 'text-clip-muted'}`}>
                           {rank.name}
                         </h3>
-                        {isCurrent && <span className="text-xs px-2 py-0.5 bg-clip-cyan/10 text-clip-cyan rounded-full border border-clip-cyan/20">CURRENT</span>}
+                        {isCurrent && <span className="text-xs px-2 py-0.5 bg-clip-cyan/10 text-clip-cyan rounded-full border border-clip-cyan/20 flex-shrink-0">CURRENT</span>}
                       </div>
                       <p className="text-clip-muted text-xs mb-2 font-mono">
                         {rank.minXP.toLocaleString()} – {rank.maxXP === Infinity ? '∞' : rank.maxXP.toLocaleString()} XP
@@ -372,9 +372,9 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
                       </div>
                     </div>
                     {!isUnlocked && (
-                      <div className="text-right flex-shrink-0">
+                      <div className="text-right flex-shrink-0 hidden sm:block">
                         <ChevronUp className="w-4 h-4 text-clip-muted mx-auto" />
-                        <p className="text-clip-muted text-xs mt-1">{(rank.minXP - userXP).toLocaleString()} XP needed</p>
+                        <p className="text-clip-muted text-xs mt-1 whitespace-nowrap">{(rank.minXP - userXP).toLocaleString()} XP needed</p>
                       </div>
                     )}
                   </div>
@@ -393,41 +393,41 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
             </div>
             <div className="divide-y divide-white/[0.04]">
               {MOCK_TOP.map((creator, i) => (
-                <div key={i} className={`flex items-center gap-4 px-5 py-4 ${
+                <div key={i} className={`flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 ${
                   creator.name === 'You' ? 'bg-clip-cyan/5' : 'hover:bg-white/[0.02]'
                 }`}>
-                  <span className={`font-display font-bold text-lg w-8 flex-shrink-0 ${
+                  <span className={`font-display font-bold text-base sm:text-lg w-6 sm:w-8 flex-shrink-0 text-center ${
                     i === 0 ? 'text-clip-amber' : i === 1 ? 'text-clip-muted' : i === 2 ? 'text-amber-700' : 'text-clip-muted'
                   }`}>
                     {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
                   </span>
-                  <div className="w-9 h-9 rounded-xl bg-clip-surface border border-white/[0.08] flex items-center justify-center text-lg flex-shrink-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-clip-surface border border-white/[0.08] flex items-center justify-center text-base sm:text-lg flex-shrink-0">
                     {creator.icon}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-clip-text truncate">{creator.name}</p>
-                    <p className="text-clip-muted text-xs">{creator.rank}</p>
+                    <p className="text-clip-muted text-xs truncate">{creator.rank}</p>
                   </div>
-                  <div className="flex items-center gap-1 text-clip-amber text-xs flex-shrink-0">
+                  <div className="flex items-center gap-1 text-clip-amber text-xs flex-shrink-0 whitespace-nowrap">
                     <Flame className="w-3 h-3" />{creator.streak}d
                   </div>
-                  <span className="text-clip-cyan font-mono text-sm flex-shrink-0">{creator.xp.toLocaleString()} XP</span>
+                  <span className="text-clip-cyan font-mono text-xs sm:text-sm flex-shrink-0 whitespace-nowrap">{creator.xp.toLocaleString()} XP</span>
                 </div>
               ))}
               {/* User position */}
-              <div className="flex items-center gap-4 px-5 py-4 bg-clip-cyan/5 border-t border-clip-cyan/10">
-                <span className="text-clip-muted font-bold w-8">#{globalRank || '—'}</span>
-                <div className="w-9 h-9 rounded-xl bg-clip-cyan/10 border border-clip-cyan/20 flex items-center justify-center text-sm flex-shrink-0">
+              <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 bg-clip-cyan/5 border-t border-clip-cyan/10">
+                <span className="text-clip-muted font-bold w-6 sm:w-8 text-center text-sm">#{globalRank || '—'}</span>
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-clip-cyan/10 border border-clip-cyan/20 flex items-center justify-center text-sm flex-shrink-0">
                   {currentRank.icon}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-clip-cyan truncate">{user?.name ?? 'You'} (You)</p>
-                  <p className="text-clip-muted text-xs">{currentRank.name}</p>
+                  <p className="text-clip-muted text-xs truncate">{currentRank.name}</p>
                 </div>
-                <div className="flex items-center gap-1 text-clip-amber text-xs flex-shrink-0">
+                <div className="flex items-center gap-1 text-clip-amber text-xs flex-shrink-0 whitespace-nowrap">
                   <Flame className="w-3 h-3" />{streak}d
                 </div>
-                <span className="text-clip-cyan font-mono text-sm flex-shrink-0">{userXP.toLocaleString()} XP</span>
+                <span className="text-clip-cyan font-mono text-xs sm:text-sm flex-shrink-0 whitespace-nowrap">{userXP.toLocaleString()} XP</span>
               </div>
             </div>
           </div>

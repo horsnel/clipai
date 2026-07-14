@@ -176,7 +176,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           {/* Game filter */}
-          <div className="flex gap-2 overflow-x-auto pb-1 flex-1">
+          <div className="flex gap-2 overflow-x-auto pb-1 flex-1 -mx-1 px-1">
             {GAMES.map(g => (
               <button key={g} onClick={() => setSelectedGame(g)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
@@ -190,10 +190,10 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
           </div>
 
           {/* Category tabs */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-shrink-0">
             {(['all', 'title', 'hashtag', 'sound', 'challenge'] as const).map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-wide transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-wide transition-all whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab
                     ? 'bg-clip-surface border border-clip-cyan/50 text-clip-cyan'
                     : 'text-clip-muted hover:text-clip-text'
@@ -249,9 +249,9 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               </div>
             ) : filtered.map((trend, idx) => (
               <div key={trend.id}
-                className="flex items-center gap-4 px-5 py-4 hover:bg-white/[0.02] transition-colors group">
+                className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-4 hover:bg-white/[0.02] transition-colors group">
                 {/* Rank */}
-                <span className="text-clip-muted font-mono text-sm w-6 flex-shrink-0">
+                <span className="text-clip-muted font-mono text-sm w-6 flex-shrink-0 hidden sm:block">
                   {String(idx + 1).padStart(2, '0')}
                 </span>
 
@@ -265,12 +265,12 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
                   <p className="font-medium text-clip-text truncate group-hover:text-clip-cyan transition-colors">
                     {trend.name}
                   </p>
-                  <div className="flex items-center gap-2 mt-0.5">
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <span className="text-clip-muted text-xs capitalize">{trend.category}</span>
                     {trend.platform && (
                       <>
                         <span className="text-white/20">·</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${PlatformBadge[trend.platform]} font-medium uppercase tracking-wide`}>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${PlatformBadge[trend.platform]} font-medium uppercase tracking-wide flex-shrink-0`}>
                           {trend.platform === 'google_trends' ? 'Google' : trend.platform === 'twitter' ? 'X' : trend.platform}
                         </span>
                       </>
@@ -278,13 +278,13 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
                     {trend.game && trend.game !== 'All' && (
                       <>
                         <span className="text-white/20">·</span>
-                        <span className="text-clip-muted text-xs">{trend.game}</span>
+                        <span className="text-clip-muted text-xs truncate">{trend.game}</span>
                       </>
                     )}
                     {trend.example && (
                       <>
-                        <span className="text-white/20">·</span>
-                        <span className="text-clip-muted text-xs italic truncate max-w-[180px]">{trend.example}</span>
+                        <span className="text-white/20 hidden sm:inline">·</span>
+                        <span className="text-clip-muted text-xs italic truncate max-w-[180px] hidden sm:inline">{trend.example}</span>
                       </>
                     )}
                   </div>
@@ -309,13 +309,13 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
                 </div>
 
                 {/* Status */}
-                <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium flex-shrink-0 ${StatusColor[trend.status]}`}>
+                <div className={`flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded-lg text-xs font-medium flex-shrink-0 ${StatusColor[trend.status]}`}>
                   <StatusIcon status={trend.status} />
-                  {trend.status}
+                  <span className="hidden sm:inline">{trend.status}</span>
                 </div>
 
                 {/* Change % */}
-                <span className={`text-xs font-mono w-14 text-right flex-shrink-0 ${
+                <span className={`text-xs font-mono w-12 sm:w-14 text-right flex-shrink-0 ${
                   trend.change > 0 ? 'text-green-400' : trend.change < 0 ? 'text-red-400' : 'text-clip-muted'
                 }`}>
                   {trend.change > 0 ? '+' : ''}{trend.change}%
