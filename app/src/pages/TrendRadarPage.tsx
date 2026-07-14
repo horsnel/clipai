@@ -2,9 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
 import {
   TrendingUp, Flame, Hash, Music, RefreshCw,
-  ChevronUp, ChevronDown, Minus, Zap, Globe, Clock,
+  ChevronUp, ChevronDown, Minus, Zap, Globe, Clock, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { TrendCardModal } from '../components/TrendCardModal';
 
 interface TrendRadarPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -14,7 +15,7 @@ interface TrendRadarPageProps {
 type TrendStatus = 'rising' | 'peaked' | 'falling';
 type TrendPlatform = 'youtube' | 'reddit' | 'google_trends' | 'tiktok' | 'twitter' | 'all';
 
-interface TrendItem {
+export interface TrendItem {
   id: string;
   name: string;
   category: 'title' | 'hashtag' | 'sound' | 'challenge';
@@ -85,6 +86,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
   const [trendData, setTrendData]         = useState<TrendData | null>(null);
   const [isLoading, setIsLoading]         = useState(false);
   const [lastRefresh, setLastRefresh]     = useState<Date | null>(null);
+  const [selectedTrend, setSelectedTrend] = useState<TrendItem | null>(null);
 
   const fetchTrends = useCallback(async () => {
     setIsLoading(true);
@@ -157,18 +159,23 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
         {topRising.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             {topRising.map((t, i) => (
-              <div key={t.id} className="card-glass p-4 border-green-400/20 bg-green-400/5 relative overflow-hidden">
+              <button
+                key={t.id}
+                onClick={() => setSelectedTrend(t)}
+                className="card-glass p-4 border-green-400/20 bg-green-400/5 relative overflow-hidden text-left hover:bg-green-400/10 transition-colors cursor-pointer focus:outline-none focus:bg-green-400/10 group"
+              >
                 <div className="absolute top-0 right-0 w-16 h-16 bg-green-400/5 rounded-full -translate-y-4 translate-x-4" />
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-green-400 font-bold text-lg">#{i + 1}</span>
                   <span className="text-green-400 text-xs px-2 py-0.5 rounded-full bg-green-400/10 font-medium">🔥 HOT</span>
+                  <Sparkles className="w-3.5 h-3.5 text-clip-cyan ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <p className="font-display font-semibold text-clip-text truncate">{t.name}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-clip-muted text-xs capitalize">{t.category}</span>
                   <span className="text-green-400 text-xs font-mono">+{t.change}%</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
@@ -248,8 +255,11 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
                 <p>No trends found for this filter.</p>
               </div>
             ) : filtered.map((trend, idx) => (
-              <div key={trend.id}
-                className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-4 hover:bg-white/[0.02] transition-colors group">
+              <button
+                key={trend.id}
+                onClick={() => setSelectedTrend(trend)}
+                className="w-full text-left flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-4 hover:bg-white/[0.03] transition-colors group cursor-pointer focus:outline-none focus:bg-white/[0.03]"
+              >
                 {/* Rank */}
                 <span className="text-clip-muted font-mono text-sm w-6 flex-shrink-0 hidden sm:block">
                   {String(idx + 1).padStart(2, '0')}
@@ -320,9 +330,22 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
                 }`}>
                   {trend.change > 0 ? '+' : ''}{trend.change}%
                 </span>
-              </div>
+
+                {/* Get content pack icon — appears on hover */}
+                <div className="hidden sm:flex items-center gap-1 text-clip-cyan opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+              </button>
             ))}
           </div>
+
+          {/* Hint below table */}
+          {filtered.length > 0 && (
+            <div className="px-4 py-3 border-t border-white/[0.04] flex items-center gap-2 text-clip-muted text-xs">
+              <Sparkles className="w-3.5 h-3.5 text-clip-cyan flex-shrink-0" />
+              <span>Tap any trend to get keywords, titles, captions & hashtags</span>
+            </div>
+          )}
         </div>
 
         {/* Upgrade CTA for free users */}
@@ -342,6 +365,14 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
           </div>
         )}
       </div>
+
+      {/* Trend Content Pack Modal */}
+      {selectedTrend && (
+        <TrendCardModal
+          trend={selectedTrend}
+          onClose={() => setSelectedTrend(null)}
+        />
+      )}
     </div>
   );
 }

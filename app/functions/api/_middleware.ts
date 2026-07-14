@@ -1615,6 +1615,83 @@ Rules:
   }
 });
 
+// ─── Trend Assets (per-trend copyable content) ──────────────────────────────
+// Given a trend name + game + platform, generates 4 sections of copyable assets:
+//   - keywords: 4 search phrases (3-5 words each)
+//   - titles: 3 video title options (6-14 words, with emojis)
+//   - captions: 3 captions (under 120 chars, with emojis + comment bait)
+//   - hashtags: 12-15 hashtags (mix of mega/mid/niche, always includes #naijagamer + #gamingafrica)
+//
+// Public (no auth) — same as /trends. One LLM call returns all 4 sections.
+app.post('/trends/assets', async (c) => {
+  const env = c.env as Env;
+  const body = await c.req.json().catch(() => ({}));
+  const trend = (body.trend || '').trim();
+  const game = (body.game || 'Gaming').trim();
+  const platform = (body.platform || 'tiktok').trim().toLowerCase();
+  const category = (body.category || 'title').trim().toLowerCase();
+
+  if (!trend) return json({ error: 'trend is required' }, 400);
+
+  const system = 'You are a viral gaming content strategist for African creators. Return ONLY valid JSON.';
+  const prompt = `For this trending topic, generate ready-to-use content assets a creator can copy-paste.
+
+Trend: "${trend}"
+Game: ${game}
+Platform: ${platform}
+Trend category: ${category}
+
+Return JSON:
+{
+  "keywords": [
+    "<3-5 word search phrase a creator would type into YouTube/TikTok search>",
+    "<3-5 word search phrase>",
+    "<3-5 word search phrase>",
+    "<3-5 word search phrase>"
+  ],
+  "titles": [
+    {"text": "<6-14 word video title with 1-2 emojis>", "score": <70-99>},
+    {"text": "<6-14 word video title with 1-2 emojis>", "score": <70-99>},
+    {"text": "<6-14 word video title with 1-2 emojis>", "score": <70-99>}
+  ],
+  "captions": [
+    {"text": "<under 120 chars, with 1-2 emojis, includes comment bait>", "vibe": "hype"},
+    {"text": "<under 120 chars, with 1-2 emojis, includes comment bait>", "vibe": "funny"},
+    {"text": "<under 120 chars, with 1-2 emojis, includes comment bait>", "vibe": "savage"}
+  ],
+  "hashtags": [
+    "#<tag1>",
+    "#<tag2>",
+    "... 12-15 total"
+  ]
+}
+
+Rules:
+- Keywords: phrases people actually search for, not sentences. Lowercase, no hashtags.
+- Titles: optimise for ${platform} algorithm, authentic not corporate, rank by score desc.
+- Captions: reference Nigerian/African gaming culture where natural, mix vibes.
+- Hashtags: 12-15 total. Mix of mega (100M+ posts), mid (1M-100M), niche (<1M).
+- ALWAYS include #naijagamer and #gamingafrica in the hashtag list.
+- All hashtags lowercase, no spaces, start with #.
+- Do not wrap the JSON in markdown fences. Return ONLY the JSON object.`;
+
+  try {
+    const data: any = await llmJson(env, prompt, system, 2000);
+    // Defensive defaults in case the LLM omits a field
+    data.keywords = Array.isArray(data.keywords) ? data.keywords.slice(0, 4) : [];
+    data.titles = Array.isArray(data.titles) ? data.titles.slice(0, 3) : [];
+    data.captions = Array.isArray(data.captions) ? data.captions.slice(0, 3) : [];
+    data.hashtags = Array.isArray(data.hashtags) ? data.hashtags.slice(0, 18) : [];
+    data.trend = trend;
+    data.game = game;
+    data.platform = platform;
+    data.generatedAt = new Date().toISOString();
+    return json(data);
+  } catch (e: any) {
+    return json({ error: e.message }, 500);
+  }
+});
+
 // ─── Growth Intel ────────────────────────────────────────────────────────────
 app.post('/intel/spy', requireAuth, requirePlan('pro', 'creator'), async (c) => {
   const env = c.env as Env;
