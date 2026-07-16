@@ -8,6 +8,7 @@ import {
   Trophy, BarChart2, Scissors, ChevronRight, Coins, ArrowRight,
 } from 'lucide-react';
 import { listClips } from '@/services/api';
+import { TopicStealWidget } from '@/components/TopicStealWidget';
 
 interface DashboardPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number; clipsUsed?: number; xp?: number } | null;
@@ -290,6 +291,11 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Topic Steal — anonymized network trends (Phase 1) */}
+        <div className="mb-10">
+          <TopicStealWidget limit={6} onNavigate={onNavigate} />
         </div>
 
         {/* Recent Clips */}

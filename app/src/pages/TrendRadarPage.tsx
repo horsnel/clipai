@@ -7,6 +7,7 @@ import {
 import { toast } from 'sonner';
 import { TrendCardModal } from '../components/TrendCardModal';
 import { ParticleLoader } from '../components/Loading';
+import { TopicStealWidget } from '../components/TopicStealWidget';
 
 interface TrendRadarPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -376,6 +377,15 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Topic Steal — anonymized trends aggregated from ClipAI Deep Analyses */}
+      <div className="max-w-6xl mx-auto mt-10">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-2 h-2 rounded-full bg-clip-amber animate-pulse" />
+          <span className="text-clip-amber text-xs font-medium uppercase tracking-wider">ClipAI Network</span>
+        </div>
+        <TopicStealWidget limit={10} onNavigate={onNavigate} />
       </div>
 
       {/* Trend Content Pack Modal */}
