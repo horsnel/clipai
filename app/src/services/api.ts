@@ -17,9 +17,12 @@
 import type {
   AnalysisOptions,
   AnalysisResult,
+  AnalyseYouTubeResponse,
+  AnalysisSummary,
   DetectedClip,
   ExportOptions,
   RenderJob,
+  TopicStealEntry,
   UploadResult,
 } from '../types';
 
@@ -213,9 +216,8 @@ export async function analyseVideo(videoId: string, opts: AnalysisOptions): Prom
   return apiClient.post<AnalysisResult>('/analyse', { videoId, ...opts });
 }
 
-export async function analyseYouTube(youtubeUrl: string, opts: AnalysisOptions): Promise<AnalysisResult> {
-  return apiClient.post<AnalysisResult>('/analyse/youtube', { youtubeUrl, ...opts });
-}
+// NOTE: analyseYouTube() is defined further below (Phase 1 unified analysis pipeline).
+// The old stub that posted to /analyse/youtube has been removed.
 
 // ─── Captions ───────────────────────────────────────────────────────────────
 export async function generateCaptions(clips: DetectedClip[], game: string): Promise<DetectedClip[]> {
@@ -325,4 +327,32 @@ export async function joinWaitlist(email: string, gameInterest?: string, source 
     creditsAwarded: number;
     message: string;
   }>('/waitlist/join', { email, game_interest: gameInterest, source });
+}
+
+// ─── Phase 1: Unified Viral Analysis (YouTube URL → 14 outputs) ──────────────
+// POST /api/analyse/youtube — 5 credits, returns full analysis JSON
+// GET  /api/analyses        — list user's past analyses
+// GET  /api/analyses/:id    — fetch one saved analysis
+// GET  /api/topic-steal     — anonymized trending topics dashboard
+
+export async function analyseYouTube(
+  youtubeUrl: string,
+  game?: string,
+): Promise<AnalyseYouTubeResponse> {
+  return apiClient.post<AnalyseYouTubeResponse>('/analyse/youtube', { youtubeUrl, game });
+}
+
+export async function listAnalyses(limit = 20, offset = 0): Promise<{ analyses: AnalysisSummary[]; count: number }> {
+  return apiClient.get<{ analyses: AnalysisSummary[]; count: number }>(
+    `/analyses?limit=${limit}&offset=${offset}`,
+  );
+}
+
+export async function getAnalysis(id: string): Promise<{ analysis: AnalysisSummary & Record<string, unknown> }> {
+  return apiClient.get<{ analysis: AnalysisSummary & Record<string, unknown> }>(`/analyses/${id}`);
+}
+
+export async function getTopicSteal(game?: string, limit = 20): Promise<{ topics: TopicStealEntry[]; generated_at: string }> {
+  const qs = game ? `?game=${encodeURIComponent(game)}&limit=${limit}` : `?limit=${limit}`;
+  return apiClient.get<{ topics: TopicStealEntry[]; generated_at: string }>(`/topic-steal${qs}`);
 }

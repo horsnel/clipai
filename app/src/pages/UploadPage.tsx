@@ -13,7 +13,7 @@ import {
   analyseYouTube,
   generateCaptions,
 } from '../services/api';
-import type { DetectedClip, AnalysisOptions } from '../types';
+import type { DetectedClip, AnalysisOptions, AnalysisResult } from '../types';
 
 interface UploadPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number } | null;
@@ -109,15 +109,20 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
 
       // Step 1: AI scan
       setCurrentStepIdx(1);
+      // NOTE: The Editor pipeline (upload → scan → caption → render) is currently
+      // locked behind the waitlist. The analyseYouTube() call below is the new
+      // Phase 1 unified-analysis signature (URL → 14 outputs). The old Editor
+      // pipeline's AnalysisResult shape is incompatible, so we cast through
+      // unknown until the Editor is rebuilt on the new pipeline.
       const analysisResult = activeTab === 'youtube'
-        ? await analyseYouTube(youtubeUrl, opts)
+        ? await analyseYouTube(youtubeUrl) as unknown as AnalysisResult
         : await analyseVideo(videoId, opts);
       if (!analysisResult.success) throw new Error(analysisResult.error ?? 'Analysis failed');
       setOverallProgress(65);
 
       // Step 2: AI captions
       setCurrentStepIdx(2);
-      let clips = analysisResult.clips;
+      let clips = analysisResult.clips ?? [];
       if (captionsEnabled && clips.length > 0) {
         clips = await generateCaptions(clips, selectedGame);
       }

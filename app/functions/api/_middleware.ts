@@ -32,6 +32,10 @@
  *   POST /intel/spy                (require_auth + plan=pro|creator + 5 credits)
  *   POST /intel/timing             (require_auth + 1 credit)
  *   POST /intel/abtitle            (require_auth + 1 credit)
+ *   POST /analyse/youtube          (require_auth + 5 credits) — Phase 1 unified analysis
+ *   GET  /analyses                 (require_auth) — list user's past analyses
+ *   GET  /analyses/:id             (require_auth) — fetch one saved analysis
+ *   GET  /topic-steal              (require_auth) — anonymized trending topics dashboard
  */
 import { Hono } from 'hono';
 import { jwtVerify, decodeJwt } from 'jose';
@@ -2223,6 +2227,402 @@ app.get('/cron/refill', async (c) => {
     refilled++;
   }
   return json({ refilled, total_checked: users.length });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// VIRAL ANALYSIS PIPELINE (Phase 1 — URL-in, JSON-out)
+// ════════════════════════════════════════════════════════════════════════════
+// POST /api/analyse/youtube   — paste URL, get 14 outputs as one JSON (5 credits)
+// GET  /api/analyses          — list user's recent analyses (paginated)
+// GET  /api/analyses/:id      — fetch a single saved analysis (re-open instantly)
+// GET  /api/topic-steal       — anonymized trending-topics dashboard (free)
+//
+// Architecture: YouTube-Only + Ephemeral Streaming
+//   1. Frontend pastes YouTube URL
+//   2. Worker fetches video metadata via oEmbed (no API key, no quota)
+//   3. Worker fetches transcript via youtube_transcript_api-style scrape
+//      (no file storage, no R2 cost, ~50KB JSON in memory)
+//   4. Worker calls LLM with one big prompt that returns all 14 outputs as JSON
+//   5. Worker stores in `analyses` table + indexes topics into `topic_signals`
+//   6. Frontend renders as collapsible cards (existing Viral Forge layout)
+//
+// Cost per analysis: ~$0.02 (just LLM tokens). No storage cost. No video files.
+
+// ─── YouTube helpers ─────────────────────────────────────────────────────────
+
+/** Extract the 11-char video ID from any YouTube URL form. */
+function parseYouTubeId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/)([A-Za-z0-9_-]{11})/,
+    /[?&]v=([A-Za-z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/** Fetch video title/author/thumbnail via YouTube oEmbed (no API key needed). */
+async function fetchYouTubeMeta(videoId: string): Promise<{
+  title: string; author: string; thumbnail_url: string;
+} | null> {
+  try {
+    const r = await fetch(
+      `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+      { cf: { cacheTtl: 3600, cacheEverything: true } },
+    );
+    if (!r.ok) return null;
+    const data = await r.json() as any;
+    return {
+      title: data.title || 'Untitled',
+      author: data.author_name || 'Unknown',
+      thumbnail_url: data.thumbnail_url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    };
+  } catch { return null; }
+}
+
+/**
+ * Fetch the YouTube transcript via the timedtext API.
+ * Returns an array of {t, text} segments. Empty array if unavailable.
+ *
+ * NOTE: This is the same approach used by `youtube-transcript-api` (Python).
+ * It calls https://www.youtube.com/api/timedtext?lang=en&v=VIDEO_ID and parses
+ * the XML response. Some videos have no captions — that's OK, we still generate
+ * a (limited) analysis based on title + description.
+ */
+async function fetchYouTubeTranscript(videoId: string): Promise<{
+  segments: { t: number; text: string }[];
+  wordCount: number;
+} | null> {
+  // Try a few language codes in priority order
+  for (const lang of ['en', 'en-US', 'en-GB']) {
+    try {
+      const url = `https://www.youtube.com/api/timedtext?lang=${lang}&v=${videoId}`;
+      const r = await fetch(url, { cf: { cacheTtl: 86400, cacheEverything: true } });
+      if (!r.ok) continue;
+      const xml = await r.text();
+      if (!xml || !xml.includes('<text')) continue;
+      // Parse the simple XML: <text start="0.48" dur="3.12">Hello world</text>
+      const segments: { t: number; text: string }[] = [];
+      const re = /<text\s+start="([\d.]+)"(?:\s+dur="[\d.]+")?[^>]*>([^<]*)<\/text>/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(xml)) !== null) {
+        const t = parseFloat(m[1]);
+        const text = decodeURIComponent(m[2].replace(/\+/g, ' '))
+          .replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+        if (text.trim()) segments.push({ t, text: text.trim() });
+      }
+      if (segments.length === 0) continue;
+      const wordCount = segments.reduce((n, s) => n + s.text.split(/\s+/).length, 0);
+      return { segments, wordCount };
+    } catch { continue; }
+  }
+  return null;
+}
+
+// ─── The unified analysis prompt ─────────────────────────────────────────────
+// One prompt → one JSON with all 14 Viral Forge outputs.
+// Designed for Gemini 2.0 Flash (or whatever LLM is configured). Returns ~6KB JSON.
+
+const ANALYSIS_SYSTEM_PROMPT = `You are ClipAI's viral analysis engine — the most advanced AI strategist for gaming and short-form video creators.
+
+You analyze YouTube video transcripts and return a complete viral strategy deck as a single JSON object. Your output is consumed by a frontend that renders it as 14 collapsible cards, so each field must be present and well-formed.
+
+You understand:
+- YouTube/TikTok/Reels algorithms and what makes the first 5 seconds critical
+- Gaming content (Valorant, Apex, Fortnite, Free Fire, PUBG, COD, Mobile Legends)
+- Nigerian/African gaming creator culture
+- Retention psychology, hook engineering, and emotional pacing
+- How to clone a creator's voice/style from their transcript
+
+ALWAYS return a single valid JSON object. No prose, no code fences, no commentary.`;
+
+function buildAnalysisPrompt(meta: { title: string; author: string }, transcript: { t: number; text: string }[], gameHint?: string): string {
+  // Compact transcript: join segments with timestamps, cap at ~12K chars to leave room
+  const transcriptText = transcript
+    .map(s => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`)
+    .join('\n')
+    .slice(0, 12000);
+
+  const gameLine = gameHint ? `Likely game: ${gameHint}` : 'Game: infer from transcript content';
+
+  return `Analyze this YouTube video and return a complete viral strategy deck as JSON.
+
+VIDEO TITLE: ${meta.title}
+CHANNEL: ${meta.author}
+${gameLine}
+
+TRANSCRIPT (with timestamps):
+${transcriptText}
+
+Return JSON with EXACTLY this structure (every field required; use empty arrays/strings if N/A):
+
+{
+  "hook_score": <number 0.0-10.0>,
+  "hook_rewrites": [
+    "<alt opener 1 — provocative question>",
+    "<alt opener 2 — shocking stat>",
+    "<alt opener 3 — pattern interrupt>"
+  ],
+  "sentiment_arc": [
+    {"t": <seconds>, "emotion": "<excitement|confusion|relief|tension|joy|anger|fear|surprise>", "intensity": <0.0-1.0>}
+  ],
+  "goldilocks_map": {
+    "trim": [{"start": <s>, "end": <s>, "reason": "<filler|pause|off-topic|repetition>"}],
+    "peak": [{"t": <s>, "label": "<short description of the punchy moment>"}]
+  },
+  "hidden_gems": [
+    {"angle": "<short angle name>", "title": "<YouTube title for this angle>", "why_viral": "<one sentence>", "clip_start": <s>, "clip_end": <s>}
+  ],
+  "unpopular_opinions": [
+    {"quote": "<exact quote from transcript>", "contradiction": "<what it contradicts>", "controversy_hook": "<how to frame it as a hook>"}
+  ],
+  "title_variants": ["<10 viral title options, 6-14 words, with 1-2 emojis each>"],
+  "caption_variants": [
+    {"clip_start": <s>, "clip_end": <s>, "captions": ["<3 caption options for this segment, under 120 chars, with emojis>"]}
+  ],
+  "style_profile": {
+    "slang": ["<3-5 slang words/phrases this creator uses>"],
+    "emoji_freq": "<none|low|medium|high>",
+    "caps_pref": "<lowercase|mixed|shouty>",
+    "punctuation": "<minimal|heavy|expressive>"
+  },
+  "distribution_pack": {
+    "x_thread": ["<10 tweets adapting this video's content into a thread, each under 280 chars>"],
+    "linkedin": "<500-word LinkedIn thought-leadership article adapting the video's themes>",
+    "newsletter": "<3-paragraph newsletter draft with a clickbait subject line>"
+  },
+  "thumbnail_concepts": [
+    {"text": "<short overlay text>", "position": "<top-left|center|bottom-right>", "color": "<yellow|white|red|cyan>", "font_weight": "<bold|black>"}
+  ],
+  "community_polls": [
+    {"question": "<poll question>", "options": ["<4 short options>"]}
+  ],
+  "sponsorship_spots": [
+    {"start": <s>, "end": <s>, "transition_script": "<native transition woven into their wording>"}
+  ],
+  "pinned_comment_tree": {
+    "pinned": "<pinned comment designed to bait replies>",
+    "replies": ["<5 drafted replies to anticipated comments, matching the creator's voice>"]
+  },
+  "shadow_editor_script": {
+    "act1": "<hook — 2-3 sentences>",
+    "act2": "<tension/build — 4-6 sentences>",
+    "act3": "<payoff — 2-3 sentences, formatted for ElevenLabs TTS>"
+  },
+  "viral_angles": {
+    "game": "<inferred game or 'general'>",
+    "topics": [
+      {"topic": "<lowercase keyword>", "heat": <0.0-1.0>, "category": "<weapon|boss|strategy|meta|drama|general>"}
+    ],
+    "strategic_notes": "<2-3 sentence summary of why this video will or won't go viral>"
+  },
+  "pacing_analysis": {
+    "wpm": <words per minute>,
+    "silence_count": <integer>,
+    "cut_recommendations": ["<specific edit recommendations>"]
+  }
+}
+
+Rules:
+- Timestamps are in SECONDS (float). Use the transcript's actual timestamps.
+- All arrays must have at least 1 item (use 3-10 where natural).
+- title_variants must have EXACTLY 10 items.
+- x_thread must have EXACTLY 10 items.
+- thumbnail_concepts must have 5 items.
+- community_polls must have 5 items.
+- Match the creator's natural voice in hook_rewrites, caption_variants, pinned_comment_tree, and distribution_pack.
+- Be specific and actionable — no generic advice like "improve your hook." Give exact rewrites.`;
+}
+
+// ─── POST /api/analyse/youtube ───────────────────────────────────────────────
+app.post('/analyse/youtube', requireAuth, requireCredits(5), async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const startedAt = Date.now();
+  const body = await c.req.json().catch(() => ({}));
+  const url: string = (body.youtubeUrl || body.url || '').trim();
+  const gameHint: string | undefined = body.game;
+
+  if (!url) return json({ error: 'youtubeUrl is required' }, 400);
+  const videoId = parseYouTubeId(url);
+  if (!videoId) return json({ error: 'Could not parse a YouTube video ID from that URL' }, 400);
+
+  // Dedupe: if this user already analyzed this exact URL in the last 24h, return cached
+  const existing = await sbFetch<any[]>(
+    env,
+    `analyses?user_id=eq.${userId}&source_url=eq.${encodeURIComponent(url)}&status=eq.completed&select=id,created_at,analysis_raw`,
+  );
+  if (existing && existing.length > 0) {
+    const row = existing[0];
+    const ageHours = (Date.now() - new Date(row.created_at).getTime()) / 3_600_000;
+    if (ageHours < 24) {
+      // Return the cached analysis (no credit charge — they already paid)
+      return json({
+        analysis_id: row.id,
+        cached: true,
+        analysis: row.analysis_raw,
+        credits_remaining: (c.get('profile') as Profile).credits,
+      });
+    }
+  }
+
+  // 1. Fetch video metadata
+  const meta = await fetchYouTubeMeta(videoId);
+  if (!meta) {
+    return json({ error: 'Could not fetch video metadata. The video may be private or age-restricted.' }, 422);
+  }
+
+  // 2. Fetch transcript
+  const transcript = await fetchYouTubeTranscript(videoId);
+  if (!transcript || transcript.segments.length === 0) {
+    return json({
+      error: 'This video has no English captions/transcript available. Try a video with closed captions enabled.',
+      video_title: meta.title,
+    }, 422);
+  }
+
+  // 3. Call LLM with the unified prompt
+  let analysisJson: any;
+  try {
+    analysisJson = await llmJson(
+      env,
+      buildAnalysisPrompt(meta, transcript.segments, gameHint),
+      ANALYSIS_SYSTEM_PROMPT,
+      8000,
+    );
+  } catch (e: any) {
+    return json({ error: 'AI analysis failed: ' + e.message }, 502);
+  }
+
+  // 4. Persist to analyses table
+  const newRow = {
+    user_id: userId,
+    source_url: url,
+    source_platform: 'youtube',
+    source_video_id: videoId,
+    video_title: meta.title,
+    video_author: meta.author,
+    thumbnail_url: meta.thumbnail_url,
+    transcript: JSON.stringify(transcript.segments),
+    transcript_word_count: transcript.wordCount,
+    hook_score: analysisJson.hook_score ?? null,
+    hook_rewrites: JSON.stringify(analysisJson.hook_rewrites ?? []),
+    sentiment_arc: JSON.stringify(analysisJson.sentiment_arc ?? []),
+    goldilocks_map: JSON.stringify(analysisJson.goldilocks_map ?? {}),
+    hidden_gems: JSON.stringify(analysisJson.hidden_gems ?? []),
+    unpopular_opinions: JSON.stringify(analysisJson.unpopular_opinions ?? []),
+    title_variants: JSON.stringify(analysisJson.title_variants ?? []),
+    caption_variants: JSON.stringify(analysisJson.caption_variants ?? []),
+    style_profile: JSON.stringify(analysisJson.style_profile ?? {}),
+    distribution_pack: JSON.stringify(analysisJson.distribution_pack ?? {}),
+    thumbnail_concepts: JSON.stringify(analysisJson.thumbnail_concepts ?? []),
+    community_polls: JSON.stringify(analysisJson.community_polls ?? []),
+    sponsorship_spots: JSON.stringify(analysisJson.sponsorship_spots ?? []),
+    pinned_comment_tree: JSON.stringify(analysisJson.pinned_comment_tree ?? {}),
+    shadow_editor_script: JSON.stringify(analysisJson.shadow_editor_script ?? {}),
+    viral_angles: JSON.stringify(analysisJson.viral_angles ?? {}),
+    pacing_analysis: JSON.stringify(analysisJson.pacing_analysis ?? {}),
+    analysis_raw: JSON.stringify(analysisJson),
+    llm_model: env.LLM_MODEL || 'auto',
+    processing_ms: Date.now() - startedAt,
+    status: 'completed',
+  };
+
+  const inserted = await sbFetch<any[]>(env, 'analyses', {
+    method: 'POST',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify(newRow),
+  });
+
+  const analysisId = inserted && inserted[0] ? inserted[0].id : null;
+
+  // 5. Index topics for the Topic Steal dashboard (best-effort, non-blocking)
+  // We call the Postgres function via RPC. If it fails, we don't care — the
+  // analysis still succeeded.
+  if (analysisId && analysisJson.viral_angles?.topics?.length) {
+    try {
+      await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc/index_analysis_topics`, {
+        method: 'POST',
+        headers: {
+          apikey: env.SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_analysis_id: analysisId }),
+      });
+    } catch { /* non-fatal */ }
+  }
+
+  // 6. Award XP + spend credits
+  await awardXp(env, userId, 'analyse', XP_REWARDS.analyse, analysisId || undefined);
+  const newBalance = await spendCredits(env, userId, 5, 'analyse_youtube');
+
+  return json({
+    analysis_id: analysisId,
+    cached: false,
+    analysis: analysisJson,
+    video: { title: meta.title, author: meta.author, thumbnail_url: meta.thumbnail_url, video_id: videoId },
+    transcript_segments: transcript.segments.length,
+    processing_ms: Date.now() - startedAt,
+    credits_remaining: newBalance,
+  });
+});
+
+// ─── GET /api/analyses — list user's recent analyses ─────────────────────────
+app.get('/analyses', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 50);
+  const offset = parseInt(c.req.query('offset') || '0', 10);
+
+  const rows = await sbFetch<any[]>(
+    env,
+    `analyses?user_id=eq.${userId}&status=eq.completed&order=created_at.desc&limit=${limit}&offset=${offset}` +
+    `&select=id,source_url,source_video_id,video_title,video_author,thumbnail_url,hook_score,created_at,processing_ms`,
+  );
+
+  return json({ analyses: rows || [], count: rows?.length || 0 });
+});
+
+// ─── GET /api/analyses/:id — fetch a single saved analysis ───────────────────
+app.get('/analyses/:id', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const id = c.req.param('id');
+
+  const rows = await sbFetch<any[]>(
+    env,
+    `analyses?id=eq.${id}&user_id=eq.${userId}&select=*`,
+  );
+
+  if (!rows || rows.length === 0) {
+    return json({ error: 'Analysis not found' }, 404);
+  }
+
+  return json({ analysis: rows[0] });
+});
+
+// ─── GET /api/topic-steal — anonymized trending topics dashboard ─────────────
+// Public (requireAuth only to keep it user-gated; data itself is anonymous).
+app.get('/topic-steal', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const game = c.req.query('game') || '';
+  const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100);
+
+  // Cache 5min globally — same data for every user
+  const cacheKey = await hashKey('topic_steal', game, limit);
+  const data = await withCache(env, cacheKey, 300, async () => {
+    const filter = game ? `&game=eq.${encodeURIComponent(game)}` : '';
+    const rows = await sbFetch<any[]>(
+      env,
+      `topic_steal_dashboard?order=mention_count.desc,avg_heat.desc&limit=${limit}${filter}`,
+    );
+    return { topics: rows || [], generated_at: new Date().toISOString() };
+  });
+
+  return json(data);
 });
 
 // ─── 404 fallback ────────────────────────────────────────────────────────────

@@ -2,18 +2,20 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
 import { Zap, Copy, ThumbsUp, RefreshCw,
   Hash, Type, Sparkles, ChevronRight, CheckCheck,
-  TrendingUp, Flame, Trophy, Crown,
+  TrendingUp, Flame, Trophy, Crown, Youtube,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { voteOnCaption, getTopCaptions, apiClient } from '@/services/api';
+import { voteOnCaption, getTopCaptions, apiClient, analyseYouTube } from '@/services/api';
 import { ParticleLoader } from '../components/Loading';
+import { AnalysisCards } from '../components/AnalysisCards';
+import type { UnifiedAnalysis } from '../types';
 
 interface ViralForgePageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
   onNavigate: (page: Page, data?: unknown[]) => void;
 }
 
-type ActiveTool = 'titles' | 'captions' | 'hashtags' | 'hooks';
+type ActiveTool = 'titles' | 'captions' | 'hashtags' | 'hooks' | 'analysis';
 
 interface GeneratedTitle {
   id: string;
@@ -59,6 +61,12 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
   // Caption battle
   const [battlePair, setBattlePair]   = useState<[GeneratedCaption, GeneratedCaption] | null>(null);
   const [battleWinner, setBattleWinner] = useState<GeneratedCaption | null>(null);
+
+  // Deep analysis (Phase 1)
+  const [ytUrl, setYtUrl]             = useState('');
+  const [analysis, setAnalysis]       = useState<UnifiedAnalysis | null>(null);
+  const [analysisMeta, setAnalysisMeta] = useState<{ title?: string; author?: string; ms?: number; cached?: boolean } | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
 
   // Top voted captions (community battle board)
   const [topCaptions, setTopCaptions] = useState<Array<{
@@ -173,17 +181,49 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
   };
 
   const hasResults =
-    (activeTool === 'titles'   && titles.length > 0)   ||
-    (activeTool === 'captions' && captions.length > 0) ||
-    (activeTool === 'hashtags' && hashtags.length > 0) ||
-    (activeTool === 'hooks'    && hooks.length > 0);
+    (activeTool === 'titles'    && titles.length > 0)   ||
+    (activeTool === 'captions'  && captions.length > 0) ||
+    (activeTool === 'hashtags'  && hashtags.length > 0) ||
+    (activeTool === 'hooks'     && hooks.length > 0)    ||
+    (activeTool === 'analysis'  && analysis !== null);
 
   const TOOLS: { key: ActiveTool; label: string; icon: typeof Type; desc: string }[] = [
+    { key: 'analysis', label: 'Deep Analysis', icon: Sparkles, desc: 'Paste a YouTube URL → 14 outputs' },
     { key: 'titles',   label: 'Title Forge',   icon: TrendingUp, desc: 'SEO-optimised viral titles ranked by score' },
     { key: 'captions', label: 'Caption Battle',icon: Flame,      desc: 'Generate & vote your best caption' },
     { key: 'hashtags', label: 'Hashtag Pack',  icon: Hash,       desc: 'Perfectly sized hashtag combos' },
     { key: 'hooks',    label: 'Hook Library',  icon: Type,       desc: 'Addictive opening lines for your video' },
   ];
+
+  // ── Deep analysis: paste URL → /api/analyse/youtube → 14 cards ───────────
+  const runAnalysis = async () => {
+    if (!ytUrl.trim()) {
+      toast.error('Paste a YouTube URL first');
+      return;
+    }
+    setAnalysisLoading(true);
+    setAnalysis(null);
+    setAnalysisMeta(null);
+    try {
+      const res = await analyseYouTube(ytUrl.trim(), selectedGame);
+      if (res.error) {
+        toast.error(res.error);
+      } else if (res.analysis) {
+        setAnalysis(res.analysis);
+        setAnalysisMeta({
+          title: res.video?.title,
+          author: res.video?.author,
+          ms: res.processing_ms,
+          cached: res.cached,
+        });
+        toast.success(res.cached ? 'Loaded cached analysis' : `Analysis done in ${((res.processing_ms ?? 0) / 1000).toFixed(1)}s`);
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Analysis failed');
+    } finally {
+      setAnalysisLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
@@ -198,7 +238,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
         </div>
 
         {/* Tool tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
           {TOOLS.map(t => (
             <button key={t.key} onClick={() => { setActiveTool(t.key); setTitles([]); setCaptions([]); setHashtags([]); setHooks([]); }}
               className={`p-4 rounded-xl border text-left transition-all ${
@@ -217,28 +257,72 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
           {/* Input panel */}
           <div className="lg:col-span-2 space-y-4">
             <div className="card-glass p-5 space-y-4">
-              <div>
-                <label className="text-sm font-medium text-clip-text block mb-2">Describe Your Clip</label>
-                <textarea
-                  value={clipDesc}
-                  onChange={e => setClipDesc(e.target.value)}
-                  placeholder="e.g. I got a 1v4 clutch with only a pistol, came back from 5 HP…"
-                  rows={4}
-                  className="input-dark w-full resize-none text-sm"
-                />
-              </div>
+              {activeTool === 'analysis' ? (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-clip-text block mb-2 flex items-center gap-2">
+                      <Youtube className="w-4 h-4 text-clip-cyan" />
+                      YouTube URL
+                    </label>
+                    <input
+                      type="url"
+                      value={ytUrl}
+                      onChange={e => setYtUrl(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !analysisLoading) runAnalysis(); }}
+                      placeholder="https://youtube.com/watch?v=…  or  https://youtu.be/…"
+                      className="input-dark w-full text-sm"
+                    />
+                    <p className="text-xs text-clip-muted mt-2">
+                      Paste any YouTube video URL with English captions. We analyze the transcript and return 14 viral strategy outputs in one shot — costs 5 credits.
+                    </p>
+                  </div>
 
-              <div>
-                <label className="text-xs text-clip-muted uppercase tracking-wider block mb-2">Game</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {GAMES.map(g => (
-                    <button key={g} onClick={() => setSelectedGame(g)}
-                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                        selectedGame === g ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.04] hover:text-clip-text'
-                      }`}>{g}</button>
-                  ))}
-                </div>
-              </div>
+                  <div>
+                    <label className="text-xs text-clip-muted uppercase tracking-wider block mb-2">Game (optional)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {GAMES.map(g => (
+                        <button key={g} onClick={() => setSelectedGame(g)}
+                          className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                            selectedGame === g ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.04] hover:text-clip-text'
+                          }`}>{g}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button onClick={runAnalysis} disabled={analysisLoading || !ytUrl.trim()}
+                    className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                    {analysisLoading
+                      ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analyzing transcript…</>
+                      : <><Sparkles className="w-4 h-4" /> Run Deep Analysis (5 credits)</>
+                    }
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-sm font-medium text-clip-text block mb-2">Describe Your Clip</label>
+                    <textarea
+                      value={clipDesc}
+                      onChange={e => setClipDesc(e.target.value)}
+                      placeholder="e.g. I got a 1v4 clutch with only a pistol, came back from 5 HP…"
+                      rows={4}
+                      className="input-dark w-full resize-none text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-clip-muted uppercase tracking-wider block mb-2">Game</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {GAMES.map(g => (
+                        <button key={g} onClick={() => setSelectedGame(g)}
+                          className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                            selectedGame === g ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.04] hover:text-clip-text'
+                          }`}>{g}</button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {activeTool === 'captions' && (
                 <div>
@@ -268,13 +352,15 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                 </div>
               )}
 
-              <button onClick={handleGenerate} disabled={isLoading || !clipDesc.trim()}
-                className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
-                {isLoading
-                  ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generating…</>
-                  : <><Zap className="w-4 h-4" /> Generate</>
-                }
-              </button>
+              {activeTool !== 'analysis' && (
+                <button onClick={handleGenerate} disabled={isLoading || !clipDesc.trim()}
+                  className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                  {isLoading
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generating…</>
+                    : <><Zap className="w-4 h-4" /> Generate</>
+                  }
+                </button>
+              )}
             </div>
 
             {/* Viral score legend */}
@@ -298,6 +384,37 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
 
           {/* Results panel */}
           <div className="lg:col-span-3">
+            {/* ── DEEP ANALYSIS ── */}
+            {activeTool === 'analysis' && (
+              <div className="space-y-3">
+                {analysisLoading ? (
+                  <div className="card-glass p-8 flex flex-col items-center justify-center min-h-[400px]">
+                    <ParticleLoader />
+                    <p className="text-xs text-clip-muted mt-6">
+                      Fetching transcript → running unified analysis → 14 outputs…
+                    </p>
+                    <p className="text-[10px] text-clip-muted mt-1">This usually takes 8-20 seconds</p>
+                  </div>
+                ) : analysis ? (
+                  <AnalysisCards
+                    analysis={analysis}
+                    videoTitle={analysisMeta?.title}
+                    videoAuthor={analysisMeta?.author}
+                    processingMs={analysisMeta?.ms}
+                    cached={analysisMeta?.cached}
+                  />
+                ) : (
+                  <div className="card-glass p-8 text-center">
+                    <Sparkles className="w-10 h-10 mx-auto mb-3 text-clip-muted opacity-30" />
+                    <p className="text-clip-text text-sm font-medium mb-1">Paste a YouTube URL to start</p>
+                    <p className="text-clip-muted text-xs leading-relaxed max-w-sm mx-auto">
+                      We'll fetch the transcript, run a single unified AI pass, and return 14 viral strategy outputs: Hook Score, title variants, sentiment arc, hidden gem angles, distribution pack, thumbnail concepts, pinned comment tree, and more.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── TITLES ── */}
             {activeTool === 'titles' && (
               <div className="space-y-3">
