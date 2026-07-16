@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import {
-  Zap, Upload, TrendingUp, Clock, Play,
-  ExternalLink, Sparkles, Radio, Flame, Bot,
+  Zap, Link2, TrendingUp, Clock, Play,
+  ExternalLink, Sparkles, Radio, Flame,
   Trophy, BarChart2, Scissors, ChevronRight, Coins, ArrowRight, Eye,
 } from 'lucide-react';
 import { listClips } from '@/services/api';
@@ -62,14 +62,6 @@ const FEATURE_CARDS: FeatureCard[] = [
     desc: 'Live gaming trends updated every hour',
     badge: 'LIVE',
     badgeColor: 'bg-green-500/10 text-green-600 border-green-500/20',
-  },
-  {
-    page: 'clipbot',
-    icon: Bot,
-    iconColor: 'text-clip-cyan',
-    iconBg: 'bg-clip-cyan/10',
-    label: 'ClipBot',
-    desc: 'Your personal AI content coach',
   },
   {
     page: 'growth',
@@ -143,8 +135,8 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
             </h1>
             <p className="text-clip-muted">Ready to make your next viral clip?</p>
           </div>
-          <Button onClick={() => onNavigate('upload')} className="btn-primary flex items-center gap-2 self-start lg:self-auto">
-            <Upload className="w-5 h-5" /> Upload Gameplay
+          <Button onClick={() => onNavigate('forge')} className="btn-primary flex items-center gap-2 self-start lg:self-auto">
+            <Link2 className="w-5 h-5" /> Paste Video URL
           </Button>
         </div>
 
@@ -321,9 +313,9 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
                 <Zap className="w-8 h-8 text-clip-cyan" />
               </div>
               <h3 className="font-display font-semibold text-xl text-clip-text mb-2">No clips yet</h3>
-              <p className="text-clip-muted mb-6">Upload your first gameplay and let AI find your highlights!</p>
-              <Button onClick={() => onNavigate('upload')} className="btn-primary">
-                <Upload className="w-5 h-5 mr-2" /> Upload Video
+              <p className="text-clip-muted mb-6">Paste a video URL and let AI find your highlights!</p>
+              <Button onClick={() => onNavigate('forge')} className="btn-primary">
+                <Link2 className="w-5 h-5 mr-2" /> Paste Video URL
               </Button>
             </div>
           ) : (

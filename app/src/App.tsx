@@ -14,6 +14,7 @@ import { LeaderboardPage } from './pages/LeaderboardPage';
 import { TrendRadarPage } from './pages/TrendRadarPage';
 import { ViralForgePage } from './pages/ViralForgePage';
 import { ClipBotPage } from './pages/ClipBotPage';
+import { ClipBotBubble } from './components/ClipBotBubble';
 import { CreatorRankPage } from './pages/CreatorRankPage';
 import { GrowthIntelPage } from './pages/GrowthIntelPage';
 import { Toaster } from '@/components/ui/sonner';
@@ -301,13 +302,24 @@ function AppContentInner({
       />
       <main className="relative">{renderPage()}</main>
       {FOOTER_PAGES.includes(currentPage) && <Footer onNavigate={navigateTo} />}
+      {/* Floating ClipBot chat widget — persistent across all logged-in pages.
+          State (messages, mode) is preserved during navigation. When the user
+          navigates to /clipbot, it forces full-page mode and covers the viewport. */}
+      {isLoggedIn && (
+        <ClipBotBubble
+          user={user}
+          onNavigate={navigateTo}
+          forcedMode={currentPage === 'clipbot' ? 'full' : undefined}
+          hideBubble={currentPage === 'clipbot'}
+        />
+      )}
       <Toaster
         position="bottom-right"
         toastOptions={{
           style: {
-            background: '#101014',
+            background: '#0B0B0F',
             border: '1px solid rgba(255, 255, 255, 0.04)',
-            color: '#C8CDD8',
+            color: '#A8AEB8',
           },
         }}
       />

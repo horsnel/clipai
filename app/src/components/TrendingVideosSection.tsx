@@ -1,15 +1,16 @@
 /**
- * TrendingVideosSection.tsx — Dashboard widget showing 6 trending YouTube
- * gaming videos with a one-click "Copy Pack" button (title + caption + hashtags).
+ * TrendingVideosSection.tsx — Dashboard widget showing trending gaming videos
+ * across multiple platforms (YouTube, TikTok, X/Twitter) with a one-click
+ * "Copy Pack" button (title + caption + hashtags).
  *
  * Designed to replace the old "Clips This Month" card on the dashboard.
  * No auth required — it's a free inspiration widget powered by
- * GET /api/trending-videos (6h global cache, one LLM call for all 6 videos).
+ * GET /api/trending-videos (6h global cache, one LLM call for all videos).
  */
 import { useState, useEffect } from 'react';
 import {
   Youtube, Copy, Check, ExternalLink, Loader2, Flame,
-  Play, AlertTriangle,
+  Play, AlertTriangle, Music2, Twitter,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTrendingVideos } from '@/services/api';
@@ -19,6 +20,40 @@ interface TrendingVideosSectionProps {
   /** Optional game filter. If omitted, "gaming" is used (top gaming highlights). */
   game?: string;
 }
+
+type Platform = 'youtube' | 'tiktok' | 'twitter';
+
+interface PlatformStyle {
+  label: string;
+  badgeClass: string;
+  iconClass: string;
+  icon: React.ElementType;
+  fallbackBg: string;
+}
+
+const PLATFORM_STYLES: Record<Platform, PlatformStyle> = {
+  youtube: {
+    label: 'YouTube',
+    badgeClass: 'bg-red-500/90 text-white',
+    iconClass: 'text-red-500',
+    icon: Youtube,
+    fallbackBg: 'bg-gradient-to-br from-red-500/20 to-red-900/20',
+  },
+  tiktok: {
+    label: 'TikTok',
+    badgeClass: 'bg-black/90 text-white border border-white/20',
+    iconClass: 'text-clip-cyan',
+    icon: Music2,
+    fallbackBg: 'bg-gradient-to-br from-cyan-500/15 to-pink-500/15',
+  },
+  twitter: {
+    label: 'X',
+    badgeClass: 'bg-black/90 text-white border border-white/20',
+    iconClass: 'text-white',
+    icon: Twitter,
+    fallbackBg: 'bg-gradient-to-br from-slate-700/30 to-slate-900/30',
+  },
+};
 
 function timeAgo(iso: string): string {
   if (!iso) return '';
@@ -46,6 +81,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [copiedId, setCopiedId]   = useState<string | null>(null);
+  const [activePlatform, setActivePlatform] = useState<Platform | 'all'>('all');
 
   useEffect(() => {
     let mounted = true;
@@ -80,6 +116,25 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
     }
   };
 
+  const filteredVideos = activePlatform === 'all'
+    ? videos
+    : videos.filter((v) => v.platform === activePlatform);
+
+  // Count per platform for the filter tabs
+  const platformCounts: Record<string, number> = {
+    all: videos.length,
+    youtube: videos.filter((v) => v.platform === 'youtube').length,
+    tiktok: videos.filter((v) => v.platform === 'tiktok').length,
+    twitter: videos.filter((v) => v.platform === 'twitter').length,
+  };
+
+  const FILTER_TABS: Array<{ key: Platform | 'all'; label: string; icon: React.ElementType }> = [
+    { key: 'all',     label: 'All',     icon: Flame },
+    { key: 'youtube', label: 'YouTube', icon: Youtube },
+    { key: 'tiktok',  label: 'TikTok',  icon: Music2 },
+    { key: 'twitter', label: 'X',       icon: Twitter },
+  ];
+
   return (
     <div className="card-glass overflow-hidden">
       {/* Header */}
@@ -93,7 +148,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
               Trending Gaming Videos
             </h3>
             <p className="text-clip-muted text-xs mt-0.5 truncate">
-              One-click copy: title · caption · hashtags
+              Multi-platform · one-click copy: title · caption · hashtags
             </p>
           </div>
         </div>
@@ -102,40 +157,74 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
         </span>
       </div>
 
+      {/* Platform filter tabs */}
+      {!loading && !error && videos.length > 0 && (
+        <div className="flex items-center gap-1 px-5 py-2 border-b border-white/[0.04] overflow-x-auto">
+          {FILTER_TABS.map((tab) => {
+            const count = platformCounts[tab.key] || 0;
+            const isActive = activePlatform === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActivePlatform(tab.key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                  isActive
+                    ? 'bg-clip-cyan/10 text-clip-cyan border border-clip-cyan/25'
+                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.03] border border-transparent'
+                }`}
+              >
+                <tab.icon className="w-3.5 h-3.5" />
+                {tab.label}
+                <span className={`text-[10px] px-1 rounded ${isActive ? 'bg-clip-cyan/20' : 'bg-white/[0.05]'}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Body */}
       <div className="p-3 sm:p-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <Loader2 className="w-6 h-6 text-clip-cyan animate-spin" />
-            <p className="text-clip-muted text-xs">Fetching trending videos…</p>
+            <p className="text-clip-muted text-xs">Fetching trending videos across platforms…</p>
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
             <AlertTriangle className="w-8 h-8 text-clip-amber/70" />
             <p className="text-clip-muted text-sm">{error}</p>
           </div>
-        ) : videos.length === 0 ? (
+        ) : filteredVideos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
             <Youtube className="w-8 h-8 text-clip-muted opacity-50" />
-            <p className="text-clip-muted text-sm">No trending videos right now. Check back soon.</p>
+            <p className="text-clip-muted text-sm">
+              {videos.length === 0
+                ? 'No trending videos right now. Check back soon.'
+                : 'No videos on this platform right now.'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {videos.map((v) => {
+            {filteredVideos.map((v) => {
               const hasPack = !!(v.copyPack?.title || v.copyPack?.caption || v.copyPack?.hashtags?.length);
+              const style = PLATFORM_STYLES[v.platform as Platform] || PLATFORM_STYLES.youtube;
+              const PlatformIcon = style.icon;
+              const hasThumbnail = !!v.thumbnail;
               return (
                 <div
                   key={v.id}
                   className="group relative rounded-xl overflow-hidden border border-white/[0.05] bg-clip-surface/40 hover:border-white/[0.10] transition-all"
                 >
-                  {/* Thumbnail with platform badge */}
+                  {/* Thumbnail or platform fallback */}
                   <a
                     href={v.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block relative aspect-video overflow-hidden bg-clip-surface"
                   >
-                    {v.thumbnail && (
+                    {hasThumbnail ? (
                       <img
                         src={v.thumbnail}
                         alt={v.title}
@@ -143,6 +232,11 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                       />
+                    ) : (
+                      // Platform-colored fallback for TikTok / X (no thumbnail available)
+                      <div className={`absolute inset-0 ${style.fallbackBg} flex items-center justify-center`}>
+                        <PlatformIcon className={`w-12 h-12 ${style.iconClass} opacity-80`} />
+                      </div>
                     )}
                     {/* Dark gradient overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/80 via-transparent to-transparent pointer-events-none" />
@@ -152,9 +246,9 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                         <Play className="w-4 h-4 text-black ml-0.5" fill="currentColor" />
                       </div>
                     </div>
-                    {/* YouTube platform badge */}
-                    <span className="absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/90 text-white">
-                      <Youtube className="w-3 h-3" /> YouTube
+                    {/* Platform badge */}
+                    <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${style.badgeClass}`}>
+                      <PlatformIcon className="w-3 h-3" /> {style.label}
                     </span>
                     {/* Copy button — top right */}
                     {hasPack && (
@@ -194,8 +288,8 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-clip-muted hover:text-clip-cyan transition-colors flex-shrink-0"
-                        aria-label="Open on YouTube"
-                        title="Open on YouTube"
+                        aria-label={`Open on ${style.label}`}
+                        title={`Open on ${style.label}`}
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </a>

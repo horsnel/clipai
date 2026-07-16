@@ -131,7 +131,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
       ctx.fillText(currentRank.name.toUpperCase(), W/2, 430);
 
       // User name
-      ctx.fillStyle = '#C8CDD8';
+      ctx.fillStyle = '#A8AEB8';
       ctx.font = 'bold 48px Inter, system-ui, sans-serif';
       ctx.fillText(user?.name ?? 'Gamer', W/2, 520);
 

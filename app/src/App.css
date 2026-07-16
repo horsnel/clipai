@@ -43,7 +43,7 @@ html {
 
 /* Slider styling */
 [data-slot="slider-track"] {
-  background: #1A1A20;
+  background: #131318;
 }
 
 [data-slot="slider-range"] {
@@ -52,7 +52,7 @@ html {
 
 [data-slot="slider-thumb"] {
   background: #00C2D6;
-  border: 2px solid #08080A;
+  border: 2px solid #050507;
 }
 
 /* Input focus states */

@@ -36,7 +36,6 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
         { label: 'Dashboard',   page: 'dashboard' as Page },
         { label: 'Viral Forge', page: 'forge' as Page },
         { label: 'Trend Radar', page: 'trends' as Page },
-        { label: 'ClipBot',     page: 'clipbot' as Page },
         { label: 'Growth Intel',page: 'growth' as Page },
         { label: 'My Rank',     page: 'rank' as Page },
         { label: 'Leaderboard', page: 'leaderboard' as Page },

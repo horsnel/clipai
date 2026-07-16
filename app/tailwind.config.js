@@ -48,15 +48,15 @@ module.exports = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        // ClipAI Custom Colors — darkened palette
-        'clip-dark': '#08080A',
-        'clip-surface': '#101014',
-        'clip-border': '#1A1A20',
+        // ClipAI Custom Colors — darkened palette (Phase: deeper dark)
+        'clip-dark': '#050507',
+        'clip-surface': '#0B0B0F',
+        'clip-border': '#131318',
         'clip-cyan': '#00C2D6',
         'clip-amber': '#C97F08',
         'clip-red': '#D63A3A',
-        'clip-text': '#C8CDD8',
-        'clip-muted': '#6E7382',
+        'clip-text': '#A8AEB8',
+        'clip-muted': '#565B6A',
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",

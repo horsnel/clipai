@@ -265,7 +265,7 @@ export interface TrendingVideo {
   channel: string;
   thumbnail: string;
   url: string;
-  platform: 'youtube';
+  platform: 'youtube' | 'tiktok' | 'twitter';
   publishedAt: string;
   copyPack?: {
     title: string;

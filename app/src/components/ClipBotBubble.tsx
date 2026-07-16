@@ -1,14 +1,47 @@
-import { useState, useRef, useEffect } from 'react';
+/**
+ * ClipBotBubble.tsx — Floating ClipBot chat widget that replaces the
+ * standalone ClipBot nav link. Three perfectly-tuned states:
+ *
+ * 1. BUBBLE   — a small floating cyan button (bottom-right) with a Bot icon
+ *               and an unread-ping dot. Visible on every logged-in page.
+ *               Click → opens the SEMI-PAGE panel.
+ *
+ * 2. SEMI-PAGE — a 400px-wide docked panel anchored to the right edge,
+ *                full viewport height. Has its own header (with controls to
+ *                expand to FULL-PAGE or close back to bubble). Chat scrolls
+ *                independently; input pinned to bottom.
+ *
+ * 3. FULL-PAGE — a centred max-w-3xl modal-style overlay that takes the full
+ *                viewport. Same chat content as semi-page but more breathing
+ *                room. Has a button to shrink back to SEMI-PAGE.
+ *
+ * State is shared across all three views (single source of truth for messages,
+ * typing indicator, input value), so switching modes mid-conversation is
+ * seamless. Chat history is persisted to localStorage per-user and restored
+ * on next mount — same as the old standalone ClipBotPage.
+ *
+ * The /clipbot route still exists for direct deep-link access; App.tsx renders
+ * the full-page mode automatically when the user lands on /clipbot.
+ */
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
-import { ArrowUp, Bot, Zap, Sparkles, Loader2 } from 'lucide-react';
+import {
+  ArrowUp, Bot, Sparkles, Loader2, Zap,
+  X, Minimize2, Maximize2, MessageSquare,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { getClipBotHistory, apiClient } from '@/services/api';
-import { TypingDots } from '../components/Loading';
+import { TypingDots } from './Loading';
 
-interface ClipBotPageProps {
+interface ClipBotBubbleProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
-  onNavigate: (page: Page, data?: unknown[]) => void;
+  /** Called when user clicks "expand to full page" — App.tsx navigates to /clipbot. */
+  onNavigate?: (page: Page) => void;
+  /** Optional forced mode — when 'full', renders as a full-page view (used by /clipbot route). */
+  forcedMode?: 'full';
+  /** When true, the bubble button is hidden (because we're already on /clipbot). */
+  hideBubble?: boolean;
 }
 
 interface Message {
@@ -34,22 +67,31 @@ const WELCOME_MSG: Message = {
   timestamp: new Date(),
 };
 
-export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
+type Mode = 'bubble' | 'semi' | 'full';
+
+export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: ClipBotBubbleProps) {
+  const [mode, setMode] = useState<Mode>(forcedMode || 'bubble');
   const [messages, setMessages] = useState<Message[]>([WELCOME_MSG]);
   const [input, setInput]       = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [msgCount, setMsgCount] = useState(0);
+  const [hasNewPing, setHasNewPing] = useState(false);  // bubble badge
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
 
   const FREE_LIMIT = 10;
   const isAtLimit  = user?.plan === 'free' && msgCount >= FREE_LIMIT;
 
+  // Sync forced mode prop (when App.tsx renders /clipbot route)
+  useEffect(() => {
+    if (forcedMode === 'full') setMode('full');
+  }, [forcedMode]);
+
   // ─── Persist chat history to localStorage (per-user) ─────────────────────
   const STORAGE_KEY = `clipai_clipbot_history_${user?.email ?? 'anon'}`;
 
   useEffect(() => {
-    // Restore from localStorage first for instant UX
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
@@ -62,7 +104,6 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
       }
     } catch {}
 
-    // Then try fetching from backend
     getClipBotHistory().then((data) => {
       if (data.history?.length) {
         const restored: Message[] = [
@@ -87,11 +128,32 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
     } catch {}
   }, [messages, STORAGE_KEY]);
 
+  // Auto-scroll to bottom on new messages / typing
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+    if (mode !== 'bubble') {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isTyping, mode]);
 
-  const sendMessage = async (text?: string) => {
+  // Clear the new-ping badge when the user opens the panel
+  useEffect(() => {
+    if (mode !== 'bubble') setHasNewPing(false);
+  }, [mode]);
+
+  // Esc closes semi → bubble; in full mode, Esc → semi (if not forced)
+  useEffect(() => {
+    if (mode === 'bubble') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (forcedMode === 'full') return;  // can't escape the route view
+        setMode(prev => prev === 'full' ? 'semi' : 'bubble');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode, forcedMode]);
+
+  const sendMessage = useCallback(async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content) return;
     if (isAtLimit) {
@@ -112,15 +174,10 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
     setMsgCount(n => n + 1);
 
     try {
-      // Build conversation history for context
       const history = messages
         .filter(m => m.id !== 'welcome')
         .map(m => ({ role: m.role, content: m.content }));
 
-      // Use apiClient which automatically includes the Supabase JWT.
-      // If the user is out of credits, the apiClient fires the UPGRADE_REQUIRED
-      // event and the global modal appears - we just remove the user's message
-      // and bail out (no fallback reply, since the user didn't get a real answer).
       const data = await apiClient.post<{ reply?: string; error?: string; credits_remaining?: number }>('/clipbot', {
         message: content,
         history,
@@ -141,9 +198,13 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botMsg]);
+
+      // If user closed the panel while we were typing, surface a ping
+      setMode(prevMode => {
+        if (prevMode === 'bubble') setHasNewPing(true);
+        return prevMode;
+      });
     } catch (e: any) {
-      // 402 = out of credits or daily limit - apiClient has already opened the
-      // UpgradeModal. Roll back the user message we just appended.
       if (e?.status === 402) {
         setMessages(prev => prev.filter(m => m.id !== userMsg.id));
         setMsgCount(n => Math.max(0, n - 1));
@@ -161,7 +222,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
       setIsTyping(false);
       inputRef.current?.focus();
     }
-  };
+  }, [input, isAtLimit, messages, user?.name, user?.plan]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -170,65 +231,161 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
     }
   };
 
-  return (
-    <div className="min-h-screen pt-24 flex flex-col">
-      <div className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 flex flex-col">
+  // ─── Don't render anything when bubble is hidden AND not forced into full mode
+  if (hideBubble && mode === 'bubble') return null;
 
+  // ─── BUBBLE STATE — floating button only
+  if (mode === 'bubble') {
+    return (
+      <button
+        onClick={() => setMode('semi')}
+        aria-label="Open ClipBot chat"
+        title="Chat with ClipBot"
+        className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-clip-cyan to-violet-600 text-black shadow-[0_0_30px_rgba(0,194,214,0.45)] hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center group"
+      >
+        <Bot className="w-7 h-7" strokeWidth={2.2} />
+        {/* Online dot */}
+        <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-clip-dark" />
+        {/* New message ping */}
+        {hasNewPing && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-clip-amber text-[9px] font-bold text-black flex items-center justify-center animate-bounce">
+            !
+          </span>
+        )}
+        {/* Hover tooltip */}
+        <span className="absolute right-full mr-3 px-3 py-1.5 rounded-lg bg-clip-surface border border-white/[0.06] text-xs text-clip-text whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          Ask ClipBot anything 💬
+        </span>
+      </button>
+    );
+  }
+
+  // ─── SEMI-PAGE and FULL-PAGE share the same chat UI, just different container
+  const isFull = mode === 'full';
+
+  const containerClass = isFull
+    // FULL-PAGE: full viewport, centred max-w-3xl
+    ? 'fixed inset-0 z-50 bg-clip-dark/95 backdrop-blur-xl flex flex-col'
+    // SEMI-PAGE: 400px docked right panel, full height
+    : 'fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[400px] bg-clip-surface/95 backdrop-blur-xl border-l border-white/[0.06] flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.6)]';
+
+  const headerClass = isFull
+    ? 'flex items-center justify-between py-4 px-6 border-b border-white/[0.04] max-w-3xl mx-auto w-full'
+    : 'flex items-center justify-between py-4 px-4 border-b border-white/[0.04]';
+
+  const messagesWrapClass = isFull
+    ? 'flex-1 overflow-y-auto py-8 px-6 max-w-3xl mx-auto w-full'
+    : 'flex-1 overflow-y-auto py-6 px-4';
+
+  const inputWrapClass = isFull
+    ? 'py-4 px-6 border-t border-white/[0.04] max-w-3xl mx-auto w-full'
+    : 'py-3 px-4 border-t border-white/[0.04]';
+
+  return (
+    <>
+      {/* Backdrop for full-page mode */}
+      {isFull && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40"
+          onClick={() => { if (forcedMode !== 'full') setMode('semi'); }}
+        />
+      )}
+
+      <div className={containerClass}>
         {/* Header */}
-        <div className="flex items-center justify-between py-4 border-b border-white/[0.04]">
+        <div className={headerClass}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
               <Bot className="w-5 h-5 text-clip-cyan" />
             </div>
-            <div>
-              <h1 className="font-display font-bold text-lg text-clip-text">ClipBot</h1>
+            <div className="min-w-0">
+              <h1 className="font-display font-bold text-base text-clip-text leading-tight">ClipBot</h1>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-600 animate-pulse" />
-                <span className="text-xs text-clip-muted">AI Coach · Online</span>
+                <span className="text-[11px] text-clip-muted">AI Coach · Online</span>
               </div>
             </div>
           </div>
 
+          {/* Window controls */}
+          <div className="flex items-center gap-1">
+            {isFull ? (
+              // Shrink to semi-page
+              !hideBubble && forcedMode !== 'full' && (
+                <button
+                  onClick={() => setMode('semi')}
+                  title="Dock to side panel"
+                  className="w-9 h-9 rounded-lg hover:bg-white/[0.05] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
+                >
+                  <Minimize2 className="w-4 h-4" />
+                </button>
+              )
+            ) : (
+              // Expand to full page — either local full mode or navigate to /clipbot
+              <button
+                onClick={() => {
+                  if (onNavigate) {
+                    onNavigate('clipbot');
+                  } else {
+                    setMode('full');
+                  }
+                }}
+                title="Expand to full page"
+                className="w-9 h-9 rounded-lg hover:bg-white/[0.05] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </button>
+            )}
+            {/* Close → back to bubble (only if not forced full) */}
+            {forcedMode !== 'full' && (
+              <button
+                onClick={() => setMode('bubble')}
+                title="Close"
+                className="w-9 h-9 rounded-lg hover:bg-white/[0.05] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Messages — Gemini-style: user = minimal pill, AI = no bubble */}
-        <div className="flex-1 overflow-y-auto py-8 space-y-6" style={{ minHeight: 0 }}>
-          {messages.map(msg => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {msg.role === 'user' ? (
-                // User: minimal dark pill bubble, right-aligned
-                <div
-                  className="max-w-[80%] bg-[#0B0B0F] text-clip-text px-4 py-2.5 text-[15px] leading-relaxed"
-                  style={{ borderRadius: '22px' }}
-                >
-                  <FormattedMessage content={msg.content} />
-                </div>
-              ) : (
-                // AI: no bubble — text directly on background, left-aligned
-                <div className="max-w-[88%] text-clip-text text-[15px] leading-relaxed">
-                  <FormattedMessage content={msg.content} />
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Typing indicator — no bubble */}
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="px-1 py-2">
-                <TypingDots />
+        {/* Messages */}
+        <div className={messagesWrapClass} style={{ minHeight: 0 }}>
+          <div className={`space-y-6 ${isFull ? 'max-w-3xl mx-auto' : ''}`}>
+            {messages.map(msg => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                {msg.role === 'user' ? (
+                  <div
+                    className="max-w-[80%] bg-[#0B0B0F] text-clip-text px-4 py-2.5 text-[15px] leading-relaxed"
+                    style={{ borderRadius: '22px' }}
+                  >
+                    <FormattedMessage content={msg.content} />
+                  </div>
+                ) : (
+                  <div className="max-w-[88%] text-clip-text text-[15px] leading-relaxed">
+                    <FormattedMessage content={msg.content} />
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-          <div ref={bottomRef} />
+            ))}
+
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="px-1 py-2">
+                  <TypingDots />
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
         </div>
 
         {/* Starter prompts (shown when only welcome message) */}
         {messages.length === 1 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 ${isFull ? 'max-w-3xl mx-auto px-6' : 'px-4'} pb-3`}>
             {STARTER_PROMPTS.map((p, i) => (
               <button key={i} onClick={() => sendMessage(p.text)}
                 className="card-glass p-3 text-left hover:border-clip-cyan/30 hover:bg-clip-cyan/5 transition-all text-sm">
@@ -240,7 +397,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
         )}
 
         {/* Input */}
-        <div className="py-4 border-t border-white/[0.04]">
+        <div className={inputWrapClass}>
           {isAtLimit ? (
             <div className="card-glass p-4 border-clip-amber/20 bg-clip-amber/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -249,7 +406,10 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
                   You've hit the free limit. Upgrade for unlimited ClipBot messages.
                 </p>
               </div>
-              <button onClick={() => onNavigate('pricing')} className="btn-primary text-sm px-5 py-2 whitespace-nowrap">
+              <button
+                onClick={() => onNavigate?.('pricing')}
+                className="btn-primary text-sm px-5 py-2 whitespace-nowrap"
+              >
                 Upgrade
               </button>
             </div>
@@ -265,14 +425,14 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask ClipBot anything about going viral…"
-                className="flex-1 bg-transparent text-[15px] text-clip-text placeholder:text-clip-muted/60 focus:outline-none py-2.5"
+                className="flex-1 bg-transparent text-[15px] text-clip-text placeholder:text-clip-muted/60 focus:outline-none py-2.5 min-w-0"
                 disabled={isTyping}
               />
               <button
                 type="submit"
                 disabled={!input.trim() || isTyping}
                 aria-label="Send message"
-                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.04] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:shadow-[0_0_20px_rgba(0, 194, 214, 0.35)] enabled:hover:scale-105 enabled:active:scale-95"
+                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.04] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:shadow-[0_0_20px_rgba(0,194,214,0.35)] enabled:hover:scale-105 enabled:active:scale-95"
               >
                 {isTyping ? (
                   <Loader2 className="w-[18px] h-[18px] animate-spin" />
@@ -282,13 +442,13 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
               </button>
             </form>
           )}
-          <p className="text-clip-muted text-xs mt-2 text-center">
+          <p className="text-clip-muted text-xs mt-2 text-center flex items-center justify-center gap-1">
+            <MessageSquare className="w-3 h-3" />
             ClipBot knows gaming content inside out
           </p>
         </div>
-
       </div>
-    </div>
+    </>
   );
 }
 
@@ -302,7 +462,6 @@ function FormattedMessage({ content }: { content: string }) {
                     [&_strong]:text-clip-cyan [&_strong]:font-semibold">
       <ReactMarkdown
         components={{
-          // Render bullet list items with a Zap icon prefix
           li: ({ children }) => (
             <li className="flex gap-2">
               <Zap className="w-3 h-3 text-clip-cyan flex-shrink-0 mt-1" />
@@ -317,7 +476,7 @@ function FormattedMessage({ content }: { content: string }) {
   );
 }
 
-// ── Fallback replies (Groq offline) ──────────────────────────────────────────
+// ── Fallback replies (when LLM is offline) ───────────────────────────────────
 
 function getFallbackReply(msg: string): string {
   const lower = msg.toLowerCase();

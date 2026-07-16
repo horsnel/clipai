@@ -58,7 +58,7 @@ export function LogoMark({
         {variant === 'gradient' && (
           <linearGradient id={`${id}-tri`} x1="30" y1="25" x2="80" y2="80" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#C8CDD8" stopOpacity="0.85" />
+            <stop offset="100%" stopColor="#A8AEB8" stopOpacity="0.85" />
           </linearGradient>
         )}
       </defs>
@@ -86,13 +86,13 @@ export function LogoMark({
           than the bottom-right vertex. */}
       <path
         d="M 32 26 L 32 74 L 76 50 Z"
-        fill={variant === 'gradient' ? `url(#${id}-tri)` : '#08080A'}
+        fill={variant === 'gradient' ? `url(#${id}-tri)` : '#050507'}
       />
 
       {/* Spark accent — 4 small lines radiating from top-right corner of triangle.
           Signals "AI magic" + energy. */}
       <g
-        stroke={variant === 'gradient' ? '#FFFFFF' : '#08080A'}
+        stroke={variant === 'gradient' ? '#FFFFFF' : '#050507'}
         strokeWidth="3.5"
         strokeLinecap="round"
         opacity={variant === 'gradient' ? '0.9' : '1'}
@@ -106,7 +106,7 @@ export function LogoMark({
       <circle
         cx="90" cy="20"
         r="2.5"
-        fill={variant === 'gradient' ? '#FFFFFF' : '#08080A'}
+        fill={variant === 'gradient' ? '#FFFFFF' : '#050507'}
         opacity={variant === 'gradient' ? '0.8' : '1'}
       />
     </svg>

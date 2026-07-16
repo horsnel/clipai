@@ -1940,29 +1940,36 @@ Rules:
   return json(data);
 });
 
-// ─── Trending Videos (Dashboard widget) ─────────────────────────────────────
-// Returns 6 trending YouTube gaming videos + a per-video copy pack (optimized
-// title + 1 caption + 8 hashtags). No auth, no credits — this is a free
-// dashboard-level inspiration widget. Cached 6h globally (trends + videos
-// don't shift faster than that, and one LLM call covers all 6 videos).
+// ─── Trending Videos (Dashboard widget, multi-platform) ─────────────────────
+// Returns ~9 trending gaming videos mixed across YouTube, TikTok, and X/Twitter
+// + a per-video copy pack (optimized title + 1 caption + 8 hashtags).
+// No auth, no credits — this is a free dashboard-level inspiration widget.
+// Cached 6h globally (trends + videos don't shift faster than that, and one
+// LLM call covers all videos).
+//
+// Platform mix:
+//   - 4 YouTube (real video data via ytTrending: id, snippet, thumbnail)
+//   - 3 TikTok  (via serpTiktok: title + url, no thumbnail — UI renders fallback)
+//   - 2 X       (via serpTwitter: title + url, no thumbnail — UI renders fallback)
 app.get('/trending-videos', async (c) => {
   const env = c.env as Env;
   const game = (c.req.query('game') || '').trim();
   const gameLabel = game || 'gaming';
 
-  const cacheKey = `trending_videos:${gameLabel.toLowerCase()}`;
+  const cacheKey = `trending_videos_v2:${gameLabel.toLowerCase()}`;
   const data = await withCache(env, cacheKey, 6 * 60 * 60, async () => {
-    // Fetch top 6 trending YouTube videos
-    const ytItems = await ytTrending(env, game || 'gaming', 6);
-    if (!ytItems.length) {
-      return { videos: [], generatedAt: new Date().toISOString(), game: gameLabel };
-    }
+    // Fetch from all 3 platforms in parallel
+    const [ytItems, ttItems, xItems] = await Promise.all([
+      ytTrending(env, game || 'gaming', 4),
+      serpTiktok(env, game || 'gaming', 3),
+      serpTwitter(env, game || 'gaming', 2),
+    ]);
 
-    // Map raw YouTube data → lightweight video objects
-    const videos = ytItems.map((it: any) => {
+    // ── Map YouTube → video objects ──
+    const ytVideos = ytItems.map((it: any) => {
       const vid = it.id?.videoId || it.id || '';
       return {
-        id: vid,
+        id: `yt_${vid}`,
         title: it.snippet?.title || 'Untitled',
         channel: it.snippet?.channelTitle || 'Unknown',
         thumbnail: vid ? `https://i.ytimg.com/vi/${vid}/mqdefault.jpg` : '',
@@ -1970,19 +1977,56 @@ app.get('/trending-videos', async (c) => {
         platform: 'youtube',
         publishedAt: it.snippet?.publishedAt || '',
       };
-    }).filter((v: any) => v.id);
+    }).filter((v: any) => v.id && v.url);
+
+    // ── Map TikTok → video objects ──
+    // serpTiktok returns { title, url, platform } — extract author from URL.
+    const ttVideos = ttItems.map((it: any, i: number) => {
+      const url = it.url || '';
+      // tiktok.com/@username/video/123... → extract @username
+      const authorMatch = url.match(/@([^/?]+)/);
+      const author = authorMatch ? `@${authorMatch[1]}` : 'TikTok creator';
+      return {
+        id: `tt_${i}_${url.slice(-12)}`,
+        title: it.title || 'TikTok gaming clip',
+        channel: author,
+        thumbnail: '',  // TikTok doesn't expose public thumbnails reliably
+        url,
+        platform: 'tiktok',
+        publishedAt: '',
+      };
+    }).filter((v: any) => v.url);
+
+    // ── Map X/Twitter → video objects ──
+    const xVideos = xItems.map((it: any, i: number) => {
+      const url = it.url || '';
+      // x.com/username/status/123 → extract @username
+      const authorMatch = url.match(/\/([^/?]+)\/status/);
+      const author = authorMatch ? `@${authorMatch[1]}` : 'X creator';
+      return {
+        id: `x_${i}_${url.slice(-12)}`,
+        title: it.title || 'X gaming clip',
+        channel: author,
+        thumbnail: '',  // X doesn't expose public thumbnails reliably
+        url,
+        platform: 'twitter',
+        publishedAt: '',
+      };
+    }).filter((v: any) => v.url);
+
+    const videos = [...ytVideos, ...ttVideos, ...xVideos];
 
     if (!videos.length) {
       return { videos: [], generatedAt: new Date().toISOString(), game: gameLabel };
     }
 
-    // ONE LLM call → copy pack for each video (much cheaper than 6 separate calls)
+    // ONE LLM call → copy pack for each video (much cheaper than N separate calls)
     const videoList = videos.map((v: any, i: number) =>
-      `${i + 1}. "${v.title}" by ${v.channel}`
+      `${i + 1}. [${v.platform.toUpperCase()}] "${v.title}" by ${v.channel}`
     ).join('\n');
 
     const system = 'You are a viral gaming content strategist for African creators. Return ONLY valid JSON.';
-    const prompt = `For each of these ${videos.length} trending YouTube gaming videos, generate a ready-to-post copy pack.
+    const prompt = `For each of these ${videos.length} trending gaming videos across multiple platforms (YouTube, TikTok, X/Twitter), generate a ready-to-post copy pack.
 
 Videos:
 ${videoList}
@@ -2002,15 +2046,18 @@ Return JSON:
 
 Rules:
 - packs array MUST have exactly ${videos.length} items, in the same order as the videos above.
+- Tailor the caption length to the platform: TikTok captions short & punchy (<100 chars), X captions even shorter (<80 chars), YouTube captions can be longer (up to 120 chars).
 - Each hashtag array: 8 items, mix of mega (e.g. #gaming) + mid (#naijagamer) + niche. ALL lowercase.
 - ALWAYS include #naijagamer and #gamingafrica in every pack.
-- Titles should feel authentic, not corporate. Optimise for clicks.
+- For TikTok packs, include #tiktokgaming and one platform-specific tag.
+- For X packs, include #gamingtwitter.
+- Titles should feel authentic, not corporate. Optimise for clicks on the respective platform.
 - Captions should reference the gaming moment / Nigerian-African creator culture where natural.
 - Return ONLY the JSON, no markdown fences.`;
 
     let packs: any[] = [];
     try {
-      const llmData: any = await llmJson(env, prompt, system, 2500);
+      const llmData: any = await llmJson(env, prompt, system, 3500);
       packs = Array.isArray(llmData.packs) ? llmData.packs : [];
     } catch {
       // LLM failure — fall back to empty packs (videos still show, just no copy button)
