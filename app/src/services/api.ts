@@ -19,8 +19,10 @@ import type {
   AnalysisResult,
   AnalyseYouTubeResponse,
   AnalysisSummary,
+  CompareResponse,
   DetectedClip,
   ExportOptions,
+  PlaylistResponse,
   RenderJob,
   TopicStealEntry,
   UploadResult,
@@ -355,4 +357,14 @@ export async function getAnalysis(id: string): Promise<{ analysis: AnalysisSumma
 export async function getTopicSteal(game?: string, limit = 20): Promise<{ topics: TopicStealEntry[]; generated_at: string }> {
   const qs = game ? `?game=${encodeURIComponent(game)}&limit=${limit}` : `?limit=${limit}`;
   return apiClient.get<{ topics: TopicStealEntry[]; generated_at: string }>(`/topic-steal${qs}`);
+}
+
+// ─── Phase 2: Competitor Lab — POST /api/analyse/compare (10 credits, pro/creator)
+export async function compareVideos(urlA: string, urlB: string): Promise<CompareResponse> {
+  return apiClient.post<CompareResponse>('/analyse/compare', { urlA, urlB });
+}
+
+// ─── Phase 3: Playlist Architect — POST /api/playlist/sequence (5 credits, pro/creator)
+export async function sequencePlaylist(urls: string[]): Promise<PlaylistResponse> {
+  return apiClient.post<PlaylistResponse>('/playlist/sequence', { urls });
 }

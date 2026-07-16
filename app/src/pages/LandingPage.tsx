@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import {
-  Zap, Brain, Share2, ChevronRight,
-  Gamepad2, Target, Sparkles, Play,
+  Zap, ChevronRight,
+  Gamepad2, Sparkles, Play, Flame, TrendingUp, Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -92,16 +92,17 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             ref={headlineRef}
             className="text-center font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-clip-text leading-tight mb-6 perspective-1000"
           >
-            <span className="word inline-block">Your</span>{' '}
-            <span className="word inline-block">Gameplay.</span>{' '}
-            <span className="word inline-block gradient-text">Your</span>{' '}
-            <span className="word inline-block gradient-text">Highlights.</span>{' '}
-            <span className="word inline-block text-clip-amber">Viral.</span>
+            <span className="word inline-block">Paste</span>{' '}
+            <span className="word inline-block">a</span>{' '}
+            <span className="word inline-block">URL.</span>{' '}
+            <span className="word inline-block gradient-text">Get</span>{' '}
+            <span className="word inline-block gradient-text">14</span>{' '}
+            <span className="word inline-block text-clip-amber">strategies.</span>
           </h1>
 
           {/* Subheadline */}
           <p className="text-center text-clip-muted text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-8 px-4">
-            Your AI growth platform for gaming clips. Spot trending moments, forge viral captions, coach your channel with ClipBot, and climb the CreatorRank leaderboard — all in one place.
+            ClipAI streams any YouTube video to Gemini and returns titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more viral outputs — in seconds. No uploads. No rendering. No storage.
           </p>
 
           {/* CTAs */}
@@ -154,15 +155,15 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           >
             <div className="feature-card card-glass p-5 hover:-translate-y-1 transition-transform duration-300">
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
-                  <Target className="w-5 h-5 text-clip-cyan" />
+                <div className="w-10 h-10 rounded-xl bg-clip-amber/10 flex items-center justify-center flex-shrink-0">
+                  <Flame className="w-5 h-5 text-clip-amber" />
                 </div>
                 <div>
                   <h3 className="font-display font-semibold text-clip-text mb-1">
-                    Trend Radar — never miss a meta
+                    Viral Forge — 14 outputs per URL
                   </h3>
                   <p className="text-clip-muted text-sm">
-                    Live trending hashtags, sounds, and clip formats for Valorant, Apex, Fortnite, COD and more.
+                    Titles, hook score, captions, distribution pack, thumbnail concepts, pinned comments, sponsorship spots — all from one paste.
                   </p>
                 </div>
               </div>
@@ -170,15 +171,15 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
             <div className="feature-card card-glass p-5 hover:-translate-y-1 transition-transform duration-300">
               <div className="flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl bg-clip-amber/10 flex items-center justify-center flex-shrink-0">
-                  <Share2 className="w-5 h-5 text-clip-amber" />
+                <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                  <TrendingUp className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
                   <h3 className="font-display font-semibold text-clip-text mb-1">
-                    ViralForge + ClipBot coach
+                    Topic Steal — network trends
                   </h3>
                   <p className="text-clip-muted text-sm">
-                    10 viral title variants per clip, platform-specific captions, hooks, and an AI coach that diagnoses flops.
+                    See which topics every ClipAI creator is analysing this week. Anonymous aggregation across all Deep Analyses.
                   </p>
                 </div>
               </div>
@@ -187,37 +188,40 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         </div>
       </section>
 
-      {/* Feature Grid Section */}
+      {/* Phase 1 Features Section */}
       <section id="features" className="py-20 lg:py-28 relative">
         <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12">
           <div className="text-center max-w-2xl mx-auto mb-16">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-clip-amber bg-clip-amber/10 border border-clip-amber/20 px-3 py-1 rounded-full mb-4">
+              <Sparkles className="w-3.5 h-3.5" /> Phase 1 — live now
+            </span>
             <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-4">
-              Four tools. <span className="gradient-text">Zero guesswork.</span>
+              One paste. <span className="gradient-text">14 viral strategies.</span>
             </h2>
             <p className="text-clip-muted text-base sm:text-lg">
-              Trend Radar spots the meta. ViralForge writes the hook. ClipBot coaches your channel. CreatorRank keeps you climbing.
+              Viral Forge turns any YouTube URL into titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more outputs — all from one Gemini call.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {[
               {
-                icon: Target,
-                title: 'Trend Radar',
-                description: 'Live trending titles, hashtags, sounds, and challenges for the games you play — updated hourly on Pro.',
-                color: 'clip-cyan',
-              },
-              {
-                icon: Brain,
-                title: 'ViralForge + ClipBot',
-                description: 'Generate 10 viral variants per clip in seconds. Ask ClipBot to diagnose flops and craft better hooks.',
+                icon: Flame,
+                title: 'Viral Forge',
+                description: 'Paste a URL → get hook score, 10 titles, captions, distribution pack, hidden gems, goldilocks map, thumbnail concepts, sponsorship spots, and 6 more outputs in seconds.',
                 color: 'clip-amber',
               },
               {
-                icon: Share2,
-                title: 'CreatorRank + Battle',
-                description: 'Earn XP for every action, climb tiers from Rookie to GOD TIER, and vote on the community Caption Battle board.',
+                icon: TrendingUp,
+                title: 'Topic Steal',
+                description: 'Anonymous aggregation across every Deep Analysis. See what topics are rising +340% in your network this week. The moat compounds with every analysis.',
                 color: 'green-400',
+              },
+              {
+                icon: Users,
+                title: 'Competitor Lab + Playlist Architect',
+                description: 'Head-to-head video comparison (Viral Gap, Voice Gap, Predictive Comments) and multi-video sequencing for distribution. Pro tier unlocks both.',
+                color: 'clip-cyan',
               },
             ].map((feature, i) => (
               <div
@@ -236,6 +240,18 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </p>
               </div>
             ))}
+          </div>
+
+          {/* 14 outputs strip */}
+          <div className="max-w-4xl mx-auto mt-12 card-glass p-6">
+            <p className="text-clip-muted text-xs uppercase tracking-wider mb-3 text-center">Every Deep Analysis returns</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {['Hook Score', '10 Titles', 'Captions', 'Distribution Pack', 'Hidden Gems', 'Goldilocks Map', 'Thumbnail Concepts', 'Pinned Comments', 'Community Polls', 'Sponsorship Spots', 'Controversy Hooks', 'Sentiment Arc', 'Shadow Editor', 'Pacing'].map((o) => (
+                <span key={o} className="text-xs text-clip-text bg-clip-surface border border-white/[0.05] px-2.5 py-1 rounded-full">
+                  {o}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </section>

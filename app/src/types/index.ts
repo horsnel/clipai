@@ -257,3 +257,69 @@ export interface TopicStealEntry {
   last_seen: string;
   growth_multiplier: number | null;
 }
+
+// ─── Phase 2: Competitor Lab comparison types ─────────────────────────────────
+export interface ComparisonResult {
+  winner: 'A' | 'B' | 'tie';
+  winner_reason: string;
+  viral_gap: {
+    a_missed: string[];
+    b_missed: string[];
+    a_exclusive_wins: string[];
+    b_exclusive_wins: string[];
+  };
+  voice_gap: {
+    a_voice: string;
+    b_voice: string;
+    differences: string[];
+    recommendation: string;
+  };
+  predictive_comments: {
+    a: Array<{ type: string; comment: string; likely_engagement: string }>;
+    b: Array<{ type: string; comment: string; likely_engagement: string }>;
+  };
+  comparison_metrics: {
+    hook:        { a: number; b: number; advantage: string };
+    pacing:      { a: string; b: string; advantage: string };
+    distribution:{ a: string; b: string; advantage: string };
+    retention:   { a: string; b: string; advantage: string };
+  };
+  steal_playbook: string[];
+}
+
+export interface CompareResponse {
+  comparison: ComparisonResult;
+  videos: {
+    a: { title: string; author: string; video_id: string; url: string; hook_score: number | null };
+    b: { title: string; author: string; video_id: string; url: string; hook_score: number | null };
+  };
+  cached: { a: boolean; b: boolean };
+  processing_ms: number;
+  credits_remaining: number;
+}
+
+// ─── Phase 3: Playlist Architect types ────────────────────────────────────────
+export interface PlaylistResult {
+  recommended_order: Array<{ position: number; title: string; rationale: string }>;
+  distribution_schedule: {
+    youtube: Array<{ day: number; video: string; time: string; reason: string }>;
+    tiktok:  Array<{ day: number; video: string; clip_segment: string; reason: string }>;
+    x:       Array<{ day: number; video: string; format: string; reason: string }>;
+    shorts:  Array<{ day: number; video: string; clip_segment: string; reason: string }>;
+  };
+  cross_promotion_hooks: Array<{ from_video: string; to_video: string; hook_script: string }>;
+  retention_forecast: {
+    expected_peak_video: string;
+    expected_weak_video: string;
+    total_projected_watch_hours: number;
+    notes: string;
+  };
+  thematic_arc: string;
+}
+
+export interface PlaylistResponse {
+  playlist: PlaylistResult;
+  videos: Array<{ url: string; video_id: string; title: string; author: string; hook_score: number | null }>;
+  processing_ms: number;
+  credits_remaining: number;
+}

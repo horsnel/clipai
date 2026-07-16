@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { listClips } from '@/services/api';
 import { TopicStealWidget } from '@/components/TopicStealWidget';
+import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
 
 interface DashboardPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number; clipsUsed?: number; xp?: number } | null;
@@ -296,6 +297,11 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
         {/* Topic Steal — anonymized network trends (Phase 1) */}
         <div className="mb-10">
           <TopicStealWidget limit={6} onNavigate={onNavigate} />
+        </div>
+
+        {/* Recent Deep Analyses — re-open past URLs instantly (Phase 1) */}
+        <div className="mb-10">
+          <RecentAnalysesWidget limit={5} onNavigate={onNavigate} />
         </div>
 
         {/* Recent Clips */}

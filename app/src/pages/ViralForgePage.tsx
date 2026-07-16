@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
 import { Zap, Copy, ThumbsUp, RefreshCw,
   Hash, Type, Sparkles, ChevronRight, CheckCheck,
-  TrendingUp, Flame, Trophy, Crown, Youtube,
+  TrendingUp, Flame, Trophy, Crown, Youtube, ListOrdered,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { voteOnCaption, getTopCaptions, apiClient, analyseYouTube } from '@/services/api';
 import { ParticleLoader } from '../components/Loading';
 import { AnalysisCards } from '../components/AnalysisCards';
+import { ComparePanel } from '../components/ComparePanel';
+import { PlaylistPanel } from '../components/PlaylistPanel';
 import type { UnifiedAnalysis } from '../types';
 
 interface ViralForgePageProps {
@@ -15,7 +17,7 @@ interface ViralForgePageProps {
   onNavigate: (page: Page, data?: unknown[]) => void;
 }
 
-type ActiveTool = 'titles' | 'captions' | 'hashtags' | 'hooks' | 'analysis';
+type ActiveTool = 'titles' | 'captions' | 'hashtags' | 'hooks' | 'analysis' | 'compare' | 'playlist';
 
 interface GeneratedTitle {
   id: string;
@@ -189,6 +191,8 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
 
   const TOOLS: { key: ActiveTool; label: string; icon: typeof Type; desc: string }[] = [
     { key: 'analysis', label: 'Deep Analysis', icon: Sparkles, desc: 'Paste a YouTube URL → 14 outputs' },
+    { key: 'compare',  label: 'Compare',       icon: Trophy,    desc: 'Head-to-head competitor analysis' },
+    { key: 'playlist', label: 'Playlist',      icon: ListOrdered, desc: 'Sequence + distribute 2–10 videos' },
     { key: 'titles',   label: 'Title Forge',   icon: TrendingUp, desc: 'SEO-optimised viral titles ranked by score' },
     { key: 'captions', label: 'Caption Battle',icon: Flame,      desc: 'Generate & vote your best caption' },
     { key: 'hashtags', label: 'Hashtag Pack',  icon: Hash,       desc: 'Perfectly sized hashtag combos' },
@@ -238,7 +242,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
         </div>
 
         {/* Tool tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
           {TOOLS.map(t => (
             <button key={t.key} onClick={() => { setActiveTool(t.key); setTitles([]); setCaptions([]); setHashtags([]); setHooks([]); }}
               className={`p-4 rounded-xl border text-left transition-all ${
@@ -254,7 +258,8 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Input panel */}
+          {/* Input panel — hidden for Compare + Playlist which manage their own inputs */}
+          {(activeTool !== 'compare' && activeTool !== 'playlist') && (
           <div className="lg:col-span-2 space-y-4">
             <div className="card-glass p-5 space-y-4">
               {activeTool === 'analysis' ? (
@@ -381,9 +386,20 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
               </div>
             </div>
           </div>
+          )}
 
-          {/* Results panel */}
-          <div className="lg:col-span-3">
+          {/* Results panel — spans full width when Compare/Playlist (which have no input column) */}
+          <div className={activeTool === 'compare' || activeTool === 'playlist' ? 'lg:col-span-5' : 'lg:col-span-3'}>
+            {/* ── COMPARE (Phase 2) ── */}
+            {activeTool === 'compare' && (
+              <ComparePanel user={user} onNavigate={onNavigate} />
+            )}
+
+            {/* ── PLAYLIST (Phase 3) ── */}
+            {activeTool === 'playlist' && (
+              <PlaylistPanel user={user} onNavigate={onNavigate} />
+            )}
+
             {/* ── DEEP ANALYSIS ── */}
             {activeTool === 'analysis' && (
               <div className="space-y-3">

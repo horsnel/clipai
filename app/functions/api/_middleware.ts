@@ -36,6 +36,8 @@
  *   GET  /analyses                 (require_auth) — list user's past analyses
  *   GET  /analyses/:id             (require_auth) — fetch one saved analysis
  *   GET  /topic-steal              (require_auth) — anonymized trending topics dashboard
+ *   POST /analyse/compare          (require_auth + pro/creator + 10 credits) — Phase 2 Competitor Lab
+ *   POST /playlist/sequence        (require_auth + pro/creator + 5 credits)  — Phase 3 Playlist Architect
  */
 import { Hono } from 'hono';
 import { jwtVerify, decodeJwt } from 'jose';
@@ -2623,6 +2625,299 @@ app.get('/topic-steal', requireAuth, async (c) => {
   });
 
   return json(data);
+});
+
+// ─── POST /api/analyse/compare — Competitor Lab (Phase 2) ────────────────────
+// Takes 2 YouTube URLs, returns head-to-head comparison:
+//   - viral_gap       (what A did that B didn't, and vice versa)
+//   - voice_gap       (style differences)
+//   - predictive_comments (predicted comment threads for both)
+//   - comparison_metrics (retention, hook, pacing, distribution)
+//
+// Charges 10 credits. Reuses cached analyses if either URL was analyzed
+// within the last 24h to avoid re-running the expensive transcript+LLM pass.
+const COMPARE_SYSTEM_PROMPT = `You are ClipAI's Competitor Lab — a head-to-head video comparison engine for gaming creators. You take two YouTube video analyses and produce a single comparison JSON that surfaces every viral angle the first creator missed and the second one nailed.
+
+ALWAYS return a single valid JSON object. No prose, no code fences, no commentary.`;
+
+function buildComparePrompt(
+  a: { title: string; author: string; transcriptText: string; analysis: any },
+  b: { title: string; author: string; transcriptText: string; analysis: any },
+): string {
+  return `Compare these two YouTube videos and produce a viral-gap analysis as JSON.
+
+VIDEO A
+Title: ${a.title}
+Channel: ${a.author}
+Hook score: ${a.analysis?.hook_score ?? 'n/a'}
+Top titles: ${JSON.stringify(a.analysis?.title_variants?.slice(0, 3) ?? [])}
+Style profile: ${JSON.stringify(a.analysis?.style_profile ?? {})}
+Strategic notes: ${a.analysis?.viral_angles?.strategic_notes ?? ''}
+
+Transcript A (excerpt):
+${a.transcriptText.slice(0, 4000)}
+
+VIDEO B
+Title: ${b.title}
+Channel: ${b.author}
+Hook score: ${b.analysis?.hook_score ?? 'n/a'}
+Top titles: ${JSON.stringify(b.analysis?.title_variants?.slice(0, 3) ?? [])}
+Style profile: ${JSON.stringify(b.analysis?.style_profile ?? {})}
+Strategic notes: ${b.analysis?.viral_angles?.strategic_notes ?? ''}
+
+Transcript B (excerpt):
+${b.transcriptText.slice(0, 4000)}
+
+Return JSON with EXACTLY this structure:
+
+{
+  "winner": "<A|B|tie>",
+  "winner_reason": "<one sentence on why>",
+  "viral_gap": {
+    "a_missed": ["<3-5 viral angles A could have used but didn't>"],
+    "b_missed": ["<3-5 viral angles B could have used but didn't>"],
+    "a_exclusive_wins": ["<2-4 things A did that B should copy>"],
+    "b_exclusive_wins": ["<2-4 things B did that A should copy>"]
+  },
+  "voice_gap": {
+    "a_voice": "<one-sentence description of A's voice/style>",
+    "b_voice": "<one-sentence description of B's voice/style>",
+    "differences": ["<3-5 concrete style differences>"],
+    "recommendation": "<which voice to clone for what audience>"
+  },
+  "predictive_comments": {
+    "a": [
+      {"type": "<praise|criticism|question|debate|spam>", "comment": "<predicted comment text>", "likely_engagement": "<low|medium|high|viral>"}
+    ],
+    "b": [
+      {"type": "<praise|criticism|question|debate|spam>", "comment": "<predicted comment text>", "likely_engagement": "<low|medium|high|viral>"}
+    ]
+  },
+  "comparison_metrics": {
+    "hook": {"a": <0-10>, "b": <0-10>, "advantage": "<A|B|tie>"},
+    "pacing": {"a": "<slow|medium|fast>", "b": "<slow|medium|fast>", "advantage": "<A|B|tie>"},
+    "distribution": {"a": "<weak|medium|strong>", "b": "<weak|medium|strong>", "advantage": "<A|B|tie>"},
+    "retention": {"a": "<low|medium|high>", "b": "<low|medium|high>", "advantage": "<A|B|tie>"}
+  },
+  "steal_playbook": [
+    "<5-7 concrete actions the loser should steal from the winner>"
+  ]
+}
+
+Rules:
+- predictive_comments.a and .b must each have at least 4 items.
+- steal_playbook must have exactly 5-7 items, each under 120 chars.
+- Be specific — quote timestamps or wording from transcripts when possible.`;
+}
+
+app.post('/analyse/compare', requireAuth, requirePlan('pro', 'creator'), requireCredits(10), async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const startedAt = Date.now();
+  const body = await c.req.json().catch(() => ({}));
+  const urlA: string = (body.urlA || '').trim();
+  const urlB: string = (body.urlB || '').trim();
+
+  if (!urlA || !urlB) return json({ error: 'urlA and urlB are both required' }, 400);
+  if (urlA === urlB) return json({ error: 'Cannot compare a video to itself' }, 400);
+
+  const idA = parseYouTubeId(urlA);
+  const idB = parseYouTubeId(urlB);
+  if (!idA || !idB) return json({ error: 'Could not parse YouTube IDs from both URLs' }, 400);
+
+  // Helper: get analysis + transcript for one URL (reuses cached row if recent)
+  const getAnalysis = async (url: string, id: string) => {
+    // Look up cached row
+    const cached = await sbFetch<any[]>(
+      env,
+      `analyses?user_id=eq.${userId}&source_url=eq.${encodeURIComponent(url)}&status=eq.completed&select=id,analysis_raw,transcript,video_title,video_author&order=created_at.desc&limit=1`,
+    );
+    if (cached && cached.length > 0) {
+      const row = cached[0];
+      const ageHours = (Date.now() - new Date(row.created_at).getTime()) / 3_600_000;
+      if (ageHours < 24 && row.analysis_raw) {
+        let transcript: { t: number; text: string }[] = [];
+        try { transcript = typeof row.transcript === 'string' ? JSON.parse(row.transcript) : (row.transcript || []); } catch { /* ignore */ }
+        return {
+          cached: true,
+          analysis: typeof row.analysis_raw === 'string' ? JSON.parse(row.analysis_raw) : row.analysis_raw,
+          title: row.video_title || 'Untitled',
+          author: row.video_author || 'Unknown',
+          transcriptText: transcript.map((s: any) => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n'),
+        };
+      }
+    }
+    // Fetch fresh
+    const meta = await fetchYouTubeMeta(id);
+    if (!meta) throw new Error(`Could not fetch metadata for video ${id}`);
+    const tr = await fetchYouTubeTranscript(id);
+    if (!tr || tr.segments.length === 0) throw new Error(`Video ${id} has no English transcript`);
+    const analysisJson = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    return {
+      cached: false,
+      analysis: analysisJson,
+      title: meta.title,
+      author: meta.author,
+      transcriptText: tr.segments.map(s => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n'),
+    };
+  };
+
+  let a: Awaited<ReturnType<typeof getAnalysis>>;
+  let b: Awaited<ReturnType<typeof getAnalysis>>;
+  try {
+    [a, b] = await Promise.all([getAnalysis(urlA, idA), getAnalysis(urlB, idB)]);
+  } catch (e: any) {
+    return json({ error: e.message || 'Failed to fetch one of the videos' }, 422);
+  }
+
+  // Run comparison LLM call
+  let comparison: any;
+  try {
+    comparison = await llmJson(env, buildComparePrompt(a, b), COMPARE_SYSTEM_PROMPT, 4000);
+  } catch (e: any) {
+    return json({ error: 'Comparison AI failed: ' + e.message }, 502);
+  }
+
+  // Spend credits (already reserved by requireCredits but commit the ledger entry)
+  const newBalance = await spendCredits(env, userId, 10, 'analyse_compare');
+
+  return json({
+    comparison,
+    videos: {
+      a: { title: a.title, author: a.author, video_id: idA, url: urlA, hook_score: a.analysis?.hook_score ?? null },
+      b: { title: b.title, author: b.author, video_id: idB, url: urlB, hook_score: b.analysis?.hook_score ?? null },
+    },
+    cached: { a: a.cached, b: b.cached },
+    processing_ms: Date.now() - startedAt,
+    credits_remaining: newBalance,
+  });
+});
+
+// ─── POST /api/playlist/sequence — Playlist Architect (Phase 3) ──────────────
+// Takes 2-10 YouTube URLs, returns an optimal sequence + distribution plan:
+//   - ordered sequence (with rationale)
+//   - distribution_schedule (per platform)
+//   - cross_promotion_hooks (how to link videos together)
+//   - retention_forecast (rough projected retention curve)
+//
+// Charges 5 credits. Reuses cached analyses where possible.
+const PLAYLIST_SYSTEM_PROMPT = `You are ClipAI's Playlist Architect — a multi-video sequencing strategist. You take 2-10 YouTube video analyses and produce an optimal publishing order + cross-platform distribution plan that maximizes total watch time.
+
+ALWAYS return a single valid JSON object. No prose, no code fences, no commentary.`;
+
+function buildPlaylistPrompt(items: Array<{ title: string; author: string; analysis: any }>): string {
+  const itemsBlock = items.map((it, i) =>
+    `${i + 1}. "${it.title}" by ${it.author} — hook: ${it.analysis?.hook_score ?? '?'}/10, game: ${it.analysis?.viral_angles?.game ?? 'general'}, topics: ${JSON.stringify((it.analysis?.viral_angles?.topics ?? []).slice(0, 3).map((t: any) => t.topic))}`,
+  ).join('\n');
+
+  return `You are given ${items.length} YouTube videos from a creator's library. Produce an optimal sequence + distribution plan as JSON.
+
+VIDEOS:
+${itemsBlock}
+
+Return JSON with EXACTLY this structure:
+
+{
+  "recommended_order": [
+    {"position": 1, "title": "<exact title from list>", "rationale": "<one sentence why this goes first>"}
+  ],
+  "distribution_schedule": {
+    "youtube": [{"day": 1, "video": "<title>", "time": "<HH:MM 24h>", "reason": "<why this slot>"}],
+    "tiktok":  [{"day": 1, "video": "<title>", "clip_segment": "<start-end seconds>", "reason": "<why>"}],
+    "x":       [{"day": 1, "video": "<title>", "format": "<thread|single|clip>", "reason": "<why>"}],
+    "shorts":  [{"day": 1, "video": "<title>", "clip_segment": "<start-end seconds>", "reason": "<why>"}]
+  },
+  "cross_promotion_hooks": [
+    {"from_video": "<title>", "to_video": "<title>", "hook_script": "<2-3 sentence spoken call-out to weave into the end of the from_video>"}
+  ],
+  "retention_forecast": {
+    "expected_peak_video": "<title>",
+    "expected_weak_video": "<title>",
+    "total_projected_watch_hours": <number>,
+    "notes": "<2-3 sentence rationale>"
+  },
+  "thematic_arc": "<2-3 sentence description of the narrative arc across the sequence>"
+}
+
+Rules:
+- recommended_order must include every input video, exactly once.
+- distribution_schedule.youtube must have at least ${Math.min(items.length, 3)} entries.
+- cross_promotion_hooks should have ${Math.max(2, Math.min(items.length - 1, 5))} entries.`;
+}
+
+app.post('/playlist/sequence', requireAuth, requirePlan('pro', 'creator'), requireCredits(5), async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const startedAt = Date.now();
+  const body = await c.req.json().catch(() => ({}));
+  const urls: string[] = Array.isArray(body.urls) ? body.urls.map((u: string) => u.trim()).filter(Boolean) : [];
+
+  if (urls.length < 2) return json({ error: 'Provide at least 2 URLs to sequence' }, 400);
+  if (urls.length > 10) return json({ error: 'Maximum 10 URLs per playlist' }, 400);
+
+  // Dedupe
+  const uniqueUrls = Array.from(new Set(urls));
+  if (uniqueUrls.length !== urls.length) {
+    return json({ error: 'Duplicate URLs detected. Remove duplicates and retry.' }, 400);
+  }
+
+  // Parse IDs
+  const parsed = uniqueUrls.map(u => ({ url: u, id: parseYouTubeId(u) }));
+  const bad = parsed.find(p => !p.id);
+  if (bad) return json({ error: `Could not parse YouTube ID from: ${bad.url}` }, 400);
+
+  // Fetch analyses (cached where possible)
+  const getOne = async (url: string, id: string) => {
+    const cached = await sbFetch<any[]>(
+      env,
+      `analyses?user_id=eq.${userId}&source_url=eq.${encodeURIComponent(url)}&status=eq.completed&select=id,analysis_raw,video_title,video_author&order=created_at.desc&limit=1`,
+    );
+    if (cached && cached.length > 0 && cached[0].analysis_raw) {
+      const row = cached[0];
+      return {
+        title: row.video_title || 'Untitled',
+        author: row.video_author || 'Unknown',
+        analysis: typeof row.analysis_raw === 'string' ? JSON.parse(row.analysis_raw) : row.analysis_raw,
+      };
+    }
+    // Fresh
+    const meta = await fetchYouTubeMeta(id);
+    if (!meta) throw new Error(`Could not fetch metadata for ${id}`);
+    const tr = await fetchYouTubeTranscript(id);
+    if (!tr || tr.segments.length === 0) throw new Error(`Video ${id} has no English transcript`);
+    const analysisJson = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    return { title: meta.title, author: meta.author, analysis: analysisJson };
+  };
+
+  let items: Array<{ title: string; author: string; analysis: any }>;
+  try {
+    items = await Promise.all(parsed.map(p => getOne(p.url, p.id!)));
+  } catch (e: any) {
+    return json({ error: e.message || 'Failed to fetch one or more videos' }, 422);
+  }
+
+  // Run playlist LLM
+  let playlist: any;
+  try {
+    playlist = await llmJson(env, buildPlaylistPrompt(items), PLAYLIST_SYSTEM_PROMPT, 4000);
+  } catch (e: any) {
+    return json({ error: 'Playlist AI failed: ' + e.message }, 502);
+  }
+
+  const newBalance = await spendCredits(env, userId, 5, 'playlist_sequence');
+
+  return json({
+    playlist,
+    videos: items.map((it, i) => ({
+      url: parsed[i].url,
+      video_id: parsed[i].id,
+      title: it.title,
+      author: it.author,
+      hook_score: it.analysis?.hook_score ?? null,
+    })),
+    processing_ms: Date.now() - startedAt,
+    credits_remaining: newBalance,
+  });
 });
 
 // ─── 404 fallback ────────────────────────────────────────────────────────────

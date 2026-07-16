@@ -3,7 +3,7 @@ import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import { 
   Check, X, Zap, Crown, Sparkles, Gift,
-  ArrowRight, Loader2
+  ArrowRight, Loader2, Flame, TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { initPayment, applyReferralCode } from '@/services/api';
@@ -36,12 +36,13 @@ const plans: Plan[] = [
     icon: Zap,
     color: 'text-clip-muted',
     features: [
-      { text: '50 credits / month', included: true },
+      { text: '50 credits / month (= 10 Deep Analyses)', included: true },
+      { text: 'Viral Forge: 14 outputs per YouTube URL', included: true },
+      { text: 'Topic Steal dashboard (read-only)', included: true },
       { text: '10 ClipBot messages / day', included: true },
       { text: 'Trend Radar (24h delayed)', included: true },
-      { text: 'CreatorRank + Leaderboard', included: true },
-      { text: 'Daily streak credits (+5 / day)', included: true },
-      { text: 'Real-time trends + competitor spy', included: false },
+      { text: 'CreatorRank + daily streak credits', included: true },
+      { text: 'Competitor Lab + Playlist Architect', included: false },
     ],
   },
   {
@@ -53,12 +54,13 @@ const plans: Plan[] = [
     icon: Sparkles,
     color: 'text-blue-600',
     features: [
-      { text: '200 ViralForge credits / month', included: true },
+      { text: '200 credits / month (= 40 Deep Analyses)', included: true },
+      { text: 'Viral Forge: 14 outputs per URL', included: true },
+      { text: 'Topic Steal dashboard (live)', included: true },
       { text: 'Unlimited ClipBot coach', included: true },
       { text: 'Real-time Trend Radar', included: true },
-      { text: 'Daily streak credits (+5 / day)', included: true },
       { text: 'Caption Battle voting', included: true },
-      { text: 'GrowthIntel competitor spy', included: false },
+      { text: 'Competitor Lab + Playlist Architect', included: false },
     ],
   },
   {
@@ -71,12 +73,13 @@ const plans: Plan[] = [
     color: 'text-clip-cyan',
     popular: true,
     features: [
-      { text: '1,000 credits / month', included: true },
-      { text: 'Unlimited ClipBot + priority AI', included: true },
-      { text: 'GrowthIntel competitor spy', included: true },
-      { text: 'Real-time Trend Radar', included: true },
-      { text: 'Early Access: Video Editor (December 2026)', included: true },
+      { text: '1,000 credits / month (= 200 Deep Analyses)', included: true },
+      { text: 'Competitor Lab — head-to-head video comparison', included: true },
+      { text: 'Playlist Architect — sequence + distribute', included: true },
+      { text: 'Topic Steal dashboard (live + 30-day history)', included: true },
+      { text: 'GrowthIntel competitor spy + priority AI', included: true },
       { text: 'Caption Battle × 3 vote weight', included: true },
+      { text: 'Early Access: Video Editor (Dec 2026)', included: true },
     ],
   },
   {
@@ -88,12 +91,13 @@ const plans: Plan[] = [
     icon: Crown,
     color: 'text-clip-amber',
     features: [
-      { text: '3,000 credits / month', included: true },
+      { text: '3,000 credits / month (= 600 Deep Analyses)', included: true },
+      { text: 'Competitor Lab + Playlist Architect (unlimited)', included: true },
+      { text: 'Topic Steal: full 90-day history + alerts', included: true },
+      { text: 'GrowthIntel + monthly 1:1 strategy call', included: true },
       { text: 'Exclusive Creator-tier trends', included: true },
-      { text: 'GrowthIntel + monthly strategy call', included: true },
-      { text: 'Caption Battle × 5 vote weight', included: true },
-      { text: 'Early Access: Video Editor (December 2026)', included: true },
-      { text: 'Featured on leaderboard + verified badge', included: true },
+      { text: 'Caption Battle × 5 vote weight + verified badge', included: true },
+      { text: 'Early Access: Video Editor (Dec 2026)', included: true },
     ],
   },
 ];
@@ -153,17 +157,41 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
     }).format(price);
   };
 
+  // Phase 1 highlight cards (defined here so JSX parser handles them cleanly)
+  const HIGHLIGHTS = [
+    { Icon: Flame,      label: 'Viral Forge',        sub: '14 outputs / URL', color: 'text-clip-amber', bg: 'bg-clip-amber/10' },
+    { Icon: TrendingUp, label: 'Topic Steal',        sub: 'Network trends',   color: 'text-green-600',  bg: 'bg-green-500/10' },
+    { Icon: Sparkles,   label: 'Competitor Lab',     sub: 'Head-to-head',     color: 'text-clip-cyan',  bg: 'bg-clip-cyan/10' },
+    { Icon: Crown,      label: 'Playlist Architect', sub: 'Sequence + ship',  color: 'text-purple-600', bg: 'bg-purple-500/10' },
+  ];
+
   return (
     <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-10">
           <h1 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-4">
-            The AI growth stack for <span className="gradient-text">gaming creators</span>
+            Paste a URL. Get <span className="gradient-text">14 viral strategies</span>.
           </h1>
           <p className="text-clip-muted text-lg max-w-2xl mx-auto">
-            Trend Radar, ViralForge, ClipBot coach, and Caption Battle — built for the games you actually play. Cancel anytime.
+            No uploads. No rendering. No storage. ClipAI streams any YouTube video to Gemini and returns
+            titles, hooks, captions, distribution packs, thumbnail concepts, and more — in seconds.
           </p>
+        </div>
+
+        {/* Phase 1 highlight strip */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-12">
+          {HIGHLIGHTS.map(h => (
+            <div key={h.label} className="card-glass p-3 flex items-center gap-2.5">
+              <div className={`w-8 h-8 rounded-lg ${h.bg} flex items-center justify-center flex-shrink-0`}>
+                <h.Icon className={`w-4 h-4 ${h.color}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-display font-medium text-clip-text text-xs truncate">{h.label}</p>
+                <p className="text-clip-muted text-[10px] truncate">{h.sub}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Annual Toggle */}
