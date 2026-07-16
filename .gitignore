@@ -28,3 +28,6 @@ Thumbs.db
 # Secrets
 *.pem
 *.key
+
+# Stray nested project folder (should never be committed)
+clipai/
