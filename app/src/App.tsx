@@ -201,7 +201,7 @@ function AppContentInner({
       case 'upload':      return <WaitlistPage user={user} onNavigate={navigateTo} />;
       case 'results':     return <WaitlistPage user={user} onNavigate={navigateTo} />;
       case 'pricing':     return <PricingPage user={user} onNavigate={navigateTo} isLoggedIn={isLoggedIn} />;
-      case 'settings':    return <SettingsPage user={user} onNavigate={navigateTo} />;
+      case 'settings':    return <SettingsPage user={user} onNavigate={navigateTo} onLogout={handleLogout} />;
       case 'terms':       return <TermsPage onNavigate={navigateTo} />;
       case 'privacy':     return <PrivacyPage onNavigate={navigateTo} />;
       case 'leaderboard': return <LeaderboardPage user={user} onNavigate={navigateTo} />;
@@ -298,7 +298,6 @@ function AppContentInner({
         onNavigate={navigateTo}
         isLoggedIn={isLoggedIn}
         user={user}
-        onLogout={handleLogout}
       />
       <main className="relative">{renderPage()}</main>
       {FOOTER_PAGES.includes(currentPage) && <Footer onNavigate={navigateTo} />}

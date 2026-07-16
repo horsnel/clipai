@@ -177,7 +177,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
   };
 
   return (
-    <div className="min-h-screen pt-20 flex flex-col">
+    <div className="min-h-screen pt-24 flex flex-col">
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 flex flex-col">
 
         {/* Header */}

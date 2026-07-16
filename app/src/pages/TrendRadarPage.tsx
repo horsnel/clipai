@@ -121,7 +121,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
     .slice(0, 3) ?? [];
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
+    <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
       <div className="max-w-6xl mx-auto">
 
         {/* Header */}

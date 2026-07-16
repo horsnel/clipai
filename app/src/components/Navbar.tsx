@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
-import { Menu, X, User, LogOut, Coins } from 'lucide-react';
+import { Menu, X, Coins } from 'lucide-react';
 import { Logo } from './Logo';
 
 interface NavbarProps {
@@ -9,10 +9,9 @@ interface NavbarProps {
   onNavigate: (page: Page, clips?: unknown[]) => void;
   isLoggedIn: boolean;
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number } | null;
-  onLogout: () => void;
 }
 
-export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: NavbarProps) {
+export function Navbar({ currentPage, onNavigate, isLoggedIn, user }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -65,7 +64,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
       }`}
     >
       <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12">
-        <div className="flex items-center justify-between h-16 lg:h-20">
+        <div className="flex items-center justify-between h-20 lg:h-24">
           {/* Logo */}
           <button
             onClick={() => onNavigate(isLoggedIn ? 'dashboard' : 'landing')}
@@ -110,28 +109,6 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
                   <span className={`text-xs font-bold tabular-nums ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`}>
                     {user?.credits ?? 0}
                   </span>
-                </button>
-
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-clip-surface rounded-lg border border-white/[0.06] min-w-0 max-w-[200px]">
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center flex-shrink-0">
-                    <User className="w-3.5 h-3.5 text-black" />
-                  </div>
-                  <span className="text-sm font-medium truncate">{user?.name}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${
-                    user?.plan === 'creator'
-                      ? 'bg-clip-amber text-black'
-                      : user?.plan === 'pro'
-                      ? 'bg-clip-cyan text-black'
-                      : 'bg-clip-surface text-clip-muted border border-white/[0.08]'
-                  }`}>
-                    {user?.plan.toUpperCase()}
-                  </span>
-                </div>
-                <button
-                  onClick={onLogout}
-                  className="p-2 text-clip-muted hover:text-clip-red hover:bg-clip-red/10 rounded-lg transition-all"
-                >
-                  <LogOut className="w-5 h-5" />
                 </button>
               </div>
             ) : (
@@ -183,36 +160,26 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user, onLogout }: 
             <div className="pt-2 border-t border-white/[0.06]">
               {isLoggedIn ? (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 px-4 py-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center">
-                      <User className="w-4 h-4 text-black" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{user?.name}</p>
-                      <p className="text-xs text-clip-muted truncate">{user?.email}</p>
-                    </div>
-                    {/* Credit chip on mobile */}
-                    <button
-                      onClick={() => handleNavClick('pricing')}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all flex-shrink-0 ${
-                        (user?.credits ?? 0) <= 5
-                          ? 'border-clip-amber/40 bg-clip-amber/10'
-                          : 'border-clip-cyan/30 bg-clip-cyan/10'
-                      }`}
-                      aria-label={`${user?.credits ?? 0} credits available`}
-                    >
-                      <Coins className={`w-3.5 h-3.5 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
-                      <span className={`text-xs font-bold tabular-nums ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`}>
-                        {user?.credits ?? 0}
-                      </span>
-                    </button>
-                  </div>
+                  {/* Credit chip on mobile */}
                   <button
-                    onClick={onLogout}
-                    className="w-full px-4 py-3 text-left text-sm font-medium text-clip-red hover:bg-clip-red/10 rounded-lg transition-all flex items-center gap-2"
+                    onClick={() => handleNavClick('pricing')}
+                    className={`w-full flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-lg border transition-all ${
+                      (user?.credits ?? 0) <= 5
+                        ? 'border-clip-amber/40 bg-clip-amber/10'
+                        : 'border-clip-cyan/30 bg-clip-cyan/10'
+                    }`}
+                    aria-label={`${user?.credits ?? 0} credits available`}
                   >
-                    <LogOut className="w-4 h-4" />
-                    Logout
+                    <Coins className={`w-3.5 h-3.5 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
+                    <span className={`text-xs font-bold tabular-nums ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`}>
+                      {user?.credits ?? 0} credits
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleNavClick('settings')}
+                    className="w-full px-4 py-3 text-left text-sm font-medium text-clip-text hover:bg-white/[0.05] rounded-lg transition-all"
+                  >
+                    Account Settings
                   </button>
                 </div>
               ) : (

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import { 
-  ChevronLeft, User, Crown, Gift, Bell, 
+  ChevronLeft, User, Crown, Gift, Bell, LogOut,
   Copy, Check, Sparkles, Zap, Crown as CrownIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,11 +15,12 @@ import {
 interface SettingsPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; referralCode?: string; credits?: number } | null;
   onNavigate: (page: Page, clips?: unknown[]) => void;
+  onLogout?: () => void;
 }
 
 type Tab = 'profile' | 'plan' | 'referrals' | 'notifications';
 
-export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
+export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<Tab>('profile');
   const [name, setName] = useState(user?.name || '');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -95,7 +96,7 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
+    <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -146,18 +147,32 @@ export function SettingsPage({ user, onNavigate }: SettingsPageProps) {
                   <p className="text-clip-muted text-xs truncate">{user?.email}</p>
                 </div>
               </div>
-              <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded font-medium ${
-                user?.plan === 'creator' 
-                  ? 'bg-clip-amber text-black' 
-                  : user?.plan === 'pro'
-                  ? 'bg-clip-cyan text-black'
-                  : 'bg-clip-surface text-clip-muted border border-white/[0.08]'
-              }`}>
-                {user?.plan === 'creator' && <CrownIcon className="w-3 h-3" />}
-                {user?.plan === 'pro' && <Sparkles className="w-3 h-3" />}
-                {user?.plan === 'free' && <Zap className="w-3 h-3" />}
-                {user?.plan?.toUpperCase()}
-              </span>
+              <div className="flex items-center gap-2 mb-4">
+                <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded font-medium ${
+                  user?.plan === 'creator' 
+                    ? 'bg-clip-amber text-black' 
+                    : user?.plan === 'pro'
+                    ? 'bg-clip-cyan text-black'
+                    : 'bg-clip-surface text-clip-muted border border-white/[0.08]'
+                }`}>
+                  {user?.plan === 'creator' && <CrownIcon className="w-3 h-3" />}
+                  {user?.plan === 'pro' && <Sparkles className="w-3 h-3" />}
+                  {user?.plan === 'free' && <Zap className="w-3 h-3" />}
+                  {user?.plan?.toUpperCase()}
+                </span>
+                <span className="text-xs text-clip-muted">
+                  {user?.credits ?? 0} credits
+                </span>
+              </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-clip-red hover:bg-clip-red/10 rounded-lg transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              )}
             </div>
           </div>
 

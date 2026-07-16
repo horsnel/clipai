@@ -140,7 +140,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
+    <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
       <div className="max-w-7xl mx-auto">
 
         {/* Welcome */}

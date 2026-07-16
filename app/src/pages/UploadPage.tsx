@@ -218,7 +218,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
   // ── Main UI ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
+    <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-10">
           <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text mb-3">
