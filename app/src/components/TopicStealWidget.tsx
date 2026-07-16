@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import {
-  Flame, TrendingUp, TrendingDown, Minus, RefreshCw,
+  Flame, TrendingUp, TrendingDown, Minus,
   Sparkles, ArrowRight, Clock, Users,
 } from 'lucide-react';
 import { getTopicSteal } from '@/services/api';
@@ -171,15 +171,7 @@ export function TopicStealWidget({
               </p>
             </div>
           </div>
-          <button
-            onClick={load}
-            disabled={state === 'loading'}
-            className="text-clip-muted hover:text-clip-cyan transition-colors p-2 -mr-2 -mt-2 disabled:opacity-50"
-            aria-label="Refresh topics"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${state === 'loading' ? 'animate-spin' : ''}`} />
-          </button>
+
         </div>
       )}
 

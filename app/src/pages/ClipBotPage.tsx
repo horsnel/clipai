@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Page } from '../App';
-import { ArrowUp, Bot, Zap, Sparkles, RefreshCw } from 'lucide-react';
+import { ArrowUp, Bot, Zap, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { getClipBotHistory, apiClient } from '@/services/api';
@@ -170,12 +170,6 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
     }
   };
 
-  const resetChat = () => {
-    setMessages([WELCOME_MSG]);
-    setMsgCount(0);
-    inputRef.current?.focus();
-  };
-
   return (
     <div className="min-h-screen pt-24 flex flex-col">
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 flex flex-col">
@@ -194,14 +188,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={resetChat}
-              className="p-2 text-clip-muted hover:text-clip-text hover:bg-clip-surface rounded-lg transition-all"
-              title="Reset chat"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
+
         </div>
 
         {/* Messages — Gemini-style: user = minimal pill, AI = no bubble */}
@@ -288,7 +275,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
                 className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.04] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:shadow-[0_0_20px_rgba(0, 194, 214, 0.35)] enabled:hover:scale-105 enabled:active:scale-95"
               >
                 {isTyping ? (
-                  <RefreshCw className="w-[18px] h-[18px] animate-spin" />
+                  <Loader2 className="w-[18px] h-[18px] animate-spin" />
                 ) : (
                   <ArrowUp className="w-[18px] h-[18px]" strokeWidth={2.5} />
                 )}

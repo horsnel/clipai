@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
 import {
-  TrendingUp, Flame, Hash, Music, RefreshCw,
+  TrendingUp, Flame, Hash, Music,
   ChevronUp, ChevronDown, Minus, Zap, Globe, Clock, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -146,14 +146,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
                 {lastRefresh.toLocaleTimeString()}
               </span>
             )}
-            <button
-              onClick={fetchTrends}
-              disabled={isLoading}
-              className="btn-secondary flex items-center gap-2 text-sm px-4 py-2"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+
           </div>
         </div>
 

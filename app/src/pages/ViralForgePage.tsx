@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
-import { Zap, Copy, ThumbsUp, RefreshCw,
+import { Zap, Copy, ThumbsUp, Loader2,
   Hash, Type, Sparkles, ChevronRight, CheckCheck,
   TrendingUp, Flame, Trophy, Crown, Youtube, ListOrdered,
   Music, MessageSquare, Ghost,
@@ -79,19 +79,15 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
   const [topCaptions, setTopCaptions] = useState<Array<{
     caption: string; net_votes: number; game?: string; vibe?: string;
   }>>([]);
-  const [topLoading, setTopLoading]   = useState(false);
   const [votedSet, setVotedSet]       = useState<Set<string>>(new Set());
 
   const fetchTopCaptions = useCallback(async () => {
-    setTopLoading(true);
     try {
       const data = await getTopCaptions();
       setTopCaptions(data.captions ?? []);
     } catch {
       // Silent fail — battle board is supplementary
       setTopCaptions([]);
-    } finally {
-      setTopLoading(false);
     }
   }, []);
 
@@ -355,7 +351,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                   <button onClick={runAnalysis} disabled={analysisLoading || !ytUrl.trim()}
                     className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
                     {analysisLoading
-                      ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analyzing transcript…</>
+                      ? <><Loader2 className="w-4 h-4 animate-spin" /> Analyzing transcript…</>
                       : <><Sparkles className="w-4 h-4" /> Run Deep Analysis (5 credits)</>
                     }
                   </button>
@@ -419,7 +415,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                 <button onClick={handleGenerate} disabled={isLoading || !clipDesc.trim()}
                   className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
                   {isLoading
-                    ? <><RefreshCw className="w-4 h-4 animate-spin" /> Generating…</>
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
                     : <><Zap className="w-4 h-4" /> Generate</>
                   }
                 </button>
@@ -683,14 +679,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                 Top Voted This Week
               </h2>
             </div>
-            <button
-              onClick={fetchTopCaptions}
-              disabled={topLoading}
-              className="text-clip-muted hover:text-clip-cyan text-xs flex items-center gap-1.5 transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${topLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
+
           </div>
 
           {topCaptions.length === 0 ? (

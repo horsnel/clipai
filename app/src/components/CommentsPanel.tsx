@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import {
-  Youtube, Loader2, Copy, Check, MessageSquare, AlertTriangle,
+  Youtube, Copy, Check, MessageSquare, AlertTriangle,
   ThumbsUp, ThumbsDown, HelpCircle, Flame, Ban, Pin,
-  RefreshCw, Sparkles,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { analyseComments } from '@/services/api';
@@ -75,7 +75,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
         <p className="font-display font-medium text-clip-text mb-1">Couldn't predict comments</p>
         <p className="text-clip-muted text-sm mb-4 max-w-md mx-auto">{error}</p>
         <button onClick={() => { setError(null); }} className="btn-primary text-sm px-4 py-2 inline-flex items-center gap-2">
-          <RefreshCw className="w-4 h-4" /> Try again
+          Try again
         </button>
       </div>
     );
@@ -287,7 +287,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
         title="Likely Spam"
         accent="text-clip-muted"
         items={r.spam || []}
-        render={(it, i) => (
+        render={(it) => (
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-sm text-clip-muted italic">"{it.comment}"</p>
@@ -304,7 +304,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
       <div className="flex items-center justify-between gap-3">
         <button onClick={() => { setResult(null); setUrl(''); }}
           className="text-clip-muted hover:text-clip-cyan text-xs flex items-center gap-1.5 transition-colors">
-          <RefreshCw className="w-3.5 h-3.5" /> Predict for another video
+          Predict for another video
         </button>
         <span className="text-clip-muted text-xs">{result.credits_remaining} credits left</span>
       </div>

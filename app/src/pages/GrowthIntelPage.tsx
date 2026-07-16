@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Page } from '../App';
 import {
   Search, Clock, BarChart2, Zap, TrendingUp,
-  Eye, RefreshCw, AlertCircle, CheckCircle, Trophy,
+  Eye, Loader2, AlertCircle, CheckCircle, Trophy,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/services/api';
@@ -176,7 +176,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
               </div>
               <button onClick={runSpy} disabled={spyLoading || !channelUrl.trim()}
                 className="btn-primary flex items-center gap-2 disabled:opacity-50">
-                {spyLoading ? <><RefreshCw className="w-4 h-4 animate-spin" /> Analysing…</> : <><Search className="w-4 h-4" /> Spy on Channel</>}
+                {spyLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analysing…</> : <><Search className="w-4 h-4" /> Spy on Channel</>}
               </button>
             </div>
 
@@ -273,7 +273,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
               </div>
               <button onClick={runTiming} disabled={timingLoading}
                 className="btn-primary flex items-center gap-2 disabled:opacity-50">
-                {timingLoading ? <><RefreshCw className="w-4 h-4 animate-spin" /> Calculating…</> : <><Clock className="w-4 h-4" /> Get Best Times</>}
+                {timingLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Calculating…</> : <><Clock className="w-4 h-4" /> Get Best Times</>}
               </button>
             </div>
 
@@ -349,7 +349,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
               </div>
               <button onClick={runAB} disabled={abLoading || !titleA.trim() || !titleB.trim()}
                 className="btn-primary flex items-center gap-2 disabled:opacity-50">
-                {abLoading ? <><RefreshCw className="w-4 h-4 animate-spin" /> Predicting…</> : <><Zap className="w-4 h-4" /> Predict Winner</>}
+                {abLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Predicting…</> : <><Zap className="w-4 h-4" /> Predict Winner</>}
               </button>
             </div>
 

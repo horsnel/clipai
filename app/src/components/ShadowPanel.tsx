@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-  Youtube, Loader2, Copy, Check, Ghost, AlertTriangle, Eye,
-  Mic, Volume2, RefreshCw, Sparkles, FileText, Film,
+  Youtube, Copy, Check, Ghost, AlertTriangle,
+  Mic, Sparkles, FileText, Film,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { analyseShadow } from '@/services/api';
@@ -76,7 +76,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
         <p className="font-display font-medium text-clip-text mb-1">Couldn't generate shadow script</p>
         <p className="text-clip-muted text-sm mb-4 max-w-md mx-auto">{error}</p>
         <button onClick={() => { setError(null); }} className="btn-primary text-sm px-4 py-2 inline-flex items-center gap-2">
-          <RefreshCw className="w-4 h-4" /> Try again
+          Try again
         </button>
       </div>
     );
@@ -244,7 +244,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
       <div className="flex items-center justify-between gap-3">
         <button onClick={() => { setResult(null); setUrl(''); }}
           className="text-clip-muted hover:text-clip-cyan text-xs flex items-center gap-1.5 transition-colors">
-          <RefreshCw className="w-3.5 h-3.5" /> Shadow another video
+          Shadow another video
         </button>
         <span className="text-clip-muted text-xs">{result.credits_remaining} credits left</span>
       </div>

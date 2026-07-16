@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import {
-  Clock, Play, ChevronRight, RefreshCw, Flame, ExternalLink, Sparkles,
+  Clock, Play, ChevronRight, Flame, ExternalLink, Sparkles,
 } from 'lucide-react';
 import { listAnalyses } from '@/services/api';
 import type { AnalysisSummary } from '../types';
@@ -115,15 +115,7 @@ export function RecentAnalysesWidget({
             </p>
           </div>
         </div>
-        <button
-          onClick={load}
-          disabled={state === 'loading'}
-          className="text-clip-muted hover:text-clip-cyan transition-colors p-2 -mr-2 -mt-2 disabled:opacity-50"
-          aria-label="Refresh"
-          title="Refresh"
-        >
-          <RefreshCw className={`w-4 h-4 ${state === 'loading' ? 'animate-spin' : ''}`} />
-        </button>
+
       </div>
 
       {/* Body */}
