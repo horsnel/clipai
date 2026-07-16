@@ -195,13 +195,10 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {user?.plan === 'free' && (
-              <span className="text-xs text-clip-muted">
-                {FREE_LIMIT - msgCount} msgs left
-              </span>
-            )}
             <button onClick={resetChat}
-              className="p-2 text-clip-muted hover:text-clip-text hover:bg-clip-surface rounded-lg transition-all">
+              className="p-2 text-clip-muted hover:text-clip-text hover:bg-clip-surface rounded-lg transition-all"
+              title="Reset chat"
+            >
               <RefreshCw className="w-4 h-4" />
             </button>
           </div>

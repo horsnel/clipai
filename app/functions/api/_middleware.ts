@@ -2288,42 +2288,216 @@ async function fetchYouTubeMeta(videoId: string): Promise<{
 }
 
 /**
- * Fetch the YouTube transcript via the timedtext API.
- * Returns an array of {t, text} segments. Empty array if unavailable.
+ * Fetch the YouTube transcript by scraping the watch page.
  *
- * NOTE: This is the same approach used by `youtube-transcript-api` (Python).
- * It calls https://www.youtube.com/api/timedtext?lang=en&v=VIDEO_ID and parses
- * the XML response. Some videos have no captions — that's OK, we still generate
- * a (limited) analysis based on title + description.
+ * The legacy `timedtext?lang=en&v=` endpoint was deprecated by YouTube — captions
+ * now require a signed `baseUrl` that is only available inside the watch page's
+ * `ytInitialPlayerResponse` JSON. This function:
+ *
+ *   1. Fetches https://www.youtube.com/watch?v=VIDEO_ID with a browser UA
+ *   2. Extracts the `ytInitialPlayerResponse` JSON blob from the inline <script>
+ *   3. Walks `captions.playerCaptionsTracklistRenderer.captionTracks`
+ *   4. Picks the best track (English manual > English ASR > first track)
+ *   5. Fetches the track's `baseUrl` (with `&fmt=json3` for JSON format)
+ *   6. Parses the JSON3 events into `{t, text}` segments
+ *
+ * Returns null if the video has no captions at all (manual or auto-generated).
  */
 async function fetchYouTubeTranscript(videoId: string): Promise<{
   segments: { t: number; text: string }[];
   wordCount: number;
+  source: 'manual' | 'asr' | null;
 } | null> {
-  // Try a few language codes in priority order
-  for (const lang of ['en', 'en-US', 'en-GB']) {
-    try {
-      const url = `https://www.youtube.com/api/timedtext?lang=${lang}&v=${videoId}`;
-      const r = await fetch(url, { cf: { cacheTtl: 86400, cacheEverything: true } });
-      if (!r.ok) continue;
-      const xml = await r.text();
-      if (!xml || !xml.includes('<text')) continue;
-      // Parse the simple XML: <text start="0.48" dur="3.12">Hello world</text>
-      const segments: { t: number; text: string }[] = [];
-      const re = /<text\s+start="([\d.]+)"(?:\s+dur="[\d.]+")?[^>]*>([^<]*)<\/text>/g;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(xml)) !== null) {
-        const t = parseFloat(m[1]);
-        const text = decodeURIComponent(m[2].replace(/\+/g, ' '))
-          .replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-        if (text.trim()) segments.push({ t, text: text.trim() });
-      }
-      if (segments.length === 0) continue;
-      const wordCount = segments.reduce((n, s) => n + s.text.split(/\s+/).length, 0);
-      return { segments, wordCount };
-    } catch { continue; }
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+  // ─── Step 1: fetch the watch page ─────────────────────────────────────────
+  let watchHtml: string;
+  try {
+    const r = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=en`, {
+      headers: {
+        'User-Agent': UA,
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      cf: { cacheTtl: 3600, cacheEverything: true },
+    });
+    if (!r.ok) return null;
+    watchHtml = await r.text();
+  } catch { return null; }
+
+  // ─── Step 2: extract ytInitialPlayerResponse ──────────────────────────────
+  // YouTube inlines this as: var ytInitialPlayerResponse = {...};
+  // The JSON is huge (often 200KB+), so we use a brace-balanced extractor
+  // rather than a non-greedy regex (which would stop at the first inner '}').
+  const marker = 'ytInitialPlayerResponse = ';
+  const markerIdx = watchHtml.indexOf(marker);
+  if (markerIdx === -1) return null;
+  const jsonStart = markerIdx + marker.length;
+  if (watchHtml[jsonStart] !== '{') return null;
+  let depth = 0;
+  let inStr = false;
+  let escape = false;
+  let jsonEnd = -1;
+  for (let i = jsonStart; i < watchHtml.length; i++) {
+    const ch = watchHtml[i];
+    if (inStr) {
+      if (escape) { escape = false; continue; }
+      if (ch === '\\') { escape = true; continue; }
+      if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { jsonEnd = i + 1; break; }
+    }
   }
-  return null;
+  if (jsonEnd === -1) return null;
+  let playerResponse: any;
+  try { playerResponse = JSON.parse(watchHtml.slice(jsonStart, jsonEnd)); } catch { return null; }
+
+  // ─── Step 3: find caption tracks ──────────────────────────────────────────
+  const tracks: any[] = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+  if (!tracks || tracks.length === 0) return null;
+
+  // Step 4: pick best track — English manual first, then English ASR, then any
+  const score = (t: any): number => {
+    const lang = (t.languageCode || '').toLowerCase();
+    const isAsr = t.kind === 'asr';
+    if (lang === 'en' && !isAsr) return 100;
+    if (lang.startsWith('en') && !isAsr) return 90;
+    if (lang === 'en' && isAsr) return 70;
+    if (lang.startsWith('en') && isAsr) return 60;
+    if (!isAsr) return 30;
+    return 10;
+  };
+  const best = [...tracks].sort((a, b) => score(b) - score(a))[0];
+  const isAsr = best.kind === 'asr';
+
+  // ─── Step 5: fetch the caption track as JSON3 ─────────────────────────────
+  const baseUrl = (best.baseUrl || '').replace(/\\u0026/g, '&') + '&fmt=json3';
+  if (!baseUrl) return null;
+
+  let captionJson: any;
+  try {
+    const cr = await fetch(baseUrl, {
+      headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
+      cf: { cacheTtl: 86400, cacheEverything: true },
+    });
+    if (!cr.ok) return null;
+    captionJson = await cr.json() as any;
+  } catch { return null; }
+
+  // ─── Step 6: parse JSON3 events into {t, text} segments ───────────────────
+  // JSON3 format: { events: [{ tStartMs: 1234, segs: [{ utf8: "Hello" }] }, ...] }
+  const events: any[] = captionJson?.events ?? [];
+  const segments: { t: number; text: string }[] = [];
+  for (const ev of events) {
+    if (typeof ev.tStartMs !== 'number') continue;
+    const segs: any[] = ev.segs ?? [];
+    const text = segs.map((s: any) => s.utf8 || '').join('').trim();
+    if (!text) continue;
+    // Clean up repeated whitespace and HTML entities
+    const cleaned = text
+      .replace(/\s+/g, ' ')
+      .replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/\n/g, ' ')
+      .trim();
+    if (cleaned) segments.push({ t: ev.tStartMs / 1000, text: cleaned });
+  }
+  if (segments.length === 0) return null;
+  const wordCount = segments.reduce((n, s) => n + s.text.split(/\s+/).length, 0);
+  return { segments, wordCount, source: isAsr ? 'asr' : 'manual' };
+}
+
+/**
+ * Fallback: fetch the video description from the watch page meta tags.
+ * Used when no transcript is available — we feed title + description to the
+ * LLM as a "synthetic transcript" so the user still gets a (limited) analysis
+ * rather than a hard error.
+ */
+async function fetchYouTubeDescription(videoId: string): Promise<string | null> {
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+  try {
+    const r = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=en`, {
+      headers: {
+        'User-Agent': UA,
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      cf: { cacheTtl: 3600, cacheEverything: true },
+    });
+    if (!r.ok) return null;
+    const html = await r.text();
+    // Try og:description meta tag first
+    const ogMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/);
+    if (ogMatch && ogMatch[1]) return decodeHtmlEntities(ogMatch[1]);
+    // Fallback to description meta tag
+    const descMatch = html.match(/<meta\s+name="description"\s+content="([^"]+)"/);
+    if (descMatch && descMatch[1]) return decodeHtmlEntities(descMatch[1]);
+    return null;
+  } catch { return null; }
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ');
+}
+
+/**
+ * Build a synthetic transcript from title + description when no real captions
+ * exist. Returns a single segment starting at t=0 so downstream code keeps
+ * working. The LLM is told the source is the description, not a transcript.
+ */
+function buildSyntheticTranscript(title: string, description: string | null): {
+  segments: { t: number; text: string }[];
+  wordCount: number;
+  source: 'description';
+} {
+  const text = description
+    ? `${title}. ${description}`
+    : title;
+  return {
+    segments: [{ t: 0, text }],
+    wordCount: text.split(/\s+/).length,
+    source: 'description',
+  };
+}
+
+/**
+ * Get a usable transcript for a video — fetching real captions if available,
+ * falling back to title+description if not. Returns the segments, source type,
+ * and metadata so callers can pass the source hint to the LLM.
+ *
+ * Used by compare / playlist / audio-trend / comments / shadow endpoints so
+ * they don't hard-fail on videos without captions.
+ */
+async function getTranscriptOrFallback(
+  videoId: string,
+  meta: { title: string; author: string },
+): Promise<{
+  segments: { t: number; text: string }[];
+  wordCount: number;
+  source: 'manual' | 'asr' | 'description';
+}> {
+  const real = await fetchYouTubeTranscript(videoId);
+  if (real && real.segments.length > 0) {
+    return {
+      segments: real.segments,
+      wordCount: real.wordCount,
+      source: real.source === 'asr' ? 'asr' : 'manual',
+    };
+  }
+  const description = await fetchYouTubeDescription(videoId);
+  const synth = buildSyntheticTranscript(meta.title, description);
+  return synth;
 }
 
 // ─── The unified analysis prompt ─────────────────────────────────────────────
@@ -2343,7 +2517,12 @@ You understand:
 
 ALWAYS return a single valid JSON object. No prose, no code fences, no commentary.`;
 
-function buildAnalysisPrompt(meta: { title: string; author: string }, transcript: { t: number; text: string }[], gameHint?: string): string {
+function buildAnalysisPrompt(
+  meta: { title: string; author: string },
+  transcript: { t: number; text: string }[],
+  gameHint?: string,
+  source?: 'manual' | 'asr' | 'description',
+): string {
   // Compact transcript: join segments with timestamps, cap at ~12K chars to leave room
   const transcriptText = transcript
     .map(s => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`)
@@ -2352,11 +2531,18 @@ function buildAnalysisPrompt(meta: { title: string; author: string }, transcript
 
   const gameLine = gameHint ? `Likely game: ${gameHint}` : 'Game: infer from transcript content';
 
+  const sourceNote = source === 'description'
+    ? `\nNOTE: This video has no captions available. The "transcript" below is the video title + description only. Generate the analysis based on this limited information — leave timestamp-specific fields (sentiment_arc, goldilocks_map, sponsorship_spots) as empty arrays/objects since you cannot infer timestamps. Still produce hook_rewrites, title_variants, distribution_pack, etc. based on the title and description.`
+    : source === 'asr'
+      ? `\nNOTE: This transcript was auto-generated by YouTube's ASR engine — expect minor transcription errors. Treat the content as accurate but the wording as approximate.`
+      : '';
+
   return `Analyze this YouTube video and return a complete viral strategy deck as JSON.
 
 VIDEO TITLE: ${meta.title}
 CHANNEL: ${meta.author}
 ${gameLine}
+${sourceNote}
 
 TRANSCRIPT (with timestamps):
 ${transcriptText}
@@ -2479,13 +2665,19 @@ app.post('/analyse/youtube', requireAuth, requireCredits(5), async (c) => {
     return json({ error: 'Could not fetch video metadata. The video may be private or age-restricted.' }, 422);
   }
 
-  // 2. Fetch transcript
-  const transcript = await fetchYouTubeTranscript(videoId);
-  if (!transcript || transcript.segments.length === 0) {
-    return json({
-      error: 'This video has no English captions/transcript available. Try a video with closed captions enabled.',
-      video_title: meta.title,
-    }, 422);
+  // 2. Fetch transcript (with description-based fallback so users still get
+  //    a limited analysis instead of a hard error for videos with no captions)
+  let transcript = await fetchYouTubeTranscript(videoId);
+  let transcriptSource: 'manual' | 'asr' | 'description' = 'description';
+  if (transcript && transcript.segments.length > 0) {
+    transcriptSource = transcript.source === 'asr' ? 'asr' : 'manual';
+  } else {
+    // Fallback: use title + description as a synthetic 1-segment transcript.
+    // The LLM is told the source so it knows to be more conservative with
+    // pacing/sentiment claims that require timestamps.
+    const description = await fetchYouTubeDescription(videoId);
+    const synth = buildSyntheticTranscript(meta.title, description);
+    transcript = { segments: synth.segments, wordCount: synth.wordCount, source: 'description' };
   }
 
   // 3. Call LLM with the unified prompt
@@ -2493,7 +2685,7 @@ app.post('/analyse/youtube', requireAuth, requireCredits(5), async (c) => {
   try {
     analysisJson = await llmJson(
       env,
-      buildAnalysisPrompt(meta, transcript.segments, gameHint),
+      buildAnalysisPrompt(meta, transcript.segments, gameHint, transcriptSource),
       ANALYSIS_SYSTEM_PROMPT,
       8000,
     );
@@ -2785,9 +2977,8 @@ app.post('/analyse/compare', requireAuth, requirePlan('pro', 'creator'), require
     // Fetch fresh
     const meta = await fetchYouTubeMeta(id);
     if (!meta) throw new Error(`Could not fetch metadata for video ${id}`);
-    const tr = await fetchYouTubeTranscript(id);
-    if (!tr || tr.segments.length === 0) throw new Error(`Video ${id} has no English transcript`);
-    const analysisJson = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    const tr = await getTranscriptOrFallback(id, meta);
+    const analysisJson = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     return {
       cached: false,
       analysis: analysisJson,
@@ -2918,9 +3109,8 @@ app.post('/playlist/sequence', requireAuth, requirePlan('pro', 'creator'), requi
     // Fresh
     const meta = await fetchYouTubeMeta(id);
     if (!meta) throw new Error(`Could not fetch metadata for ${id}`);
-    const tr = await fetchYouTubeTranscript(id);
-    if (!tr || tr.segments.length === 0) throw new Error(`Video ${id} has no English transcript`);
-    const analysisJson = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    const tr = await getTranscriptOrFallback(id, meta);
+    const analysisJson = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     return { title: meta.title, author: meta.author, analysis: analysisJson };
   };
 
@@ -3052,9 +3242,8 @@ app.post('/analyse/audio-trend', requireAuth, requireCredits(3), async (c) => {
     // Fetch fresh
     const meta = await fetchYouTubeMeta(videoId);
     if (!meta) return json({ error: 'Could not fetch video metadata' }, 422);
-    const tr = await fetchYouTubeTranscript(videoId);
-    if (!tr || tr.segments.length === 0) return json({ error: 'This video has no English transcript available' }, 422);
-    analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    const tr = await getTranscriptOrFallback(videoId, meta);
+    analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     title = meta.title;
     author = meta.author;
     transcriptText = tr.segments.map(s => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
@@ -3172,9 +3361,8 @@ app.post('/analyse/comments', requireAuth, requireCredits(2), async (c) => {
   } else {
     const meta = await fetchYouTubeMeta(videoId);
     if (!meta) return json({ error: 'Could not fetch video metadata' }, 422);
-    const tr = await fetchYouTubeTranscript(videoId);
-    if (!tr || tr.segments.length === 0) return json({ error: 'This video has no English transcript available' }, 422);
-    analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    const tr = await getTranscriptOrFallback(videoId, meta);
+    analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     title = meta.title;
     author = meta.author;
     transcriptText = tr.segments.map(s => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
@@ -3296,9 +3484,8 @@ app.post('/analyse/shadow', requireAuth, requireCredits(4), async (c) => {
   } else {
     const meta = await fetchYouTubeMeta(videoId);
     if (!meta) return json({ error: 'Could not fetch video metadata' }, 422);
-    const tr = await fetchYouTubeTranscript(videoId);
-    if (!tr || tr.segments.length === 0) return json({ error: 'This video has no English transcript available' }, 422);
-    analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    const tr = await getTranscriptOrFallback(videoId, meta);
+    analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     title = meta.title;
     author = meta.author;
     transcriptText = tr.segments.map(s => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
