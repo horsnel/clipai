@@ -160,16 +160,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
               </button>
             ))}
             <div className="pt-2 border-t border-white/[0.03]">
-              {isLoggedIn ? (
-                <div className="space-y-2">
-                  <button
-                    onClick={() => handleNavClick('settings')}
-                    className="w-full px-4 py-3 text-left text-sm font-medium text-clip-text hover:bg-white/[0.03] rounded-lg transition-all"
-                  >
-                    Account Settings
-                  </button>
-                </div>
-              ) : (
+              {isLoggedIn ? null : (
                 <div className="space-y-2">
                   <button
                     onClick={() => handleNavClick('auth')}
