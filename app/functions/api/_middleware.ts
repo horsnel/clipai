@@ -62,6 +62,10 @@ interface Env {
   YOUTUBE_API_KEY: string;
   REDDIT_USER_AGENT: string;
   SERPER_API_KEY: string;   // serper.dev — powers TikTok/X site-search + Google Trends news layer
+  // Channel audit — platform scrapers (all optional, all free-tier)
+  LAMATOK_API_KEY?: string;       // RapidAPI — TikTok user info + videos (100 free req)
+  KONBINI_API_KEY?: string;       // RapidAPI — Instagram user info + media (100 free req)
+  SOCIALDATA_API_KEY?: string;    // socialdata.tools — X/Twitter profile (paid, ~$0.0007/lookup)
   // Paystack
   PAYSTACK_SECRET_KEY: string;
   // Worker
@@ -743,6 +747,11 @@ app.get('/health', async (c) => {
 
   // Serper (just check key presence — actual ping costs quota)
   checks.serper = { status: env.SERPER_API_KEY ? 'ok' : 'unbound' };
+
+  // Channel audit scrapers (all optional)
+  checks.lamatok = { status: env.LAMATOK_API_KEY ? 'ok' : 'unbound', detail: env.LAMATOK_API_KEY ? 'TikTok audits enabled' : 'TikTok audits are lite (Serper fallback)' };
+  checks.konbini = { status: env.KONBINI_API_KEY ? 'ok' : 'unbound', detail: env.KONBINI_API_KEY ? 'Instagram audits enabled' : 'Instagram audits are lite (Serper fallback)' };
+  checks.socialdata = { status: env.SOCIALDATA_API_KEY ? 'ok' : 'unbound', detail: env.SOCIALDATA_API_KEY ? 'X audits enabled' : 'X audits are lite (Serper fallback)' };
 
   // Paystack
   checks.paystack = { status: env.PAYSTACK_SECRET_KEY ? 'ok' : 'unbound' };
@@ -1751,7 +1760,7 @@ async function serpInstagram(env: Env, game: string, limit = 4): Promise<any[]> 
 // object. YouTube has a real Data API (subscribers, total views, recent uploads
 // with per-video view counts). TikTok/X/IG don't expose public APIs, so we fall
 // back to Serper to surface recent posts only (no follower counts).
-type AuditPlatform = 'youtube' | 'tiktok' | 'twitter' | 'instagram';
+type AuditPlatform = 'youtube' | 'tiktok' | 'twitter' | 'instagram' | 'reddit';
 
 function detectPlatform(url: string): AuditPlatform | null {
   const u = (url || '').toLowerCase();
@@ -1759,6 +1768,7 @@ function detectPlatform(url: string): AuditPlatform | null {
   if (u.includes('tiktok.com')) return 'tiktok';
   if (u.includes('instagram.com')) return 'instagram';
   if (u.includes('x.com') || u.includes('twitter.com')) return 'twitter';
+  if (u.includes('reddit.com') || u.includes('redd.it')) return 'reddit';
   return null;
 }
 
@@ -1909,11 +1919,86 @@ async function auditYouTubeChannel(env: Env, raw: string): Promise<any> {
   };
 }
 
-/** Lite audit for TikTok — Serper surfaces recent posts but no follower count. */
+/** TikTok audit — uses LamaTok (RapidAPI) for real follower counts + recent videos with views/likes.
+ *  Falls back to Serper (search-only, no follower count) when LAMATOK_API_KEY is not set.
+ *  Sign up free at: https://rapidapi.com/LamaTok/api/lamatok (100 free requests). */
 async function auditTikTokProfile(env: Env, url: string): Promise<any> {
-  if (!env.SERPER_API_KEY) return { error: 'Serper API key not configured', platform: 'tiktok' };
-  const m = url.match(/tiktok\.com\/@([A-Za-z0-9_.]+)/);
-  const username = m ? '@' + m[1] : '';
+  const m = url.match(/tiktok\.com\/@?([A-Za-z0-9_.]+)/);
+  const rawUsername = m ? m[1] : '';
+  const username = rawUsername.replace(/^@/, '');
+  const handle = username ? '@' + username : '';
+
+  // ── LamaTok (real audit) ────────────────────────────────────────────────────
+  if (env.LAMATOK_API_KEY) {
+    try {
+      const userRes = await fetch(`https://lamatok.p.rapidapi.com/user/${encodeURIComponent(username)}`, {
+        headers: {
+          'X-RapidAPI-Key': env.LAMATOK_API_KEY,
+          'X-RapidAPI-Host': 'lamatok.p.rapidapi.com',
+        },
+      });
+      if (userRes.ok) {
+        const userJson = await userRes.json() as any;
+        const u = userJson?.user || userJson?.data?.user || userJson?.data || userJson || {};
+        const channelName = u.nickname || u.unique_id || u.display_name || username || 'TikTok creator';
+        const avatar = u.avatar || u.avatar_larger || u.avatar_medium || '';
+        const description = u.signature || u.bio || '';
+        const subscribers = Number(u.follower_count || u.followers || u.fans || 0);
+        const following = Number(u.following_count || u.followings || 0);
+        const totalLikes = Number(u.total_favorited || u.total_likes || 0);
+        const videoCount = Number(u.aweme_count || u.video_count || u.videos || 0);
+
+        // Fetch recent videos
+        let recentVideos: any[] = [];
+        try {
+          const vidsRes = await fetch(`https://lamatok.p.rapidapi.com/user/${encodeURIComponent(username)}/videos?count=10`, {
+            headers: {
+              'X-RapidAPI-Key': env.LAMATOK_API_KEY,
+              'X-RapidAPI-Host': 'lamatok.p.rapidapi.com',
+            },
+          });
+          if (vidsRes.ok) {
+            const vidsJson = await vidsRes.json() as any;
+            const vids = vidsJson?.videos || vidsJson?.data?.videos || vidsJson?.data || vidsJson?.aweme_list || [];
+            recentVideos = (Array.isArray(vids) ? vids : []).slice(0, 10).map((v: any, i: number) => ({
+              id: v.id || v.aweme_id || `tt_audit_${i}`,
+              title: v.desc || v.title || v.caption || `TikTok post ${i + 1}`,
+              thumbnail: v.video?.cover?.url_list?.[0] || v.video?.origin_cover?.url_list?.[0] || v.cover?.url_list?.[0] || '',
+              url: v.share_url || v.video?.share_url || (v.id ? `https://www.tiktok.com/${handle}/video/${v.id}` : ''),
+              publishedAt: v.create_time ? new Date(v.create_time * 1000).toISOString() : '',
+              viewCount: Number(v.stats?.play_count || v.play_count || 0),
+              likeCount: Number(v.stats?.digg_count || v.digg_count || 0),
+              commentCount: Number(v.stats?.comment_count || v.comment_count || 0),
+            }));
+          }
+        } catch {}
+
+        const totalRecentViews = recentVideos.reduce((s: number, v: any) => s + (v.viewCount || 0), 0);
+        const totalRecentLikes = recentVideos.reduce((s: number, v: any) => s + (v.likeCount || 0), 0);
+        const avgRecentViews = recentVideos.length ? Math.round(totalRecentViews / recentVideos.length) : 0;
+        const avgEngagementRate = totalRecentViews > 0 ? (totalRecentLikes / totalRecentViews) * 100 : 0;
+
+        return {
+          platform: 'tiktok',
+          channelId: u.id || u.uid || u.open_id || '',
+          channelName,
+          channelHandle: u.unique_id ? '@' + u.unique_id : handle,
+          description,
+          avatar,
+          banner: u.background_image?.url_list?.[0] || '',
+          country: u.region || '',
+          publishedAt: '',
+          statistics: { subscribers, totalViews: totalLikes, videoCount, hiddenSubscriberCount: false },
+          recentVideos,
+          metrics: { avgRecentViews, totalRecentViews, avgEngagementRate, recentVideoCount: recentVideos.length },
+          auditedAt: new Date().toISOString(),
+        };
+      }
+    } catch {}
+  }
+
+  // ── Serper fallback (lite — no follower count, posts only) ───────────────────
+  if (!env.SERPER_API_KEY) return { error: 'Set LAMATOK_API_KEY (RapidAPI) for full TikTok audits. Serper fallback also requires SERPER_API_KEY.', platform: 'tiktok' };
   const q = username ? `site:tiktok.com ${username}` : `site:tiktok.com ${url.split('/').pop() || ''}`;
   const raw = await serperSearch(env, q, 8);
   const recentVideos = raw.slice(0, 6).map((v: any, i: number) => ({
@@ -1928,21 +2013,104 @@ async function auditTikTokProfile(env: Env, url: string): Promise<any> {
     platform: 'tiktok',
     channelId: '',
     channelName: username || 'TikTok creator',
-    channelHandle: username,
+    channelHandle: handle,
     description: '',
     avatar: '', banner: '', country: '', publishedAt: '',
     statistics: { subscribers: 0, totalViews: 0, videoCount: recentVideos.length, hiddenSubscriberCount: true },
     recentVideos,
     metrics: { avgRecentViews: 0, totalRecentViews: 0, avgEngagementRate: 0, recentVideoCount: recentVideos.length },
     auditedAt: new Date().toISOString(),
-    note: 'TikTok does not expose public follower counts. Showing recent posts from search.',
+    note: 'Lite audit — set LAMATOK_API_KEY (RapidAPI, free tier) to see follower counts, recent video views, and engagement rates.',
   };
 }
 
+/** Instagram audit — uses KonbiniAPI (RapidAPI) for real follower counts + recent media with likes/comments.
+ *  Falls back to Serper (search-only, no follower count) when KONBINI_API_KEY is not set.
+ *  Sign up free at: https://rapidapi.com/berkulerkan/api/konbiniapi (100 free requests). */
 async function auditInstagramProfile(env: Env, url: string): Promise<any> {
-  if (!env.SERPER_API_KEY) return { error: 'Serper API key not configured', platform: 'instagram' };
   const m = url.match(/instagram\.com\/([A-Za-z0-9_.]+)/);
-  const username = m ? m[1] : '';
+  const username = (m ? m[1] : '').replace(/^@/, '');
+  const handle = username ? '@' + username : '';
+
+  // ── KonbiniAPI (real audit) ──────────────────────────────────────────────────
+  if (env.KONBINI_API_KEY && username) {
+    try {
+      const userRes = await fetch(`https://konbiniapi.p.rapidapi.com/api/v1/instagram/user?username=${encodeURIComponent(username)}`, {
+        headers: {
+          'X-RapidAPI-Key': env.KONBINI_API_KEY,
+          'X-RapidAPI-Host': 'konbiniapi.p.rapidapi.com',
+        },
+      });
+      if (userRes.ok) {
+        const userJson = await userRes.json() as any;
+        const u = userJson?.data?.user || userJson?.user || userJson?.data || {};
+        const channelName = u.full_name || u.username || username;
+        const avatar = u.profile_pic_url || u.profile_pic_url_hd || '';
+        const description = u.biography || u.bio || '';
+        const subscribers = Number(u.edge_followed_by?.count ?? u.follower_count ?? u.followers ?? 0);
+        const following = Number(u.edge_follow?.count ?? u.following_count ?? u.following ?? 0);
+        const videoCount = Number(u.edge_owner_to_timeline_media?.count ?? u.media_count ?? u.posts ?? 0);
+        const isPrivate = u.is_private || false;
+        const isVerified = u.is_verified || false;
+
+        // Fetch recent media
+        let recentVideos: any[] = [];
+        try {
+          const mediaRes = await fetch(`https://konbiniapi.p.rapidapi.com/api/v1/instagram/user/media?username=${encodeURIComponent(username)}&count=10`, {
+            headers: {
+              'X-RapidAPI-Key': env.KONBINI_API_KEY,
+              'X-RapidAPI-Host': 'konbiniapi.p.rapidapi.com',
+            },
+          });
+          if (mediaRes.ok) {
+            const mediaJson = await mediaRes.json() as any;
+            const media = mediaJson?.data?.edges || mediaJson?.data?.media || mediaJson?.edges || mediaJson?.media || mediaJson?.data || [];
+            const items = Array.isArray(media) ? media : (media?.edges || []);
+            recentVideos = items.slice(0, 10).map((edge: any, i: number) => {
+              const n = edge?.node || edge;
+              return {
+                id: n.id || `ig_audit_${i}`,
+                title: n.caption?.text || n.caption || (n.is_video ? 'Reel' : 'Post') + ` ${i + 1}`,
+                thumbnail: n.thumbnail_url || n.display_url || n.thumbnail_src || '',
+                url: n.permalink || n.shortcode ? `https://www.instagram.com/p/${n.shortcode}/` : '',
+                publishedAt: n.taken_at_timestamp ? new Date(n.taken_at_timestamp * 1000).toISOString() : (n.timestamp || ''),
+                viewCount: Number(n.video_view_count || n.video_views || 0),
+                likeCount: Number(n.edge_media_preview_like?.count ?? n.like_count ?? 0),
+                commentCount: Number(n.edge_media_to_comment?.count ?? n.comment_count ?? 0),
+              };
+            });
+          }
+        } catch {}
+
+        const totalRecentViews = recentVideos.reduce((s: number, v: any) => s + (v.viewCount || 0), 0);
+        const totalRecentLikes = recentVideos.reduce((s: number, v: any) => s + (v.likeCount || 0), 0);
+        const avgRecentViews = recentVideos.length ? Math.round(totalRecentViews / recentVideos.length) : 0;
+        const avgEngagementRate = (subscribers > 0 && recentVideos.length > 0)
+          ? (totalRecentLikes / recentVideos.length / subscribers) * 100
+          : 0;
+
+        return {
+          platform: 'instagram',
+          channelId: u.id || '',
+          channelName,
+          channelHandle: u.username ? '@' + u.username : handle,
+          description,
+          avatar,
+          banner: '',
+          country: '',
+          publishedAt: '',
+          statistics: { subscribers, totalViews: 0, videoCount, hiddenSubscriberCount: isPrivate },
+          recentVideos,
+          metrics: { avgRecentViews, totalRecentViews, avgEngagementRate, recentVideoCount: recentVideos.length },
+          auditedAt: new Date().toISOString(),
+          note: isPrivate ? 'Account is private — limited data.' : (isVerified ? 'Verified account.' : ''),
+        };
+      }
+    } catch {}
+  }
+
+  // ── Serper fallback (lite — no follower count) ───────────────────────────────
+  if (!env.SERPER_API_KEY) return { error: 'Set KONBINI_API_KEY (RapidAPI) for full Instagram audits. Serper fallback also requires SERPER_API_KEY.', platform: 'instagram' };
   const q = username ? `site:instagram.com ${username}` : 'site:instagram.com';
   const raw = await serperSearch(env, q, 8);
   const recentVideos = raw.slice(0, 6).map((v: any, i: number) => ({
@@ -1957,21 +2125,95 @@ async function auditInstagramProfile(env: Env, url: string): Promise<any> {
     platform: 'instagram',
     channelId: '',
     channelName: username || 'Instagram creator',
-    channelHandle: username ? '@' + username : '',
+    channelHandle: handle,
     description: '',
     avatar: '', banner: '', country: '', publishedAt: '',
     statistics: { subscribers: 0, totalViews: 0, videoCount: recentVideos.length, hiddenSubscriberCount: true },
     recentVideos,
     metrics: { avgRecentViews: 0, totalRecentViews: 0, avgEngagementRate: 0, recentVideoCount: recentVideos.length },
     auditedAt: new Date().toISOString(),
-    note: 'Instagram does not expose public follower counts. Showing recent posts from search.',
+    note: 'Lite audit — set KONBINI_API_KEY (RapidAPI, free tier) to see follower counts, recent media likes, and engagement rates.',
   };
 }
 
+/** X/Twitter audit — uses SocialData API for real follower counts + recent tweets with engagement.
+ *  Falls back to Serper (search-only, no follower count) when SOCIALDATA_API_KEY is not set.
+ *  Sign up at: https://www.socialdata.tools (~$1 free credit on signup, then $0.0007/lookup). */
 async function auditXProfile(env: Env, url: string): Promise<any> {
-  if (!env.SERPER_API_KEY) return { error: 'Serper API key not configured', platform: 'twitter' };
   const m = url.match(/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]+)/);
-  const username = m ? m[1] : '';
+  const username = (m ? m[1] : '').replace(/^@/, '');
+  const handle = username ? '@' + username : '';
+
+  // ── SocialData API (real audit) ─────────────────────────────────────────────
+  if (env.SOCIALDATA_API_KEY && username) {
+    try {
+      const profileRes = await fetch(`https://www.socialdata.tools/api/v1/twitter/profile?username=${encodeURIComponent(username)}`, {
+        headers: { 'Authorization': `Bearer ${env.SOCIALDATA_API_KEY}` },
+      });
+      if (profileRes.ok) {
+        const profileJson = await profileRes.json() as any;
+        const profile = profileJson?.user || profileJson?.data?.user || profileJson?.data || profileJson || {};
+        const channelName = profile.name || profile.screen_name || username;
+        const avatar = (profile.profile_image_url_https || profile.profile_image_url || '').replace('_normal.', '_400x400.');
+        const banner = profile.profile_banner_url || '';
+        const description = profile.description || '';
+        const subscribers = Number(profile.followers_count || 0);
+        const following = Number(profile.friends_count || 0);
+        const videoCount = Number(profile.statuses_count || 0);
+        const isVerified = profile.verified || false;
+        const publishedAt = profile.created_at || '';
+
+        // Fetch recent tweets
+        let recentVideos: any[] = [];
+        try {
+          const tweetsRes = await fetch(`https://www.socialdata.tools/api/v1/twitter/users/${encodeURIComponent(username)}/tweets?limit=10`, {
+            headers: { 'Authorization': `Bearer ${env.SOCIALDATA_API_KEY}` },
+          });
+          if (tweetsRes.ok) {
+            const tweetsJson = await tweetsRes.json() as any;
+            const tweets = tweetsJson?.tweets || tweetsJson?.data || [];
+            recentVideos = (Array.isArray(tweets) ? tweets : []).slice(0, 10).map((t: any, i: number) => ({
+              id: t.id || t.id_str || `x_audit_${i}`,
+              title: (t.text || t.full_text || 'X post').slice(0, 100),
+              thumbnail: (t.extended_entities?.media?.[0]?.media_url_https) || (t.entities?.media?.[0]?.media_url) || '',
+              url: t.id_str ? `https://x.com/${username}/status/${t.id_str}` : '',
+              publishedAt: t.created_at || '',
+              viewCount: Number(t.view_count || 0),
+              likeCount: Number(t.favorite_count || 0),
+              commentCount: Number(t.reply_count || t.conversation_count || 0),
+            }));
+          }
+        } catch {}
+
+        const totalRecentViews = recentVideos.reduce((s: number, v: any) => s + (v.viewCount || 0), 0);
+        const totalRecentLikes = recentVideos.reduce((s: number, v: any) => s + (v.likeCount || 0), 0);
+        const avgRecentViews = recentVideos.length ? Math.round(totalRecentViews / recentVideos.length) : 0;
+        const avgEngagementRate = (subscribers > 0 && recentVideos.length > 0)
+          ? (totalRecentLikes / recentVideos.length / subscribers) * 100
+          : 0;
+
+        return {
+          platform: 'twitter',
+          channelId: profile.id_str || profile.id || '',
+          channelName,
+          channelHandle: profile.screen_name ? '@' + profile.screen_name : handle,
+          description,
+          avatar,
+          banner,
+          country: profile.location || '',
+          publishedAt,
+          statistics: { subscribers, totalViews: 0, videoCount, hiddenSubscriberCount: false },
+          recentVideos,
+          metrics: { avgRecentViews, totalRecentViews, avgEngagementRate, recentVideoCount: recentVideos.length },
+          auditedAt: new Date().toISOString(),
+          note: isVerified ? 'Verified account.' : '',
+        };
+      }
+    } catch {}
+  }
+
+  // ── Serper fallback (lite — no follower count) ─────────────────────────────
+  if (!env.SERPER_API_KEY) return { error: 'Set SOCIALDATA_API_KEY (socialdata.tools) for full X audits. Serper fallback also requires SERPER_API_KEY.', platform: 'twitter' };
   const q = username ? `site:x.com ${username}` : 'site:x.com';
   const raw = await serperSearch(env, q, 8);
   const recentVideos = raw.slice(0, 6).map((v: any, i: number) => ({
@@ -1985,26 +2227,106 @@ async function auditXProfile(env: Env, url: string): Promise<any> {
   return {
     platform: 'twitter',
     channelId: '',
-    channelName: username ? '@' + username : 'X creator',
-    channelHandle: username ? '@' + username : '',
+    channelName: handle || 'X creator',
+    channelHandle: handle,
     description: '',
     avatar: '', banner: '', country: '', publishedAt: '',
     statistics: { subscribers: 0, totalViews: 0, videoCount: recentVideos.length, hiddenSubscriberCount: true },
     recentVideos,
     metrics: { avgRecentViews: 0, totalRecentViews: 0, avgEngagementRate: 0, recentVideoCount: recentVideos.length },
     auditedAt: new Date().toISOString(),
-    note: 'X does not expose public follower counts. Showing recent posts from search.',
+    note: 'Lite audit — set SOCIALDATA_API_KEY (socialdata.tools, ~$1 free credit) to see follower counts, tweet engagement, and recent posts.',
   };
+}
+
+/** Reddit audit — uses Reddit's public JSON endpoints (no API key needed, no signup).
+ *  Returns: karma breakdown, account age, recent posts with scores.
+ *  Just needs a descriptive User-Agent (REDDIT_USER_AGENT env var). */
+async function auditRedditProfile(env: Env, url: string): Promise<any> {
+  const m = url.match(/reddit\.com\/(?:user|u)\/([A-Za-z0-9_-]+)/);
+  const username = m ? m[1] : '';
+  if (!username) return { error: 'Could not parse Reddit username from URL. Use format: reddit.com/u/username', platform: 'reddit' };
+
+  const userAgent = env.REDDIT_USER_AGENT || 'ClipAI/1.0 (channel audit; +https://clipai-bqo.pages.dev)';
+  const headers = { 'User-Agent': userAgent };
+
+  try {
+    // Fetch user profile
+    const aboutRes = await fetch(`https://www.reddit.com/user/${encodeURIComponent(username)}/about.json`, { headers });
+    if (!aboutRes.ok) {
+      if (aboutRes.status === 404) return { error: `Reddit user "${username}" not found (404). Check the username and try again.`, platform: 'reddit' };
+      return { error: `Reddit lookup failed (HTTP ${aboutRes.status}). Reddit may be rate-limiting our server IP — try again in a minute.`, platform: 'reddit' };
+    }
+    const aboutJson = await aboutRes.json() as any;
+    const data = aboutJson?.data || {};
+    const subreddit = data?.subreddit || {};
+    const channelName = subreddit.title || data.name || username;
+    const avatar = subreddit.icon_img || subreddit.icon_url || '';
+    const description = subreddit.public_description || subreddit.description || '';
+    const subscribers = Number(subreddit.subscribers || 0);
+    const totalKarma = Number(data.total_karma || 0);
+    const commentKarma = Number(data.comment_karma || 0);
+    const linkKarma = Number(data.link_karma || 0);
+    const accountAge = data.created_utc ? new Date(data.created_utc * 1000).toISOString() : '';
+    const isVerified = data.verified || data.is_employee || false;
+
+    // Fetch recent posts
+    let recentVideos: any[] = [];
+    try {
+      const postsRes = await fetch(`https://www.reddit.com/user/${encodeURIComponent(username)}/.json?limit=10`, { headers });
+      if (postsRes.ok) {
+        const postsJson = await postsRes.json() as any;
+        const children = postsJson?.data?.children || [];
+        recentVideos = children.map((c: any, i: number) => {
+          const p = c?.data || {};
+          return {
+            id: p.id || `rd_audit_${i}`,
+            title: p.title || p.body?.slice(0, 100) || 'Reddit post',
+            thumbnail: (p.thumbnail && p.thumbnail.startsWith('http')) ? p.thumbnail : '',
+            url: p.permalink ? `https://www.reddit.com${p.permalink}` : '',
+            publishedAt: p.created_utc ? new Date(p.created_utc * 1000).toISOString() : '',
+            viewCount: Number(p.view_count || 0),
+            likeCount: Number(p.score || 0),
+            commentCount: Number(p.num_comments || 0),
+          };
+        }).slice(0, 10);
+      }
+    } catch {}
+
+    const totalRecentLikes = recentVideos.reduce((s: number, v: any) => s + (v.likeCount || 0), 0);
+    const avgRecentLikes = recentVideos.length ? Math.round(totalRecentLikes / recentVideos.length) : 0;
+    const avgEngagementRate = recentVideos.length > 0 ? (recentVideos.reduce((s: number, v: any) => s + (v.commentCount || 0), 0) / recentVideos.length) : 0;
+
+    return {
+      platform: 'reddit',
+      channelId: data.id || '',
+      channelName,
+      channelHandle: 'u/' + username,
+      description,
+      avatar,
+      banner: subreddit.banner_img || subreddit.banner_background_image || '',
+      country: '',
+      publishedAt: accountAge,
+      statistics: { subscribers, totalViews: totalKarma, videoCount: recentVideos.length, hiddenSubscriberCount: false },
+      recentVideos,
+      metrics: { avgRecentViews: avgRecentLikes, totalRecentViews: totalKarma, avgEngagementRate, recentVideoCount: recentVideos.length },
+      auditedAt: new Date().toISOString(),
+      note: isVerified ? 'Verified Reddit account.' : '',
+    };
+  } catch (e: any) {
+    return { error: `Reddit audit failed: ${e?.message || 'network error'}`, platform: 'reddit' };
+  }
 }
 
 async function auditChannel(env: Env, url: string): Promise<any> {
   const platform = detectPlatform(url);
-  if (!platform) return { error: 'Unsupported URL. Please paste a YouTube, TikTok, X, or Instagram link.' };
+  if (!platform) return { error: 'Unsupported URL. Please paste a YouTube, TikTok, X, Instagram, or Reddit link.' };
   switch (platform) {
     case 'youtube':   return auditYouTubeChannel(env, url);
     case 'tiktok':    return auditTikTokProfile(env, url);
     case 'instagram': return auditInstagramProfile(env, url);
     case 'twitter':   return auditXProfile(env, url);
+    case 'reddit':    return auditRedditProfile(env, url);
   }
   return { error: 'Unsupported platform' };
 }

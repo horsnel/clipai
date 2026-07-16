@@ -283,7 +283,7 @@ export interface TrendingVideosResponse {
 }
 
 // ─── Channel Audit (free audit flow + dashboard squares) ─────────────────────
-export type AuditPlatform = 'youtube' | 'tiktok' | 'twitter' | 'instagram';
+export type AuditPlatform = 'youtube' | 'tiktok' | 'twitter' | 'instagram' | 'reddit';
 
 export interface ChannelAuditVideo {
   id: string;

@@ -12,7 +12,7 @@
  * Used inside <ChannelAuditsGrid /> on the dashboard.
  */
 import {
-  Youtube, Music2, Twitter, Instagram,
+  Youtube, Music2, Twitter, Instagram, MessageCircle,
   Users, Eye, TrendingUp, Video, AlertCircle,
 } from 'lucide-react';
 import type { ChannelAudit, AuditPlatform } from '../types';
@@ -62,6 +62,14 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
     ring: 'ring-pink-400/40',
     accent: 'text-pink-400',
   },
+  reddit: {
+    label: 'Reddit',
+    icon: MessageCircle,
+    iconColor: 'text-orange-500',
+    banner: 'from-orange-500/25 via-red-500/15 to-clip-surface',
+    ring: 'ring-orange-400/40',
+    accent: 'text-orange-500',
+  },
 };
 
 function formatCount(n: number): string {
@@ -73,7 +81,7 @@ function formatCount(n: number): string {
 export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
   const config = PLATFORM_CONFIG[audit.platform] || PLATFORM_CONFIG.youtube;
   const PlatformIcon = config.icon;
-  const hasRealStats = audit.platform === 'youtube' && !audit.statistics.hiddenSubscriberCount;
+  const hasRealStats = (audit.platform === 'youtube' || audit.platform === 'reddit' || audit.platform === 'tiktok' || audit.platform === 'instagram' || audit.platform === 'twitter') && !audit.statistics.hiddenSubscriberCount;
   const avatarFallback = audit.channelHandle || audit.channelName || '?';
 
   return (

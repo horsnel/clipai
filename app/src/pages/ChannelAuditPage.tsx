@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import {
   ArrowRight, ArrowLeft, Check, X, Loader2,
   Youtube, Music2, Twitter, Instagram, AlertTriangle, Link2,
-  Sparkles, Trash2, ExternalLink, Search,
+  Sparkles, Trash2, ExternalLink, Search, MessageCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { auditChannel } from '@/services/api';
@@ -41,10 +41,11 @@ interface AuditState {
 }
 
 const PLATFORM_HINTS: Array<{ platform: AuditPlatform; label: string; icon: React.ElementType; color: string; example: string }> = [
-  { platform: 'youtube',   label: 'YouTube',   icon: Youtube,   color: 'text-red-500',  example: 'youtube.com/@MrBeast' },
-  { platform: 'tiktok',    label: 'TikTok',    icon: Music2,    color: 'text-clip-cyan', example: 'tiktok.com/@username' },
-  { platform: 'instagram', label: 'Instagram', icon: Instagram, color: 'text-pink-400', example: 'instagram.com/username' },
-  { platform: 'twitter',   label: 'X',         icon: Twitter,   color: 'text-slate-300', example: 'x.com/username' },
+  { platform: 'youtube',   label: 'YouTube',   icon: Youtube,       color: 'text-red-500',     example: 'youtube.com/@MrBeast' },
+  { platform: 'tiktok',    label: 'TikTok',    icon: Music2,        color: 'text-clip-cyan',   example: 'tiktok.com/@username' },
+  { platform: 'instagram', label: 'Instagram', icon: Instagram,     color: 'text-pink-400',    example: 'instagram.com/username' },
+  { platform: 'twitter',   label: 'X',         icon: Twitter,       color: 'text-slate-300',   example: 'x.com/username' },
+  { platform: 'reddit',    label: 'Reddit',    icon: MessageCircle, color: 'text-orange-500',  example: 'reddit.com/u/username' },
 ];
 
 const MAX_AUDITS = 8;
@@ -55,6 +56,7 @@ function detectPlatformFromUrl(url: string): AuditPlatform | null {
   if (u.includes('tiktok.com')) return 'tiktok';
   if (u.includes('instagram.com')) return 'instagram';
   if (u.includes('x.com') || u.includes('twitter.com')) return 'twitter';
+  if (u.includes('reddit.com') || u.includes('redd.it')) return 'reddit';
   return null;
 }
 
@@ -79,7 +81,7 @@ export function ChannelAuditPage({ user, onNavigate: _onNavigate, onComplete }: 
     }
     const platform = detectPlatformFromUrl(trimmed);
     if (!platform) {
-      toast.error('Unsupported link. Use a YouTube, TikTok, X, or Instagram URL.');
+      toast.error('Unsupported link. Use a YouTube, TikTok, X, Instagram, or Reddit URL.');
       return;
     }
     if (completedAudits.length >= MAX_AUDITS) {
@@ -170,9 +172,9 @@ export function ChannelAuditPage({ user, onNavigate: _onNavigate, onComplete }: 
           </div>
 
           <p className="text-clip-muted text-sm leading-relaxed mb-5">
-            Hi {user?.name ?? 'Creator'}! Paste a link to your YouTube, TikTok, X, or Instagram
+            Hi {user?.name ?? 'Creator'}! Paste a link to your YouTube, TikTok, X, Instagram, or Reddit
             channel and we'll pull a free analytics report — subscribers, total views, recent
-            videos, engagement rate. You can audit up to {MAX_AUDITS} channels.
+            posts, engagement rate. You can audit up to {MAX_AUDITS} channels.
           </p>
 
           {/* Platform hints */}
@@ -247,9 +249,9 @@ export function ChannelAuditPage({ user, onNavigate: _onNavigate, onComplete }: 
 
         {/* Helper text */}
         <p className="text-center text-clip-muted text-xs mt-5">
-          YouTube audits include real subscriber counts & per-video view data.
+          YouTube & Reddit audits return real follower counts & engagement data.
           <br />
-          TikTok, X & Instagram audits show recent posts (those platforms don't expose follower counts).
+          TikTok, X & Instagram audits require API keys (LamaTok / KonbiniAPI / SocialData) for full stats — without keys they show recent posts only.
         </p>
       </div>
     </div>
@@ -295,8 +297,8 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
   // Done — show a compact preview row
   const audit = entry.audit!;
   const platform = audit.platform;
-  const PlatformIcon = platform === 'youtube' ? Youtube : platform === 'tiktok' ? Music2 : platform === 'instagram' ? Instagram : Twitter;
-  const platformColor = platform === 'youtube' ? 'text-red-500' : platform === 'tiktok' ? 'text-clip-cyan' : platform === 'instagram' ? 'text-pink-400' : 'text-slate-300';
+  const PlatformIcon = platform === 'youtube' ? Youtube : platform === 'tiktok' ? Music2 : platform === 'instagram' ? Instagram : platform === 'reddit' ? MessageCircle : Twitter;
+  const platformColor = platform === 'youtube' ? 'text-red-500' : platform === 'tiktok' ? 'text-clip-cyan' : platform === 'instagram' ? 'text-pink-400' : platform === 'reddit' ? 'text-orange-500' : 'text-slate-300';
 
   return (
     <div className="flex items-center gap-3 p-3 rounded-xl bg-clip-surface/50 border border-white/[0.025] hover:border-white/[0.06] transition-colors">
@@ -324,11 +326,11 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
         </p>
       </div>
 
-      {/* Quick stats (YouTube only) */}
-      {platform === 'youtube' && !audit.statistics.hiddenSubscriberCount && (
+      {/* Quick stats (real-audit platforms) */}
+      {!audit.statistics.hiddenSubscriberCount && (
         <div className="hidden sm:flex items-center gap-3 text-xs text-clip-muted flex-shrink-0">
-          <span className="tabular-nums">{formatShort(audit.statistics.subscribers)} subs</span>
-          <span className="tabular-nums">{formatShort(audit.statistics.totalViews)} views</span>
+          <span className="tabular-nums">{formatShort(audit.statistics.subscribers)} {platform === 'reddit' ? 'subs' : 'subs'}</span>
+          <span className="tabular-nums">{formatShort(audit.statistics.totalViews)} {platform === 'reddit' ? 'karma' : 'views'}</span>
         </div>
       )}
 

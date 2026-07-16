@@ -37,6 +37,7 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
   tiktok:    { label: 'TikTok',    icon: Music2,    iconColor: 'text-clip-cyan', banner: 'from-cyan-500/25 via-pink-500/15 to-clip-surface',       accent: 'text-clip-cyan' },
   twitter:   { label: 'X',         icon: Twitter,   iconColor: 'text-slate-300', banner: 'from-slate-500/25 via-slate-700/15 to-clip-surface',     accent: 'text-slate-300' },
   instagram: { label: 'Instagram', icon: Instagram, iconColor: 'text-pink-400',  banner: 'from-purple-500/25 via-pink-500/15 to-amber-500/10',    accent: 'text-pink-400' },
+  reddit:    { label: 'Reddit',    icon: MessageCircle, iconColor: 'text-orange-500', banner: 'from-orange-500/25 via-red-500/15 to-clip-surface',  accent: 'text-orange-500' },
 };
 
 function formatCount(n: number): string {
@@ -61,7 +62,7 @@ function timeAgo(iso: string): string {
 export function ChannelAuditModal({ audit, onClose, onDelete }: ChannelAuditModalProps) {
   const config = PLATFORM_CONFIG[audit.platform] || PLATFORM_CONFIG.youtube;
   const PlatformIcon = config.icon;
-  const hasRealStats = audit.platform === 'youtube' && !audit.statistics.hiddenSubscriberCount;
+  const hasRealStats = !audit.statistics.hiddenSubscriberCount;
 
   // Esc to close
   useEffect(() => {
@@ -150,10 +151,10 @@ export function ChannelAuditModal({ audit, onClose, onDelete }: ChannelAuditModa
         <div className="px-6 sm:px-8 mt-5">
           {hasRealStats ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <BigStat icon={Users}      value={formatCount(audit.statistics.subscribers)} label="Subscribers" color={config.accent} />
-              <BigStat icon={Eye}        value={formatCount(audit.statistics.totalViews)}  label="Total Views" color={config.accent} />
-              <BigStat icon={Video}      value={formatCount(audit.statistics.videoCount)}  label="Videos"      color={config.accent} />
-              <BigStat icon={TrendingUp} value={`${audit.metrics.avgEngagementRate}%`}    label="Engagement"  color={config.accent} />
+              <BigStat icon={Users}      value={formatCount(audit.statistics.subscribers)} label={audit.platform === 'reddit' ? 'Subredditors' : 'Subscribers'} color={config.accent} />
+              <BigStat icon={Eye}        value={formatCount(audit.statistics.totalViews)}  label={audit.platform === 'reddit' ? 'Total Karma' : 'Total Views'} color={config.accent} />
+              <BigStat icon={Video}      value={formatCount(audit.statistics.videoCount)}  label={audit.platform === 'reddit' ? 'Posts' : audit.platform === 'youtube' ? 'Videos' : 'Posts'} color={config.accent} />
+              <BigStat icon={TrendingUp} value={`${audit.metrics.avgEngagementRate.toFixed(1)}%`} label={audit.platform === 'reddit' ? 'Comments/Post' : 'Engagement'} color={config.accent} />
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2.5">
@@ -162,11 +163,11 @@ export function ChannelAuditModal({ audit, onClose, onDelete }: ChannelAuditModa
             </div>
           )}
 
-          {/* Avg recent views (YouTube) */}
+          {/* Avg recent views (real-audit platforms only) */}
           {hasRealStats && audit.metrics.recentVideoCount > 0 && (
             <div className="mt-2.5 flex items-center justify-center gap-2 text-xs text-clip-muted bg-clip-surface/50 rounded-lg py-2 border border-white/[0.02]">
               <TrendingUp className="w-3.5 h-3.5 text-clip-cyan" />
-              Avg views on last {audit.metrics.recentVideoCount} videos:{' '}
+              Avg {audit.platform === 'reddit' ? 'score' : 'views'} on last {audit.metrics.recentVideoCount} {audit.platform === 'youtube' ? 'videos' : 'posts'}:{' '}
               <span className="font-bold text-clip-text tabular-nums">{formatCount(audit.metrics.avgRecentViews)}</span>
               <span className="text-clip-muted/60">·</span>
               <span>Total: {formatCount(audit.metrics.totalRecentViews)}</span>
