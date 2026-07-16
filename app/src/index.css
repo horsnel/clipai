@@ -62,7 +62,7 @@
   }
   
   .card-glass {
-    @apply bg-clip-surface/80 backdrop-blur-sm border border-white/[0.04] rounded-2xl;
+    @apply bg-clip-surface/80 backdrop-blur-sm border border-white/[0.025] rounded-2xl;
   }
   
   .btn-primary {
@@ -73,12 +73,12 @@
   
   .btn-secondary {
     @apply bg-clip-surface text-clip-text font-medium px-6 py-3 rounded-xl 
-           border border-white/[0.05] hover:bg-white/[0.04] hover:-translate-y-0.5 
+           border border-white/[0.02] hover:bg-white/[0.025] hover:-translate-y-0.5 
            transition-all duration-200;
   }
   
   .input-dark {
-    @apply bg-clip-surface border border-white/[0.05] rounded-xl px-4 py-3 
+    @apply bg-clip-surface border border-white/[0.02] rounded-xl px-4 py-3 
            text-clip-text placeholder:text-clip-muted/60
            focus:outline-none focus:border-clip-cyan/50 focus:ring-1 focus:ring-clip-cyan/30
            transition-all duration-200;
@@ -109,7 +109,7 @@
   }
   
   .hype-badge-gray {
-    @apply bg-clip-surface text-clip-muted text-xs font-bold px-2 py-0.5 rounded border border-white/[0.05];
+    @apply bg-clip-surface text-clip-muted text-xs font-bold px-2 py-0.5 rounded border border-white/[0.02];
   }
 }
 

@@ -10,7 +10,7 @@
 import { useState, useEffect } from 'react';
 import {
   Youtube, Copy, Check, ExternalLink, Loader2, Flame,
-  Play, AlertTriangle, Music2, Twitter,
+  Play, AlertTriangle, Music2, Twitter, Instagram,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTrendingVideos } from '@/services/api';
@@ -21,7 +21,7 @@ interface TrendingVideosSectionProps {
   game?: string;
 }
 
-type Platform = 'youtube' | 'tiktok' | 'twitter';
+type Platform = 'youtube' | 'tiktok' | 'twitter' | 'instagram';
 
 interface PlatformStyle {
   label: string;
@@ -52,6 +52,13 @@ const PLATFORM_STYLES: Record<Platform, PlatformStyle> = {
     iconClass: 'text-white',
     icon: Twitter,
     fallbackBg: 'bg-gradient-to-br from-slate-700/30 to-slate-900/30',
+  },
+  instagram: {
+    label: 'Instagram',
+    badgeClass: 'bg-gradient-to-r from-purple-600/90 to-pink-500/90 text-white',
+    iconClass: 'text-pink-400',
+    icon: Instagram,
+    fallbackBg: 'bg-gradient-to-br from-purple-500/20 via-pink-500/15 to-amber-500/15',
   },
 };
 
@@ -126,19 +133,21 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
     youtube: videos.filter((v) => v.platform === 'youtube').length,
     tiktok: videos.filter((v) => v.platform === 'tiktok').length,
     twitter: videos.filter((v) => v.platform === 'twitter').length,
+    instagram: videos.filter((v) => v.platform === 'instagram').length,
   };
 
   const FILTER_TABS: Array<{ key: Platform | 'all'; label: string; icon: React.ElementType }> = [
-    { key: 'all',     label: 'All',     icon: Flame },
-    { key: 'youtube', label: 'YouTube', icon: Youtube },
-    { key: 'tiktok',  label: 'TikTok',  icon: Music2 },
-    { key: 'twitter', label: 'X',       icon: Twitter },
+    { key: 'all',       label: 'All',       icon: Flame },
+    { key: 'youtube',   label: 'YouTube',   icon: Youtube },
+    { key: 'tiktok',    label: 'TikTok',    icon: Music2 },
+    { key: 'twitter',   label: 'X',         icon: Twitter },
+    { key: 'instagram', label: 'Instagram', icon: Instagram },
   ];
 
   return (
     <div className="card-glass overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/[0.04]">
+      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/[0.025]">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
             <Flame className="w-5 h-5 text-red-500" />
@@ -159,7 +168,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
 
       {/* Platform filter tabs */}
       {!loading && !error && videos.length > 0 && (
-        <div className="flex items-center gap-1 px-5 py-2 border-b border-white/[0.04] overflow-x-auto">
+        <div className="flex items-center gap-1 px-5 py-2 border-b border-white/[0.025] overflow-x-auto">
           {FILTER_TABS.map((tab) => {
             const count = platformCounts[tab.key] || 0;
             const isActive = activePlatform === tab.key;
@@ -169,13 +178,13 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                 onClick={() => setActivePlatform(tab.key)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
                   isActive
-                    ? 'bg-clip-cyan/10 text-clip-cyan border border-clip-cyan/25'
-                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.03] border border-transparent'
+                    ? 'bg-clip-cyan/6 text-clip-cyan border border-clip-cyan/25'
+                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.02] border border-transparent'
                 }`}
               >
                 <tab.icon className="w-3.5 h-3.5" />
                 {tab.label}
-                <span className={`text-[10px] px-1 rounded ${isActive ? 'bg-clip-cyan/20' : 'bg-white/[0.05]'}`}>
+                <span className={`text-[10px] px-1 rounded ${isActive ? 'bg-clip-cyan/20' : 'bg-white/[0.02]'}`}>
                   {count}
                 </span>
               </button>
@@ -215,7 +224,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
               return (
                 <div
                   key={v.id}
-                  className="group relative rounded-xl overflow-hidden border border-white/[0.05] bg-clip-surface/40 hover:border-white/[0.10] transition-all"
+                  className="group relative rounded-xl overflow-hidden border border-white/[0.02] bg-clip-surface/40 hover:border-white/[0.10] transition-all"
                 >
                   {/* Thumbnail or platform fallback */}
                   <a
@@ -301,7 +310,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                         {v.copyPack.hashtags.slice(0, 4).map((tag, i) => (
                           <span
                             key={i}
-                            className="text-[10px] text-clip-cyan/80 bg-clip-cyan/5 px-1.5 py-0.5 rounded border border-clip-cyan/10"
+                            className="text-[10px] text-clip-cyan/80 bg-clip-cyan/3 px-1.5 py-0.5 rounded border border-clip-cyan/10"
                           >
                             {tag}
                           </span>
@@ -319,7 +328,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                   {hasPack && (
                     <button
                       onClick={() => handleCopy(v)}
-                      className="sm:hidden w-full py-2 text-xs font-medium text-clip-cyan border-t border-white/[0.05] hover:bg-clip-cyan/5 transition-colors flex items-center justify-center gap-1.5"
+                      className="sm:hidden w-full py-2 text-xs font-medium text-clip-cyan border-t border-white/[0.02] hover:bg-clip-cyan/3 transition-colors flex items-center justify-center gap-1.5"
                     >
                       {copiedId === v.id ? (
                         <><Check className="w-3.5 h-3.5" /> Copied</>

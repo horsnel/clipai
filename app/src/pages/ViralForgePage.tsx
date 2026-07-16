@@ -305,8 +305,8 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             <button key={t.key} onClick={() => { setActiveTool(t.key); setTitles([]); setCaptions([]); setHashtags([]); setHooks([]); }}
               className={`p-4 rounded-xl border text-left transition-all ${
                 activeTool === t.key
-                  ? 'border-clip-cyan/50 bg-clip-cyan/5'
-                  : 'border-white/[0.04] bg-clip-surface hover:border-white/[0.07]'
+                  ? 'border-clip-cyan/50 bg-clip-cyan/3'
+                  : 'border-white/[0.025] bg-clip-surface hover:border-white/[0.025]'
               }`}>
               <t.icon className={`w-5 h-5 mb-2 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-muted'}`} />
               <p className={`text-sm font-medium ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
@@ -346,7 +346,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                       {GAMES.map(g => (
                         <button key={g} onClick={() => setSelectedGame(g)}
                           className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                            selectedGame === g ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.04] hover:text-clip-text'
+                            selectedGame === g ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.025] hover:text-clip-text'
                           }`}>{g}</button>
                       ))}
                     </div>
@@ -379,7 +379,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                       {GAMES.map(g => (
                         <button key={g} onClick={() => setSelectedGame(g)}
                           className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                            selectedGame === g ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.04] hover:text-clip-text'
+                            selectedGame === g ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.025] hover:text-clip-text'
                           }`}>{g}</button>
                       ))}
                     </div>
@@ -394,7 +394,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                     {VIBES.map(v => (
                       <button key={v} onClick={() => setSelectedVibe(v)}
                         className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                          selectedVibe === v ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.04] hover:text-clip-text'
+                          selectedVibe === v ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.025] hover:text-clip-text'
                         }`}>{v}</button>
                     ))}
                   </div>
@@ -408,7 +408,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                     {PLATFORMS.map(p => (
                       <button key={p} onClick={() => setSelectedPlatform(p)}
                         className={`px-3 py-2 rounded-lg text-xs font-medium transition-all text-left ${
-                          selectedPlatform === p ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.04] hover:text-clip-text'
+                          selectedPlatform === p ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.025] hover:text-clip-text'
                         }`}>{p}</button>
                     ))}
                   </div>
@@ -512,7 +512,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                 {!hasResults ? (
                   <EmptyState label="titles" loading={isLoading} />
                 ) : titles.map((title, i) => (
-                  <div key={title.id} className="card-glass p-4 hover:border-white/[0.07] transition-all group">
+                  <div key={title.id} className="card-glass p-4 hover:border-white/[0.025] transition-all group">
                     <div className="flex items-start gap-3">
                       <span className="text-clip-muted font-mono text-sm mt-1 flex-shrink-0">
                         {String(i + 1).padStart(2, '0')}
@@ -528,7 +528,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                         </div>
                       </div>
                       <button onClick={() => copy(title.text, title.id)}
-                        className="p-2 rounded-lg text-clip-muted hover:text-clip-cyan hover:bg-clip-cyan/10 transition-all flex-shrink-0">
+                        className="p-2 rounded-lg text-clip-muted hover:text-clip-cyan hover:bg-clip-cyan/6 transition-all flex-shrink-0">
                         {copiedId === title.id ? <CheckCheck className="w-4 h-4 text-clip-cyan" /> : <Copy className="w-4 h-4" />}
                       </button>
                     </div>
@@ -545,14 +545,14 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                 ) : (
                   <>
                     {battlePair && !battleWinner && (
-                      <div className="card-glass p-5 border-clip-amber/20 bg-clip-amber/5">
+                      <div className="card-glass p-5 border-clip-amber/20 bg-clip-amber/3">
                         <p className="text-clip-amber text-sm font-medium mb-4 flex items-center gap-2">
                           <Flame className="w-4 h-4" /> Caption Battle — pick the better one!
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {battlePair.map(cap => (
                             <button key={cap.id} onClick={() => handleBattleVote(cap)}
-                              className="card-glass p-4 text-left hover:border-clip-amber/40 hover:bg-clip-amber/5 transition-all group">
+                              className="card-glass p-4 text-left hover:border-clip-amber/40 hover:bg-clip-amber/3 transition-all group">
                               <p className="text-clip-text text-sm leading-relaxed mb-3">{cap.text}</p>
                               <div className="flex items-center justify-between">
                                 <ViralPill score={cap.viralScore} />
@@ -582,7 +582,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
 
                     <div className="space-y-3">
                       {captions.map(cap => (
-                        <div key={cap.id} className="card-glass p-4 group hover:border-white/[0.07] transition-all">
+                        <div key={cap.id} className="card-glass p-4 group hover:border-white/[0.025] transition-all">
                           <div className="flex items-start gap-3">
                             <div className="flex-1 min-w-0">
                               <p className="text-clip-text text-sm leading-relaxed">{cap.text}</p>
@@ -602,7 +602,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                               </div>
                             </div>
                             <button onClick={() => copy(cap.text, cap.id)}
-                              className="p-2 rounded-lg text-clip-muted hover:text-clip-cyan hover:bg-clip-cyan/10 transition-all flex-shrink-0">
+                              className="p-2 rounded-lg text-clip-muted hover:text-clip-cyan hover:bg-clip-cyan/6 transition-all flex-shrink-0">
                               {copiedId === cap.id ? <CheckCheck className="w-4 h-4 text-clip-cyan" /> : <Copy className="w-4 h-4" />}
                             </button>
                           </div>
@@ -633,18 +633,18 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                       {hashtags.map((tag, i) => (
                         <button key={i} onClick={() => copy(tag, `tag-${i}`)}
                           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all border ${
-                            i < 3 ? 'border-clip-cyan/30 bg-clip-cyan/10 text-clip-cyan' :
-                            i < 8 ? 'border-white/[0.05] bg-clip-surface text-clip-text hover:border-clip-cyan/30' :
-                            'border-white/[0.03] bg-clip-surface/50 text-clip-muted hover:text-clip-text'
+                            i < 3 ? 'border-clip-cyan/30 bg-clip-cyan/6 text-clip-cyan' :
+                            i < 8 ? 'border-white/[0.02] bg-clip-surface text-clip-text hover:border-clip-cyan/30' :
+                            'border-white/[0.02] bg-clip-surface/50 text-clip-muted hover:text-clip-text'
                           }`}>
                           {tag}
                           {copiedId === `tag-${i}` && <CheckCheck className="w-3 h-3 inline ml-1 text-clip-cyan" />}
                         </button>
                       ))}
                     </div>
-                    <div className="mt-4 pt-4 border-t border-white/[0.04] flex items-center gap-4 text-xs text-clip-muted">
+                    <div className="mt-4 pt-4 border-t border-white/[0.025] flex items-center gap-4 text-xs text-clip-muted">
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-clip-cyan/30 inline-block" /> Mega (high reach)</span>
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-clip-surface border border-white/[0.05] inline-block" /> Mid-tier</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-clip-surface border border-white/[0.02] inline-block" /> Mid-tier</span>
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-clip-surface/50 inline-block" /> Niche</span>
                     </div>
                   </div>
@@ -658,14 +658,14 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                 {!hasResults ? (
                   <EmptyState label="hooks" loading={isLoading} />
                 ) : hooks.map((hook, i) => (
-                  <div key={i} className="card-glass p-4 group hover:border-white/[0.07] transition-all">
+                  <div key={i} className="card-glass p-4 group hover:border-white/[0.025] transition-all">
                     <div className="flex items-start gap-3">
                       <span className="text-clip-cyan font-mono text-xs mt-1 flex-shrink-0">
                         {String(i + 1).padStart(2, '0')}
                       </span>
                       <p className="flex-1 text-clip-text text-sm leading-relaxed">{hook}</p>
                       <button onClick={() => copy(hook, `hook-${i}`)}
-                        className="p-2 rounded-lg text-clip-muted hover:text-clip-cyan hover:bg-clip-cyan/10 transition-all flex-shrink-0">
+                        className="p-2 rounded-lg text-clip-muted hover:text-clip-cyan hover:bg-clip-cyan/6 transition-all flex-shrink-0">
                         {copiedId === `hook-${i}` ? <CheckCheck className="w-4 h-4 text-clip-cyan" /> : <Copy className="w-4 h-4" />}
                       </button>
                     </div>
@@ -701,7 +701,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                 const alreadyVoted = votedSet.has(c.caption);
                 return (
                   <div key={i} className={`card-glass p-4 flex items-start gap-3 ${
-                    i === 0 ? 'border-clip-amber/30 bg-clip-amber/5' : ''
+                    i === 0 ? 'border-clip-amber/30 bg-clip-amber/3' : ''
                   }`}>
                     <span className={`font-display font-bold text-lg w-8 flex-shrink-0 ${
                       i === 0 ? 'text-clip-amber' : i === 1 ? 'text-clip-muted' : i === 2 ? 'text-amber-700' : 'text-clip-muted/60'
@@ -763,7 +763,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
 
 function ViralPill({ score }: { score: number }) {
   const color = score >= 90 ? 'text-clip-amber bg-clip-amber/10' :
-                score >= 75 ? 'text-clip-cyan bg-clip-cyan/10' :
+                score >= 75 ? 'text-clip-cyan bg-clip-cyan/6' :
                 score >= 60 ? 'text-green-600 bg-green-500/10' :
                               'text-clip-muted bg-clip-surface';
   return (

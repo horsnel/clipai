@@ -97,13 +97,13 @@ export function UpgradeModal({ state, onClose, onNavigate }: UpgradeModalProps) 
       className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
     >
       <div
-        className="bg-clip-dark border border-white/[0.05] rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl"
+        className="bg-clip-dark border border-white/[0.02] rounded-t-3xl sm:rounded-3xl w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] flex flex-col shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label="Upgrade your plan"
       >
         {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-white/[0.04] flex items-start justify-between gap-3 flex-shrink-0">
+        <div className="p-5 sm:p-6 border-b border-white/[0.025] flex items-start justify-between gap-3 flex-shrink-0">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-2">
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
@@ -126,7 +126,7 @@ export function UpgradeModal({ state, onClose, onNavigate }: UpgradeModalProps) 
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.04] rounded-lg transition-colors flex-shrink-0"
+            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.025] rounded-lg transition-colors flex-shrink-0"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -144,8 +144,8 @@ export function UpgradeModal({ state, onClose, onNavigate }: UpgradeModalProps) 
               }}
               className={`w-full p-4 sm:p-5 rounded-2xl border text-left transition-all flex items-center gap-4 group ${
                 plan.popular
-                  ? 'border-clip-cyan/50 bg-clip-cyan/5 hover:bg-clip-cyan/10'
-                  : 'border-white/[0.05] bg-clip-surface/50 hover:bg-clip-surface hover:border-white/[0.08]'
+                  ? 'border-clip-cyan/50 bg-clip-cyan/3 hover:bg-clip-cyan/6'
+                  : 'border-white/[0.02] bg-clip-surface/50 hover:bg-clip-surface hover:border-white/[0.08]'
               }`}
             >
               {/* Icon */}
@@ -187,7 +187,7 @@ export function UpgradeModal({ state, onClose, onNavigate }: UpgradeModalProps) 
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:p-5 border-t border-white/[0.04] flex-shrink-0">
+        <div className="p-4 sm:p-5 border-t border-white/[0.025] flex-shrink-0">
           <div className="flex items-start gap-2 text-xs text-clip-muted">
             <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
             <p>

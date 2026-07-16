@@ -17,6 +17,7 @@ import { ClipBotPage } from './pages/ClipBotPage';
 import { ClipBotBubble } from './components/ClipBotBubble';
 import { CreatorRankPage } from './pages/CreatorRankPage';
 import { GrowthIntelPage } from './pages/GrowthIntelPage';
+import { OnboardingPage } from './pages/OnboardingPage';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { UpgradeModalProvider, useUpgradeModal } from '@/components/UpgradeModalContext';
@@ -30,7 +31,7 @@ import './App.css';
 export type Page =
   | 'landing' | 'auth' | 'dashboard' | 'upload' | 'results'
   | 'pricing' | 'settings' | 'terms' | 'privacy' | 'leaderboard'
-  | 'trends' | 'forge' | 'clipbot' | 'rank' | 'growth';
+  | 'trends' | 'forge' | 'clipbot' | 'rank' | 'growth' | 'onboarding';
 
 interface AppUser {
   id: string;
@@ -138,6 +139,7 @@ function AppContentInner({
     const TOOL_LABELS: Record<Page, string> = {
       landing: 'ClipAI',
       auth: 'ClipAI',
+      onboarding: 'ClipAI',
       dashboard: 'Dashboard',
       upload: 'Video Editor',
       results: 'Video Editor',
@@ -169,11 +171,17 @@ function AppContentInner({
     return () => window.removeEventListener(UPGRADE_REQUIRED_EVENT, onUpgradeRequired);
   }, [showUpgrade, currentPage]);
 
-  // ─── Redirect after login ───────────────────────────────────────────────
+  // ─── Redirect after login + onboarding gate ────────────────────────────
   useEffect(() => {
     if (!isLoading && authUser) {
       if (currentPage === 'auth' || currentPage === 'landing') {
-        setCurrentPage('dashboard');
+        // First-time login? Show onboarding before dashboard.
+        const onboardingDone = localStorage.getItem(`clipai_onboarding_complete_${authUser.email}`);
+        if (!onboardingDone) {
+          setCurrentPage('onboarding');
+        } else {
+          setCurrentPage('dashboard');
+        }
       }
     }
   }, [isLoading, authUser]);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -189,7 +197,7 @@ function AppContentInner({
   };
 
   // Pages that require login. 'upload' + 'results' now route to the v3 waitlist (no auth required).
-  const PROTECTED: Page[] = ['dashboard','settings','trends','forge','clipbot','rank','growth'];
+  const PROTECTED: Page[] = ['dashboard','settings','trends','forge','clipbot','rank','growth','onboarding'];
 
   const renderPage = () => {
     if (PROTECTED.includes(currentPage) && !isLoggedIn) {
@@ -198,6 +206,7 @@ function AppContentInner({
     switch (currentPage) {
       case 'landing':     return <LandingPage onNavigate={navigateTo} />;
       case 'auth':        return <AuthPage onNavigate={navigateTo} onLogin={handleLogin} />;
+      case 'onboarding':  return <OnboardingPage user={user} onNavigate={navigateTo} onComplete={() => setCurrentPage('dashboard')} />;
       case 'dashboard':   return <DashboardPage user={user} onNavigate={navigateTo} onLogout={handleLogout} />;
       case 'upload':      return <WaitlistPage user={user} onNavigate={navigateTo} />;
       case 'results':     return <WaitlistPage user={user} onNavigate={navigateTo} />;

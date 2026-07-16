@@ -85,7 +85,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
     return (
       <div className="card-glass p-6 space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
             <MessageSquare className="w-5 h-5 text-clip-cyan" />
           </div>
           <div>
@@ -138,7 +138,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
       </h4>
       <ul className="space-y-2">
         {items.map((it, i) => (
-          <li key={i} className="p-2.5 rounded-lg bg-clip-surface border border-white/[0.03]">
+          <li key={i} className="p-2.5 rounded-lg bg-clip-surface border border-white/[0.02]">
             {render(it, i)}
           </li>
         ))}
@@ -157,7 +157,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
       {/* Header */}
       <div className="card-glass p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
             <MessageSquare className="w-5 h-5 text-clip-cyan" />
           </div>
           <div className="min-w-0">
@@ -168,7 +168,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
           </div>
         </div>
         {result.cached_analysis && (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/10 px-1.5 py-0.5 rounded border border-clip-cyan/20 flex-shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/6 px-1.5 py-0.5 rounded border border-clip-cyan/20 flex-shrink-0">
             Cached
           </span>
         )}
@@ -250,7 +250,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
               <p className="text-xs text-clip-muted mt-1">{it.why_likely}</p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              {tag(it.intent, 'text-clip-cyan bg-clip-cyan/10 border-clip-cyan/20')}
+              {tag(it.intent, 'text-clip-cyan bg-clip-cyan/6 border-clip-cyan/20')}
               <button onClick={() => copy(it.comment, `q${i}`)} className="text-clip-muted hover:text-clip-cyan p-1 transition-colors">
                 {copiedKey === `q${i}` ? <Check className="w-3 h-3 text-clip-cyan" /> : <Copy className="w-3 h-3" />}
               </button>
@@ -294,7 +294,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
               <p className="text-xs text-clip-muted/70 mt-1">{it.why_likely}</p>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
-              {tag(it.pattern, 'text-clip-muted bg-clip-surface border-white/[0.05]')}
+              {tag(it.pattern, 'text-clip-muted bg-clip-surface border-white/[0.02]')}
             </div>
           </div>
         )}

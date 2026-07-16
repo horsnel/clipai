@@ -77,7 +77,7 @@ export function TopicStealWidget({
   const TrendBadge = ({ mult }: { mult: number | null }) => {
     if (mult === null) {
       return (
-        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.05]">
+        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.02]">
           <Minus className="w-2.5 h-2.5" /> new
         </span>
       );
@@ -119,7 +119,7 @@ export function TopicStealWidget({
       );
     }
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.05]">
+      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.02]">
         <Minus className="w-2.5 h-2.5" /> flat
       </span>
     );
@@ -142,7 +142,7 @@ export function TopicStealWidget({
     <div className={`card-glass overflow-hidden ${className}`}>
       {/* Header */}
       {!compact && (
-        <div className="flex items-center justify-between gap-3 p-5 sm:p-6 pb-3 border-b border-white/[0.04]">
+        <div className="flex items-center justify-between gap-3 p-5 sm:p-6 pb-3 border-b border-white/[0.025]">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-clip-amber/10 flex items-center justify-center flex-shrink-0">
               <Flame className="w-5 h-5 text-clip-amber" />
@@ -181,7 +181,7 @@ export function TopicStealWidget({
           <span className="text-[10px] uppercase tracking-wider text-clip-muted font-semibold">
             Window
           </span>
-          <div className="flex items-center gap-1 bg-clip-surface rounded-lg p-0.5 border border-white/[0.04]">
+          <div className="flex items-center gap-1 bg-clip-surface rounded-lg p-0.5 border border-white/[0.025]">
             {DAYS_OPTIONS.map(d => (
               <button
                 key={d}
@@ -223,7 +223,7 @@ export function TopicStealWidget({
 
         {state === 'empty' && (
           <div className="p-6 text-center">
-            <div className="w-12 h-12 rounded-xl bg-clip-cyan/10 flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-xl bg-clip-cyan/6 flex items-center justify-center mx-auto mb-3">
               <Sparkles className="w-6 h-6 text-clip-cyan" />
             </div>
             <p className="font-display font-medium text-clip-text mb-1">
@@ -247,7 +247,7 @@ export function TopicStealWidget({
         )}
 
         {state === 'ready' && (
-          <ul className="divide-y divide-white/[0.03]">
+          <ul className="divide-y divide-white/[0.02]">
             {topics.map((t, i) => {
               const widthPct = Math.max(6, (t.mention_count / maxMentions) * 100);
               return (
@@ -267,7 +267,7 @@ export function TopicStealWidget({
                         {t.topic}
                       </span>
                       {t.game && t.game !== 'general' && (
-                        <span className="text-[10px] text-clip-muted bg-clip-surface border border-white/[0.05] px-1.5 py-0.5 rounded flex-shrink-0">
+                        <span className="text-[10px] text-clip-muted bg-clip-surface border border-white/[0.02] px-1.5 py-0.5 rounded flex-shrink-0">
                           {t.game}
                         </span>
                       )}
@@ -302,7 +302,7 @@ export function TopicStealWidget({
 
         {/* Footer CTA */}
         {!compact && state === 'ready' && onNavigate && (
-          <div className="pt-3 mt-2 border-t border-white/[0.04] flex items-center justify-between">
+          <div className="pt-3 mt-2 border-t border-white/[0.025] flex items-center justify-between">
             <span className="text-clip-muted text-xs flex items-center gap-1.5">
               <Sparkles className="w-3 h-3 text-clip-amber" />
               Steal these angles → run a Deep Analysis

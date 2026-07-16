@@ -79,7 +79,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
   const getPlanBadge = (plan: string) => {
     if (plan === 'creator') return <span className="text-[10px] px-1.5 py-0.5 bg-clip-amber text-black rounded font-bold">CREATOR</span>;
     if (plan === 'pro') return <span className="text-[10px] px-1.5 py-0.5 bg-clip-cyan text-black rounded font-bold">PRO</span>;
-    return <span className="text-[10px] px-1.5 py-0.5 bg-clip-surface text-clip-muted border border-white/[0.05] rounded font-bold">FREE</span>;
+    return <span className="text-[10px] px-1.5 py-0.5 bg-clip-surface text-clip-muted border border-white/[0.02] rounded font-bold">FREE</span>;
   };
 
   const getRankIcon = (rank: number) => {
@@ -109,7 +109,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
 
         {/* Tab Switcher */}
         <div className="flex justify-center mb-8">
-          <div className="inline-flex bg-clip-surface rounded-xl p-1 border border-white/[0.04]">
+          <div className="inline-flex bg-clip-surface rounded-xl p-1 border border-white/[0.025]">
             <button
               onClick={() => setActiveTab('alltime')}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium text-sm transition-all ${
@@ -188,7 +188,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
 
         {/* Rankings List */}
         <div className="card-glass overflow-hidden mb-6">
-          <div className="p-4 border-b border-white/[0.04]">
+          <div className="p-4 border-b border-white/[0.025]">
             <div className="flex items-center justify-between text-xs text-clip-muted uppercase tracking-wider">
               <span className="w-12">Rank</span>
               <span className="flex-1">Player</span>
@@ -197,7 +197,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
             </div>
           </div>
           
-          <div className="divide-y divide-white/[0.03]">
+          <div className="divide-y divide-white/[0.02]">
             {rest.map((player) => (
               <div 
                 key={player.rank} 

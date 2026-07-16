@@ -13,12 +13,12 @@ export function TermsPage({ onNavigate }: TermsPageProps) {
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => onNavigate('landing')}
-            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.04] rounded-lg transition-all"
+            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.025] rounded-lg transition-all"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center">
               <FileText className="w-5 h-5 text-clip-cyan" />
             </div>
             <div>

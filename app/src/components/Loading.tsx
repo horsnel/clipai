@@ -83,7 +83,7 @@ export function ParticleLoader({
       {/* Particle canvas */}
       <div className="relative w-48 h-48 mx-auto">
         {/* Glow halo */}
-        <div className="absolute inset-0 rounded-full bg-clip-cyan/10 blur-2xl animate-pulse" />
+        <div className="absolute inset-0 rounded-full bg-clip-cyan/6 blur-2xl animate-pulse" />
         <div className="absolute inset-4 rounded-full bg-clip-cyan/20 blur-xl animate-pulse" style={{ animationDelay: '300ms' }} />
 
         {/* Orbiting rings */}

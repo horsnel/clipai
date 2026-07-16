@@ -58,8 +58,8 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
     <div className="min-h-screen flex items-center justify-center py-20 px-4 relative">
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-clip-cyan/5 rounded-full blur-[150px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/5 rounded-full blur-[120px]" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-clip-cyan/3 rounded-full blur-[150px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/3 rounded-full blur-[120px]" />
       </div>
 
       <div className="w-full max-w-md relative z-10">
@@ -91,7 +91,7 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
           {/* Google Auth */}
           <button
             onClick={handleGoogleAuth}
-            className="w-full flex items-center justify-center gap-3 bg-clip-surface hover:bg-white/[0.04] border border-white/[0.05] hover:border-white/[0.07] text-clip-text font-medium py-3 px-4 rounded-xl transition-all duration-200 mb-6"
+            className="w-full flex items-center justify-center gap-3 bg-clip-surface hover:bg-white/[0.025] border border-white/[0.02] hover:border-white/[0.025] text-clip-text font-medium py-3 px-4 rounded-xl transition-all duration-200 mb-6"
           >
             <Chrome className="w-5 h-5" />
             Continue with Google
@@ -99,9 +99,9 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
 
           {/* Divider */}
           <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 h-px bg-white/[0.05]" />
+            <div className="flex-1 h-px bg-white/[0.02]" />
             <span className="text-clip-muted text-xs uppercase tracking-wider">or</span>
-            <div className="flex-1 h-px bg-white/[0.05]" />
+            <div className="flex-1 h-px bg-white/[0.02]" />
           </div>
 
           {/* Form */}

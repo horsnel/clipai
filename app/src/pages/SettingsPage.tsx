@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
-import { 
-  ChevronLeft, User, Crown, Gift, Bell, LogOut,
+import {
+  User, Crown, Gift, Bell, LogOut,
   Copy, Check, Sparkles, Zap, Crown as CrownIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -99,21 +99,13 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
     <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => onNavigate('dashboard')}
-            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.04] rounded-lg transition-all"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="font-display font-bold text-2xl sm:text-3xl text-clip-text">
-              Settings
-            </h1>
-            <p className="text-clip-muted text-sm">
-              Manage your account and preferences
-            </p>
-          </div>
+        <div className="mb-8">
+          <h1 className="font-display font-bold text-2xl sm:text-3xl text-clip-text">
+            Settings
+          </h1>
+          <p className="text-clip-muted text-sm">
+            Manage your account and preferences
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -127,7 +119,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     activeTab === tab.id
                       ? 'bg-clip-cyan text-black'
-                      : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.04]'
+                      : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.025]'
                   }`}
                 >
                   <tab.icon className="w-4 h-4" />
@@ -153,7 +145,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                     ? 'bg-clip-amber text-black' 
                     : user?.plan === 'pro'
                     ? 'bg-clip-cyan text-black'
-                    : 'bg-clip-surface text-clip-muted border border-white/[0.05]'
+                    : 'bg-clip-surface text-clip-muted border border-white/[0.02]'
                 }`}>
                   {user?.plan === 'creator' && <CrownIcon className="w-3 h-3" />}
                   {user?.plan === 'pro' && <Sparkles className="w-3 h-3" />}
@@ -268,7 +260,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                         ? 'bg-clip-amber text-black' 
                         : user?.plan === 'pro'
                         ? 'bg-clip-cyan text-black'
-                        : 'bg-clip-surface text-clip-muted border border-white/[0.05]'
+                        : 'bg-clip-surface text-clip-muted border border-white/[0.02]'
                     }`}>
                       {user?.plan?.toUpperCase()}
                     </span>
@@ -311,7 +303,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                     Share this code with friends and earn 5 free clips for each signup!
                   </p>
                   <div className="flex gap-3">
-                    <div className="flex-1 bg-clip-surface border border-white/[0.05] rounded-xl px-4 py-3 font-mono text-clip-text">
+                    <div className="flex-1 bg-clip-surface border border-white/[0.02] rounded-xl px-4 py-3 font-mono text-clip-text">
                       {referralCode}
                     </div>
                     <button
@@ -363,7 +355,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                       <button
                         onClick={() => setNotifications(prev => ({ ...prev, [item.key]: !prev[item.key as keyof typeof notifications] }))}
                         className={`w-12 h-6 rounded-full transition-colors relative flex-shrink-0 ${
-                          notifications[item.key as keyof typeof notifications] ? 'bg-clip-cyan' : 'bg-clip-surface border border-white/[0.05]'
+                          notifications[item.key as keyof typeof notifications] ? 'bg-clip-cyan' : 'bg-clip-surface border border-white/[0.02]'
                         }`}
                       >
                         <div

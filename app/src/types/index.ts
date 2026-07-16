@@ -265,8 +265,10 @@ export interface TrendingVideo {
   channel: string;
   thumbnail: string;
   url: string;
-  platform: 'youtube' | 'tiktok' | 'twitter';
+  platform: 'youtube' | 'tiktok' | 'twitter' | 'instagram';
   publishedAt: string;
+  /** YouTube view count (other platforms don't expose play counts). 0 if N/A. */
+  viewCount?: number;
   copyPack?: {
     title: string;
     caption: string;

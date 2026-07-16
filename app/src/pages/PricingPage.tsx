@@ -161,7 +161,7 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
   const HIGHLIGHTS = [
     { Icon: Flame,      label: 'Viral Forge',        sub: '14 outputs / URL', color: 'text-clip-amber', bg: 'bg-clip-amber/10' },
     { Icon: TrendingUp, label: 'Topic Steal',        sub: 'Network trends',   color: 'text-green-600',  bg: 'bg-green-500/10' },
-    { Icon: Sparkles,   label: 'Competitor Lab',     sub: 'Head-to-head',     color: 'text-clip-cyan',  bg: 'bg-clip-cyan/10' },
+    { Icon: Sparkles,   label: 'Competitor Lab',     sub: 'Head-to-head',     color: 'text-clip-cyan',  bg: 'bg-clip-cyan/6' },
     { Icon: Crown,      label: 'Playlist Architect', sub: 'Sequence + ship',  color: 'text-purple-600', bg: 'bg-purple-500/10' },
   ];
 
@@ -228,7 +228,7 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
               className={`relative card-glass p-6 lg:p-8 flex flex-col ${
                 plan.popular 
                   ? 'border-clip-cyan/50 ring-1 ring-clip-cyan/30 md:scale-105 z-10 pt-8 sm:pt-6 lg:pt-8' 
-                  : 'hover:border-white/[0.07]'
+                  : 'hover:border-white/[0.025]'
               } transition-all duration-300`}
             >
               {/* Popular badge */}

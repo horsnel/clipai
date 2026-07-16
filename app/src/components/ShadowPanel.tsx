@@ -86,7 +86,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
     return (
       <div className="card-glass p-6 space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
             <Ghost className="w-5 h-5 text-clip-cyan" />
           </div>
           <div>
@@ -131,7 +131,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
       {/* Header */}
       <div className="card-glass p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
             <Ghost className="w-5 h-5 text-clip-cyan" />
           </div>
           <div className="min-w-0">
@@ -142,7 +142,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
           </div>
         </div>
         {result.cached_analysis && (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/10 px-1.5 py-0.5 rounded border border-clip-cyan/20 flex-shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/6 px-1.5 py-0.5 rounded border border-clip-cyan/20 flex-shrink-0">
             Cached
           </span>
         )}
@@ -173,7 +173,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
             <p className="text-[10px] uppercase tracking-wider text-clip-amber font-bold mb-1.5">Act 3 · Payoff</p>
             <p className="text-sm text-clip-text leading-relaxed">{fullScript.act3_payoff}</p>
           </div>
-          <div className="pt-2 border-t border-white/[0.04]">
+          <div className="pt-2 border-t border-white/[0.025]">
             <p className="text-[10px] uppercase tracking-wider text-clip-muted font-bold mb-1.5">Call to Action</p>
             <p className="text-sm text-clip-text/90 italic">{fullScript.cta}</p>
           </div>
@@ -187,7 +187,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
         </h4>
         <ul className="space-y-2">
           {(r.b_roll_cues || []).map((c, i) => (
-            <li key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-clip-surface border border-white/[0.03]">
+            <li key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-clip-surface border border-white/[0.02]">
               <span className="text-[10px] font-bold uppercase tracking-wider text-clip-muted bg-clip-dark px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">
                 {c.t}
               </span>
@@ -196,7 +196,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   <span className="text-[10px] text-clip-muted">{c.duration_seconds}s</span>
                   {c.text_overlay && (
-                    <span className="text-[10px] text-clip-cyan bg-clip-cyan/10 border border-clip-cyan/20 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] text-clip-cyan bg-clip-cyan/6 border border-clip-cyan/20 px-1.5 py-0.5 rounded">
                       "{c.text_overlay}"
                     </span>
                   )}
@@ -213,19 +213,19 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
           <Mic className="w-4 h-4 text-clip-cyan" /> TTS / Voiceover Settings
         </h4>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="p-3 rounded-lg bg-clip-surface border border-white/[0.03]">
+          <div className="p-3 rounded-lg bg-clip-surface border border-white/[0.02]">
             <p className="text-[10px] uppercase tracking-wider text-clip-muted mb-1">Voice</p>
             <p className="text-sm text-clip-text">{r.tts_settings.voice_recommendation}</p>
           </div>
-          <div className="p-3 rounded-lg bg-clip-surface border border-white/[0.03]">
+          <div className="p-3 rounded-lg bg-clip-surface border border-white/[0.02]">
             <p className="text-[10px] uppercase tracking-wider text-clip-muted mb-1">Pace</p>
             <p className="text-sm text-clip-text font-mono">{r.tts_settings.pace_wpm} <span className="text-clip-muted text-xs">wpm</span></p>
           </div>
-          <div className="p-3 rounded-lg bg-clip-surface border border-white/[0.03]">
+          <div className="p-3 rounded-lg bg-clip-surface border border-white/[0.02]">
             <p className="text-[10px] uppercase tracking-wider text-clip-muted mb-1">Pitch</p>
             <p className="text-sm text-clip-text capitalize">{r.tts_settings.pitch}</p>
           </div>
-          <div className="p-3 rounded-lg bg-clip-surface border border-white/[0.03]">
+          <div className="p-3 rounded-lg bg-clip-surface border border-white/[0.02]">
             <p className="text-[10px] uppercase tracking-wider text-clip-muted mb-1">Pause</p>
             <p className="text-sm text-clip-text">{r.tts_settings.pause_strategy}</p>
           </div>

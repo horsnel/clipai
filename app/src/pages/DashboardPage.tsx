@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import {
-  Zap, Link2, TrendingUp, Clock, Play,
+  Zap, Link2, Clock, Play,
   ExternalLink, Sparkles, Radio, Flame,
-  Trophy, BarChart2, Scissors, ChevronRight, Coins, ArrowRight, Eye,
+  Trophy, BarChart2, Scissors, ChevronRight, Coins, ArrowRight,
 } from 'lucide-react';
 import { listClips } from '@/services/api';
 import { TopicStealWidget } from '@/components/TopicStealWidget';
 import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
 import { TrendingVideosSection } from '@/components/TrendingVideosSection';
+import { TrendingViewsChart } from '@/components/TrendingViewsChart';
 import { setPendingAnalysisId } from '@/lib/navState';
 import type { AnalysisSummary } from '../types';
 
@@ -89,7 +90,7 @@ const FEATURE_CARDS: FeatureCard[] = [
     label: 'Video Export',
     desc: 'AI clip rendering & editing',
     badge: 'SOON',
-    badgeColor: 'bg-clip-surface text-clip-muted border-white/[0.05]',
+    badgeColor: 'bg-clip-surface text-clip-muted border-white/[0.02]',
     locked: true,
   },
 ];
@@ -140,32 +141,13 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
           </Button>
         </div>
 
-        {/* Stats — 3 redesigned cards: Total Views + Credits Balance + Trending Snapshot */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-10">
-          {/* Total Views — redesigned with colored icon circle */}
-          <div className="card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all">
-            <div className="flex items-center gap-4 mb-3">
-              <div className="w-12 h-12 rounded-full bg-blue-500/15 flex items-center justify-center flex-shrink-0">
-                <Eye className="w-6 h-6 text-blue-500" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-clip-muted text-xs uppercase tracking-wider font-medium">Total Views</p>
-                <p className="font-display font-bold text-3xl text-clip-text tabular-nums leading-tight mt-0.5">24.5K</p>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-2 mt-2">
-              <p className="text-green-600 text-xs flex items-center gap-1 font-medium">
-                <TrendingUp className="w-3 h-3 flex-shrink-0" /> +12% this week
-              </p>
-              <span className="text-[10px] text-clip-muted/70 uppercase tracking-wider">Last 7 days</span>
-            </div>
-          </div>
-
+        {/* Stats — 2 redesigned cards: Credits Balance + Trending Snapshot */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6">
           {/* Credits Balance — redesigned with colored icon circle */}
           <div className={`card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all ${
             (user?.credits ?? 0) <= 5
-              ? 'border-clip-amber/30 bg-clip-amber/5'
-              : 'border-clip-cyan/20 bg-clip-cyan/5'
+              ? 'border-clip-amber/30 bg-clip-amber/3'
+              : 'border-clip-cyan/20 bg-clip-cyan/3'
           }`}>
             <div className="flex items-center gap-4 mb-3">
               <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -207,7 +189,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
             )}
           </div>
 
-          {/* Trending Snapshot — replaces Clips This Month card; deep-links to Trend Radar */}
+          {/* Trending Snapshot — deep-links to Trend Radar */}
           <button
             onClick={() => onNavigate('trends')}
             className="card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all text-left cursor-pointer"
@@ -225,11 +207,16 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
             <div className="flex items-center justify-between gap-2 mt-2">
               <p className="text-green-600 text-xs flex items-center gap-1 font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                5 platforms live
+                4 platforms live
               </p>
               <span className="text-[10px] text-clip-muted/70 uppercase tracking-wider">Open Trend Radar</span>
             </div>
           </button>
+        </div>
+
+        {/* ── Trending Views chart (replaces old "Total Views" stat card) ── */}
+        <div className="mb-10">
+          <TrendingViewsChart />
         </div>
 
         {/* ── Trending Gaming Videos (replaces Clips This Month row) ── */}
@@ -241,7 +228,6 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
         <div className="mb-10">
           <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
             <h2 className="font-display font-semibold text-xl text-clip-text">AI Tools</h2>
-            <span className="text-clip-muted text-xs sm:text-sm">All powered by ClipAI</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURE_CARDS.map(card => (
@@ -309,7 +295,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
 
           {clips.length === 0 ? (
             <div className="card-glass p-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-clip-cyan/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-clip-cyan/6 flex items-center justify-center mx-auto mb-4">
                 <Zap className="w-8 h-8 text-clip-cyan" />
               </div>
               <h3 className="font-display font-semibold text-xl text-clip-text mb-2">No clips yet</h3>
@@ -322,7 +308,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {clips.map(clip => (
                 <div key={clip.id} onClick={() => onNavigate('results')}
-                  className="card-glass overflow-hidden cursor-pointer group hover:-translate-y-1 hover:border-white/[0.07] transition-all duration-300">
+                  className="card-glass overflow-hidden cursor-pointer group hover:-translate-y-1 hover:border-white/[0.025] transition-all duration-300">
                   <div className="relative aspect-video overflow-hidden">
                     <img src={clip.thumbnail} alt={clip.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />

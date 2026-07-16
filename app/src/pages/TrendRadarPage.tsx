@@ -184,7 +184,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
                   selectedGame === g
                     ? 'bg-clip-cyan text-black'
-                    : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04]'
+                    : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.025]'
                 }`}>
                 {g}
               </button>
@@ -208,13 +208,12 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
 
         {/* Platform filter row */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-          <span className="text-clip-muted text-xs uppercase tracking-wider self-center mr-1 flex-shrink-0">Source:</span>
           {PLATFORMS.map(p => (
             <button key={p.id} onClick={() => setActivePlatform(p.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                 activePlatform === p.id
                   ? p.color + ' border-transparent'
-                  : 'bg-clip-surface text-clip-muted hover:text-clip-text border-white/[0.04]'
+                  : 'bg-clip-surface text-clip-muted hover:text-clip-text border-white/[0.025]'
               }`}>
               {p.label}
             </button>
@@ -228,7 +227,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
 
         {/* Trends table */}
         <div className="card-glass overflow-hidden">
-          <div className="p-4 border-b border-white/[0.04] flex items-center justify-between">
+          <div className="p-4 border-b border-white/[0.025] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Globe className="w-4 h-4 text-clip-cyan" />
               <span className="text-sm font-medium text-clip-text">
@@ -243,7 +242,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
             )}
           </div>
 
-          <div className="divide-y divide-white/[0.03]">
+          <div className="divide-y divide-white/[0.02]">
             {isLoading ? (
               <ParticleLoader
                 stages={[
@@ -264,7 +263,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <button
                 key={trend.id}
                 onClick={() => setSelectedTrend(trend)}
-                className="w-full text-left flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-4 hover:bg-white/[0.03] transition-colors group cursor-pointer focus:outline-none focus:bg-white/[0.03]"
+                className="w-full text-left flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-4 hover:bg-white/[0.02] transition-colors group cursor-pointer focus:outline-none focus:bg-white/[0.02]"
               >
                 {/* Rank */}
                 <span className="text-clip-muted font-mono text-sm w-6 flex-shrink-0 hidden sm:block">
@@ -347,7 +346,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
 
           {/* Hint below table */}
           {filtered.length > 0 && (
-            <div className="px-4 py-3 border-t border-white/[0.03] flex items-center gap-2 text-clip-muted text-xs">
+            <div className="px-4 py-3 border-t border-white/[0.02] flex items-center gap-2 text-clip-muted text-xs">
               <Sparkles className="w-3.5 h-3.5 text-clip-cyan flex-shrink-0" />
               <span>Tap any trend to get keywords, titles, captions & hashtags</span>
             </div>
@@ -356,7 +355,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
 
         {/* Upgrade CTA for free users */}
         {user?.plan === 'free' && (
-          <div className="mt-6 card-glass p-5 border-clip-amber/20 bg-clip-amber/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="mt-6 card-glass p-5 border-clip-amber/20 bg-clip-amber/3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Zap className="w-5 h-5 text-clip-amber flex-shrink-0" />
               <div>

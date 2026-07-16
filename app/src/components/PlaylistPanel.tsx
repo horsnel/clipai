@@ -139,7 +139,7 @@ export function PlaylistPanel({ user, onNavigate }: PlaylistPanelProps) {
                 youtube: 'text-red-600 bg-red-500/10',
                 tiktok: 'text-pink-600 bg-pink-500/10',
                 x: 'text-slate-300 bg-slate-500/10',
-                shorts: 'text-clip-cyan bg-clip-cyan/10',
+                shorts: 'text-clip-cyan bg-clip-cyan/6',
               };
               return (
                 <div key={platform}>
@@ -206,7 +206,7 @@ export function PlaylistPanel({ user, onNavigate }: PlaylistPanelProps) {
               <p className="text-[10px] uppercase tracking-wider text-red-600 mb-1">Expected weak</p>
               <p className="text-sm text-clip-text truncate" title={p.retention_forecast.expected_weak_video}>{p.retention_forecast.expected_weak_video}</p>
             </div>
-            <div className="p-3 rounded-lg bg-clip-cyan/5 border border-clip-cyan/20">
+            <div className="p-3 rounded-lg bg-clip-cyan/3 border border-clip-cyan/20">
               <p className="text-[10px] uppercase tracking-wider text-clip-cyan mb-1">Projected hours</p>
               <p className="text-sm text-clip-text font-mono">{p.retention_forecast.total_projected_watch_hours.toLocaleString()}</p>
             </div>
@@ -232,7 +232,7 @@ export function PlaylistPanel({ user, onNavigate }: PlaylistPanelProps) {
     <div className="max-w-2xl mx-auto">
       <div className="card-glass p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
             <ListOrdered className="w-5 h-5 text-clip-cyan" />
           </div>
           <div>

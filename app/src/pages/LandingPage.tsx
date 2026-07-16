@@ -81,8 +81,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         {/* Background effects */}
         <div className="absolute inset-0 vignette pointer-events-none" />
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-clip-cyan/5 rounded-full blur-[120px]" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/5 rounded-full blur-[100px]" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-clip-cyan/3 rounded-full blur-[120px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/3 rounded-full blur-[100px]" />
         </div>
 
         {/* Content */}
@@ -128,7 +128,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             ref={phoneRef}
             className="relative mx-auto w-full max-w-sm sm:max-w-md lg:max-w-lg perspective-1000 preserve-3d"
           >
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.05]">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.02]">
               <img 
                 src="/hero-phone.jpg" 
                 alt="ClipAI Phone Mockup"
@@ -226,7 +226,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             ].map((feature, i) => (
               <div
                 key={feature.title}
-                className="card-glass p-8 hover:-translate-y-2 hover:border-white/[0.07] transition-all duration-300 group"
+                className="card-glass p-8 hover:-translate-y-2 hover:border-white/[0.025] transition-all duration-300 group"
                 style={{ transitionDelay: `${i * 100}ms` }}
               >
                 <div className={`w-14 h-14 rounded-2xl bg-${feature.color}/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
@@ -247,7 +247,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             <p className="text-clip-muted text-xs uppercase tracking-wider mb-3 text-center">Every Deep Analysis returns</p>
             <div className="flex flex-wrap justify-center gap-2">
               {['Hook Score', '10 Titles', 'Captions', 'Distribution Pack', 'Hidden Gems', 'Goldilocks Map', 'Thumbnail Concepts', 'Pinned Comments', 'Community Polls', 'Sponsorship Spots', 'Controversy Hooks', 'Sentiment Arc', 'Shadow Editor', 'Pacing'].map((o) => (
-                <span key={o} className="text-xs text-clip-text bg-clip-surface border border-white/[0.05] px-2.5 py-1 rounded-full">
+                <span key={o} className="text-xs text-clip-text bg-clip-surface border border-white/[0.02] px-2.5 py-1 rounded-full">
                   {o}
                 </span>
               ))}
@@ -287,7 +287,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 <img
                   src="/avatar-tobi.jpg"
                   alt="Tobi"
-                  className="w-12 h-12 rounded-xl object-cover border border-white/[0.05] flex-shrink-0"
+                  className="w-12 h-12 rounded-xl object-cover border border-white/[0.02] flex-shrink-0"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="font-display font-semibold text-clip-text">Tobi</p>
@@ -308,7 +308,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center max-w-6xl mx-auto">
             {/* Phone mockup */}
             <div className="relative">
-              <div className="relative rounded-3xl overflow-hidden shadow-card border border-white/[0.05] max-w-sm mx-auto lg:mx-0">
+              <div className="relative rounded-3xl overflow-hidden shadow-card border border-white/[0.02] max-w-sm mx-auto lg:mx-0">
                 <img 
                   src="/gameplay-thumb-1.jpg" 
                   alt="Smart Cuts Preview"
@@ -318,7 +318,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 
                 {/* Overlay UI elements */}
                 <div className="absolute bottom-4 left-4 right-4">
-                  <div className="bg-clip-dark/90 backdrop-blur-sm rounded-xl p-3 border border-white/[0.05]">
+                  <div className="bg-clip-dark/90 backdrop-blur-sm rounded-xl p-3 border border-white/[0.02]">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-clip-muted">Beat Sync</span>
                       <span className="text-xs text-clip-cyan">ON</span>
@@ -347,7 +347,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                   { icon: Gamepad2, text: 'Watermark + outro branding' },
                 ].map((item) => (
                   <div key={item.text} className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
                       <item.icon className="w-5 h-5 text-clip-cyan" />
                     </div>
                     <span className="text-clip-text font-medium">{item.text}</span>
@@ -370,12 +370,12 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
       {/* CTA Section */}
       <section className="py-20 lg:py-28 relative">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-clip-cyan/5 rounded-full blur-[150px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-clip-cyan/3 rounded-full blur-[150px]" />
         </div>
         
         <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 relative z-10">
           <div className="max-w-xl mx-auto">
-            <div className="card-glass p-8 lg:p-10 border-white/[0.05]">
+            <div className="card-glass p-8 lg:p-10 border-white/[0.02]">
               <h2 className="font-display font-bold text-2xl sm:text-3xl text-clip-text text-center mb-3">
                 Get 50 free credits
               </h2>

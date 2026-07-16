@@ -138,10 +138,10 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <button key={t.key} onClick={() => { if (!t.locked) setActiveTool(t.key); else onNavigate('pricing'); }}
               className={`p-4 rounded-xl border text-left transition-all relative ${
                 activeTool === t.key
-                  ? 'border-clip-cyan/50 bg-clip-cyan/5'
+                  ? 'border-clip-cyan/50 bg-clip-cyan/3'
                   : t.locked
-                  ? 'border-white/[0.03] bg-clip-surface/50 opacity-60 cursor-pointer'
-                  : 'border-white/[0.04] bg-clip-surface hover:border-white/[0.07]'
+                  ? 'border-white/[0.02] bg-clip-surface/50 opacity-60 cursor-pointer'
+                  : 'border-white/[0.025] bg-clip-surface hover:border-white/[0.025]'
               }`}>
               {t.locked && (
                 <span className="absolute top-2 right-2 text-xs px-1.5 py-0.5 bg-clip-amber/10 text-clip-amber rounded border border-clip-amber/20 flex-shrink-0">PRO</span>
@@ -193,7 +193,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
 
             {spyResult && (
               <div className="space-y-4">
-                <div className="card-glass p-5 border-clip-cyan/20 bg-clip-cyan/5">
+                <div className="card-glass p-5 border-clip-cyan/20 bg-clip-cyan/3">
                   <div className="flex items-center gap-2 mb-4">
                     <Trophy className="w-4 h-4 text-clip-cyan" />
                     <h4 className="font-display font-semibold text-clip-text">{spyResult.channelName}</h4>
@@ -231,7 +231,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                   </div>
                 </div>
 
-                <div className="card-glass p-5 border-clip-amber/20 bg-clip-amber/5">
+                <div className="card-glass p-5 border-clip-amber/20 bg-clip-amber/3">
                   <div className="flex items-start gap-3">
                     <Zap className="w-5 h-5 text-clip-amber flex-shrink-0 mt-0.5" />
                     <div>
@@ -260,7 +260,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                     {PLATFORMS.map(p => (
                       <button key={p} onClick={() => setTimingPlatform(p)}
                         className={`w-full px-3 py-2 rounded-lg text-sm text-left transition-all ${
-                          timingPlatform === p ? 'bg-clip-cyan text-black font-medium' : 'bg-clip-surface text-clip-muted border border-white/[0.04] hover:text-clip-text'
+                          timingPlatform === p ? 'bg-clip-cyan text-black font-medium' : 'bg-clip-surface text-clip-muted border border-white/[0.025] hover:text-clip-text'
                         }`}>{p}</button>
                     ))}
                   </div>
@@ -291,10 +291,10 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             {timingResult && (
               <div className="space-y-4">
                 <div className="card-glass overflow-hidden">
-                  <div className="p-4 border-b border-white/[0.04]">
+                  <div className="p-4 border-b border-white/[0.025]">
                     <p className="font-medium text-clip-text">{timingResult.platform} — Nigeria (WAT)</p>
                   </div>
-                  <div className="divide-y divide-white/[0.03]">
+                  <div className="divide-y divide-white/[0.02]">
                     {timingResult.slots.map((slot, i) => (
                       <div key={i} className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3">
                         <span className="text-clip-muted text-xs sm:text-sm w-16 sm:w-20 font-medium flex-shrink-0">{slot.day}</span>
@@ -305,7 +305,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                           }`} style={{ width: `${slot.score}%` }} />
                         </div>
                         <span className={`text-xs font-medium flex-shrink-0 px-2 py-0.5 rounded whitespace-nowrap ${
-                          slot.label === 'PEAK' ? 'bg-clip-cyan/10 text-clip-cyan' :
+                          slot.label === 'PEAK' ? 'bg-clip-cyan/6 text-clip-cyan' :
                           slot.label === 'GREAT' ? 'bg-green-500/10 text-green-600' :
                           'bg-clip-amber/10 text-clip-amber'
                         }`}>{slot.label}</span>
@@ -313,7 +313,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                     ))}
                   </div>
                 </div>
-                <div className="card-glass p-4 border-clip-cyan/20 bg-clip-cyan/5 flex items-start gap-3">
+                <div className="card-glass p-4 border-clip-cyan/20 bg-clip-cyan/3 flex items-start gap-3">
                   <AlertCircle className="w-4 h-4 text-clip-cyan flex-shrink-0 mt-0.5" />
                   <p className="text-clip-text text-sm">{timingResult.insight}</p>
                 </div>
@@ -368,7 +368,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
               <div className="space-y-4">
                 {/* Winner banner */}
                 <div className={`card-glass p-5 flex items-center gap-4 ${
-                  abResult.winner === 'A' ? 'border-clip-cyan/30 bg-clip-cyan/5' : 'border-clip-amber/30 bg-clip-amber/5'
+                  abResult.winner === 'A' ? 'border-clip-cyan/30 bg-clip-cyan/3' : 'border-clip-amber/30 bg-clip-amber/3'
                 }`}>
                   <CheckCircle className="w-6 h-6 text-clip-cyan flex-shrink-0" />
                   <div className="min-w-0">

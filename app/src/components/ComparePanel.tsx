@@ -79,9 +79,9 @@ export function ComparePanel({ user, onNavigate }: ComparePanelProps) {
   if (result) {
     const c: ComparisonResult = result.comparison;
     const MetricBadge = ({ adv }: { adv: string }) => {
-      if (adv === 'A') return <span className="text-xs font-bold text-clip-cyan px-1.5 py-0.5 rounded bg-clip-cyan/10">A wins</span>;
+      if (adv === 'A') return <span className="text-xs font-bold text-clip-cyan px-1.5 py-0.5 rounded bg-clip-cyan/6">A wins</span>;
       if (adv === 'B') return <span className="text-xs font-bold text-clip-amber px-1.5 py-0.5 rounded bg-clip-amber/10">B wins</span>;
-      return <span className="text-xs text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.05]">tie</span>;
+      return <span className="text-xs text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.02]">tie</span>;
     };
 
     return (
@@ -93,7 +93,7 @@ export function ComparePanel({ user, onNavigate }: ComparePanelProps) {
             <div className="text-center text-clip-muted text-xs uppercase tracking-wider">vs</div>
             <VideoCard label="B" video={result.videos.b} isWinner={c.winner === 'B'} />
           </div>
-          <div className="mt-4 pt-4 border-t border-white/[0.04] text-center">
+          <div className="mt-4 pt-4 border-t border-white/[0.025] text-center">
             <p className="text-clip-muted text-xs uppercase tracking-wider mb-1">Verdict</p>
             <p className="font-display font-semibold text-clip-text">{c.winner_reason}</p>
           </div>
@@ -144,11 +144,11 @@ export function ComparePanel({ user, onNavigate }: ComparePanelProps) {
             <Sparkles className="w-4 h-4 text-purple-400" /> Voice Gap
           </h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-            <div className="p-3 rounded-lg bg-clip-cyan/5 border border-clip-cyan/10">
+            <div className="p-3 rounded-lg bg-clip-cyan/3 border border-clip-cyan/10">
               <p className="text-[10px] uppercase tracking-wider text-clip-cyan mb-1">A's voice</p>
               <p className="text-sm text-clip-text">{c.voice_gap.a_voice}</p>
             </div>
-            <div className="p-3 rounded-lg bg-clip-amber/5 border border-clip-amber/10">
+            <div className="p-3 rounded-lg bg-clip-amber/3 border border-clip-amber/10">
               <p className="text-[10px] uppercase tracking-wider text-clip-amber mb-1">B's voice</p>
               <p className="text-sm text-clip-text">{c.voice_gap.b_voice}</p>
             </div>
@@ -212,7 +212,7 @@ export function ComparePanel({ user, onNavigate }: ComparePanelProps) {
     <div className="max-w-2xl mx-auto">
       <div className="card-glass p-6 sm:p-8">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
             <Trophy className="w-5 h-5 text-clip-cyan" />
           </div>
           <div>
@@ -296,9 +296,9 @@ function VideoCard({ label, video, isWinner }: {
 }) {
   const thumb = `https://i.ytimg.com/vi/${video.video_id}/mqdefault.jpg`;
   return (
-    <div className={`p-3 rounded-xl border transition-all ${isWinner ? 'bg-clip-cyan/5 border-clip-cyan/30' : 'bg-clip-surface border-white/[0.05]'}`}>
+    <div className={`p-3 rounded-xl border transition-all ${isWinner ? 'bg-clip-cyan/3 border-clip-cyan/30' : 'bg-clip-surface border-white/[0.02]'}`}>
       <div className="flex items-center gap-2 mb-2">
-        <span className={`text-xs font-bold w-5 h-5 rounded flex items-center justify-center ${isWinner ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.05]'}`}>
+        <span className={`text-xs font-bold w-5 h-5 rounded flex items-center justify-center ${isWinner ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted border border-white/[0.02]'}`}>
           {label}
         </span>
         {isWinner && <span className="text-[10px] font-bold text-clip-cyan uppercase tracking-wider">Winner</span>}
@@ -322,7 +322,7 @@ function CommentList({ label, comments }: {
   const typeColor: Record<string, string> = {
     praise: 'text-green-600 bg-green-500/10',
     criticism: 'text-red-600 bg-red-500/10',
-    question: 'text-clip-cyan bg-clip-cyan/10',
+    question: 'text-clip-cyan bg-clip-cyan/6',
     debate: 'text-clip-amber bg-clip-amber/10',
     spam: 'text-clip-muted bg-clip-surface',
   };

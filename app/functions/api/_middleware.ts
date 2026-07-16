@@ -1331,7 +1331,33 @@ async function ytTrending(env: Env, game: string, max = 10): Promise<any[]> {
     const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(game + ' gaming highlights')}&type=video&videoDuration=short&order=viewCount&maxResults=${max}&key=${env.YOUTUBE_API_KEY}&regionCode=NG`);
     if (!r.ok) return [];
     const data = (await r.json()) as any;
-    return data.items || [];
+    const items = data.items || [];
+    if (!items.length) return [];
+
+    // Fetch view counts in one batched call — search.list doesn't include
+    // statistics. videos.list?part=statistics&id=...&id=... returns them.
+    // Used by the dashboard's "Trending Views" chart.
+    const videoIds = items.map((it: any) => it.id?.videoId || it.id).filter(Boolean).join(',');
+    if (videoIds) {
+      try {
+        const sr = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds}&key=${env.YOUTUBE_API_KEY}`);
+        if (sr.ok) {
+          const sdata = (await sr.json()) as any;
+          const viewMap: Record<string, number> = {};
+          for (const v of (sdata.items || [])) {
+            viewMap[v.id] = parseInt(v.statistics?.viewCount || '0', 10) || 0;
+          }
+          // Attach viewCount to each search item
+          for (const it of items) {
+            const vid = it.id?.videoId || it.id;
+            (it as any).viewCount = viewMap[vid] || 0;
+          }
+        }
+      } catch {
+        // Stats fetch failed — items still have everything else, just no viewCount
+      }
+    }
+    return items;
   } catch {
     return [];
   }
@@ -1666,6 +1692,30 @@ async function serpTwitter(env: Env, game: string, limit = 6): Promise<any[]> {
   }));
 }
 
+async function serpInstagram(env: Env, game: string, limit = 4): Promise<any[]> {
+  // Use Google's index via Serper — site:instagram.com/reels scopes to IG Reels.
+  // Instagram doesn't expose public play counts, so we set views=0 (UI handles
+  // null/0 by hiding the chart bar for that video).
+  const q = (game && game.toLowerCase() !== 'all')
+    ? `site:instagram.com/reels ${game} gaming`
+    : 'site:instagram.com/reels gaming viral 2026';
+  const raw = await serperSearch(env, q, limit + 4);
+  return raw.slice(0, limit).map((v: any) => {
+    const url = v.link || '';
+    // instagram.com/reels/<shortcode>/ or instagram.com/p/<shortcode>/
+    // Author is often in the page title: "Username on Instagram: ..."
+    const titleParts = (v.title || '').split(' on Instagram');
+    const author = titleParts.length > 1 ? titleParts[0].trim() : 'Instagram creator';
+    return {
+      title: v.title || 'Instagram Reel',
+      views: 0,
+      author,
+      url,
+      platform: 'instagram',
+    };
+  });
+}
+
 app.get('/trends/_diag', async (c) => {
   // Diagnostic endpoint — pings each keyless platform directly and reports
   // raw HTTP status + first 200 chars of body. Helps isolate which layer
@@ -1941,31 +1991,33 @@ Rules:
 });
 
 // ─── Trending Videos (Dashboard widget, multi-platform) ─────────────────────
-// Returns ~9 trending gaming videos mixed across YouTube, TikTok, and X/Twitter
-// + a per-video copy pack (optimized title + 1 caption + 8 hashtags).
-// No auth, no credits — this is a free dashboard-level inspiration widget.
-// Cached 6h globally (trends + videos don't shift faster than that, and one
-// LLM call covers all videos).
+// Returns ~11 trending gaming videos mixed across YouTube, TikTok, X/Twitter,
+// and Instagram Reels + a per-video copy pack (optimized title + 1 caption +
+// 8 hashtags) and a viewCount (YouTube only; other platforms don't expose
+// public play counts). No auth, no credits — this is a free dashboard-level
+// inspiration widget. Cached 6h globally.
 //
 // Platform mix:
-//   - 4 YouTube (real video data via ytTrending: id, snippet, thumbnail)
-//   - 3 TikTok  (via serpTiktok: title + url, no thumbnail — UI renders fallback)
-//   - 2 X       (via serpTwitter: title + url, no thumbnail — UI renders fallback)
+//   - 4 YouTube  (real video data via ytTrending: id, snippet, thumbnail, viewCount)
+//   - 3 TikTok   (via serpTiktok: title + url, no thumbnail, no views)
+//   - 2 X        (via serpTwitter: title + url, no thumbnail, no views)
+//   - 2 IG Reels (via serpInstagram: title + url, no thumbnail, no views)
 app.get('/trending-videos', async (c) => {
   const env = c.env as Env;
   const game = (c.req.query('game') || '').trim();
   const gameLabel = game || 'gaming';
 
-  const cacheKey = `trending_videos_v2:${gameLabel.toLowerCase()}`;
+  const cacheKey = `trending_videos_v3:${gameLabel.toLowerCase()}`;
   const data = await withCache(env, cacheKey, 6 * 60 * 60, async () => {
-    // Fetch from all 3 platforms in parallel
-    const [ytItems, ttItems, xItems] = await Promise.all([
+    // Fetch from all 4 platforms in parallel
+    const [ytItems, ttItems, xItems, igItems] = await Promise.all([
       ytTrending(env, game || 'gaming', 4),
       serpTiktok(env, game || 'gaming', 3),
       serpTwitter(env, game || 'gaming', 2),
+      serpInstagram(env, game || 'gaming', 2),
     ]);
 
-    // ── Map YouTube → video objects ──
+    // ── Map YouTube → video objects (with viewCount) ──
     const ytVideos = ytItems.map((it: any) => {
       const vid = it.id?.videoId || it.id || '';
       return {
@@ -1976,6 +2028,7 @@ app.get('/trending-videos', async (c) => {
         url: vid ? `https://www.youtube.com/watch?v=${vid}` : '',
         platform: 'youtube',
         publishedAt: it.snippet?.publishedAt || '',
+        viewCount: typeof it.viewCount === 'number' ? it.viewCount : 0,
       };
     }).filter((v: any) => v.id && v.url);
 
@@ -1994,6 +2047,7 @@ app.get('/trending-videos', async (c) => {
         url,
         platform: 'tiktok',
         publishedAt: '',
+        viewCount: 0,
       };
     }).filter((v: any) => v.url);
 
@@ -2011,10 +2065,26 @@ app.get('/trending-videos', async (c) => {
         url,
         platform: 'twitter',
         publishedAt: '',
+        viewCount: 0,
       };
     }).filter((v: any) => v.url);
 
-    const videos = [...ytVideos, ...ttVideos, ...xVideos];
+    // ── Map Instagram Reels → video objects ──
+    const igVideos = igItems.map((it: any, i: number) => {
+      const url = it.url || '';
+      return {
+        id: `ig_${i}_${url.slice(-12)}`,
+        title: it.title || 'Instagram Reel',
+        channel: it.author || 'Instagram creator',
+        thumbnail: '',  // Instagram doesn't expose public thumbnails reliably
+        url,
+        platform: 'instagram',
+        publishedAt: '',
+        viewCount: 0,
+      };
+    }).filter((v: any) => v.url);
+
+    const videos = [...ytVideos, ...ttVideos, ...xVideos, ...igVideos];
 
     if (!videos.length) {
       return { videos: [], generatedAt: new Date().toISOString(), game: gameLabel };
@@ -2026,7 +2096,7 @@ app.get('/trending-videos', async (c) => {
     ).join('\n');
 
     const system = 'You are a viral gaming content strategist for African creators. Return ONLY valid JSON.';
-    const prompt = `For each of these ${videos.length} trending gaming videos across multiple platforms (YouTube, TikTok, X/Twitter), generate a ready-to-post copy pack.
+    const prompt = `For each of these ${videos.length} trending gaming videos across multiple platforms (YouTube, TikTok, X/Twitter, Instagram Reels), generate a ready-to-post copy pack.
 
 Videos:
 ${videoList}
@@ -2046,21 +2116,21 @@ Return JSON:
 
 Rules:
 - packs array MUST have exactly ${videos.length} items, in the same order as the videos above.
-- Tailor the caption length to the platform: TikTok captions short & punchy (<100 chars), X captions even shorter (<80 chars), YouTube captions can be longer (up to 120 chars).
+- Tailor the caption length to the platform: TikTok captions short & punchy (<100 chars), X captions even shorter (<80 chars), YouTube captions can be longer (up to 120 chars), Instagram Reels captions up to 140 chars.
 - Each hashtag array: 8 items, mix of mega (e.g. #gaming) + mid (#naijagamer) + niche. ALL lowercase.
 - ALWAYS include #naijagamer and #gamingafrica in every pack.
-- For TikTok packs, include #tiktokgaming and one platform-specific tag.
+- For TikTok packs, include #tiktokgaming.
 - For X packs, include #gamingtwitter.
+- For Instagram packs, include #instagramreels and #reelsgaming.
 - Titles should feel authentic, not corporate. Optimise for clicks on the respective platform.
 - Captions should reference the gaming moment / Nigerian-African creator culture where natural.
 - Return ONLY the JSON, no markdown fences.`;
 
     let packs: any[] = [];
     try {
-      const llmData: any = await llmJson(env, prompt, system, 3500);
+      const llmData: any = await llmJson(env, prompt, system, 4500);
       packs = Array.isArray(llmData.packs) ? llmData.packs : [];
     } catch {
-      // LLM failure — fall back to empty packs (videos still show, just no copy button)
       packs = [];
     }
 

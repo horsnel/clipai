@@ -67,7 +67,7 @@ function Card({
     <div className="card-glass overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full p-4 flex items-center gap-3 text-left hover:bg-white/[0.03] transition-colors"
+        className="w-full p-4 flex items-center gap-3 text-left hover:bg-white/[0.02] transition-colors"
       >
         <Icon className={`w-5 h-5 flex-shrink-0 ${accentClass}`} />
         <div className="flex-1 min-w-0">
@@ -75,13 +75,13 @@ function Card({
           {subtitle && <p className="text-xs text-clip-muted mt-0.5 truncate">{subtitle}</p>}
         </div>
         {count !== undefined && (
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-md bg-clip-surface border border-white/[0.04] ${accentClass}`}>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-md bg-clip-surface border border-white/[0.025] ${accentClass}`}>
             {count}
           </span>
         )}
         <span className={`text-clip-muted text-xs transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
       </button>
-      {open && <div className="px-4 pb-4 pt-1 border-t border-white/[0.03]">{children}</div>}
+      {open && <div className="px-4 pb-4 pt-1 border-t border-white/[0.02]">{children}</div>}
     </div>
   );
 }
@@ -120,7 +120,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
               {videoAuthor && <p className="text-xs text-clip-muted">by {videoAuthor}</p>}
             </div>
             <div className="flex items-center gap-2 text-xs text-clip-muted">
-              {cached && <span className="px-2 py-0.5 rounded-md bg-clip-cyan/10 text-clip-cyan">cached</span>}
+              {cached && <span className="px-2 py-0.5 rounded-md bg-clip-cyan/6 text-clip-cyan">cached</span>}
               {processingMs && <span>{(processingMs / 1000).toFixed(1)}s</span>}
             </div>
           </div>
@@ -183,7 +183,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wider text-clip-muted">Rewritten openers</p>
               {a.hook_rewrites.map((r, i) => (
-                <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03]">
+                <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                   <CopyItem text={r} label="Hook copied" />
                 </div>
               ))}
@@ -196,7 +196,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
       <Card icon={TrendingUp} title="Title Variants" subtitle="10 viral title options" count={a.title_variants?.length ?? 0}>
         <div className="space-y-2">
           {a.title_variants?.map((t, i) => (
-            <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03] flex items-start gap-2">
+            <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02] flex items-start gap-2">
               <span className="text-xs font-bold text-clip-cyan tabular-nums flex-shrink-0 mt-0.5">{i + 1}.</span>
               <CopyItem text={t} label="Title copied" />
             </div>
@@ -209,7 +209,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
         <Card icon={Lightbulb} title="Hidden Gem Angles" subtitle="Secondary stories worth clipping" count={a.hidden_gems.length} accent="violet">
           <div className="space-y-3">
             {a.hidden_gems.map((g, i) => (
-              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03]">
+              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <p className="text-sm font-semibold text-violet-500 mb-1">{g.angle}</p>
                 <CopyItem text={g.title} label="Title copied" />
                 <p className="text-xs text-clip-muted mt-2">{g.why_viral}</p>
@@ -230,7 +230,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
               <p className="text-xs uppercase tracking-wider text-clip-muted mb-2">X Thread ({a.distribution_pack.x_thread.length} tweets)</p>
               <div className="space-y-2">
                 {a.distribution_pack.x_thread.map((t, i) => (
-                  <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03] flex items-start gap-2">
+                  <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02] flex items-start gap-2">
                     <span className="text-xs font-bold text-clip-cyan flex-shrink-0 mt-0.5">{i + 1}/</span>
                     <CopyItem text={t} label="Tweet copied" />
                   </div>
@@ -241,7 +241,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
           {a.distribution_pack?.linkedin && (
             <div>
               <p className="text-xs uppercase tracking-wider text-clip-muted mb-2">LinkedIn Article</p>
-              <div className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03]">
+              <div className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <CopyItem text={a.distribution_pack.linkedin} label="Article copied" />
               </div>
             </div>
@@ -249,7 +249,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
           {a.distribution_pack?.newsletter && (
             <div>
               <p className="text-xs uppercase tracking-wider text-clip-muted mb-2">Newsletter Draft</p>
-              <div className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03]">
+              <div className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <CopyItem text={a.distribution_pack.newsletter} label="Newsletter copied" />
               </div>
             </div>
@@ -262,7 +262,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
         <Card icon={MessageSquare} title="Caption Pack" subtitle="Style-matched captions per segment" count={a.caption_variants.length}>
           <div className="space-y-3">
             {a.caption_variants.map((seg, i) => (
-              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03]">
+              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <p className="text-[10px] text-clip-muted font-mono mb-2">
                   {formatTimestamp(seg.clip_start)} → {formatTimestamp(seg.clip_end)}
                 </p>
@@ -326,7 +326,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
                 <p className="text-xs uppercase tracking-wider text-clip-muted mb-2">Drafted replies</p>
                 <div className="space-y-1.5">
                   {a.pinned_comment_tree.replies.map((r, i) => (
-                    <div key={i} className="rounded-lg bg-clip-surface/50 p-2.5 border border-white/[0.03]">
+                    <div key={i} className="rounded-lg bg-clip-surface/50 p-2.5 border border-white/[0.02]">
                       <CopyItem text={r} label="Reply copied" />
                     </div>
                   ))}
@@ -342,7 +342,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
         <Card icon={Camera} title="Thumbnail Overlay Concepts" subtitle="Text + position + color" count={a.thumbnail_concepts.length}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {a.thumbnail_concepts.map((t, i) => (
-              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03]">
+              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <p className="text-sm font-bold text-clip-text mb-1"
                   style={{ color: t.color === 'yellow' ? '#FBBF24' : t.color === 'red' ? '#F87171' : t.color === 'cyan' ? '#00C2D6' : undefined }}>
                   {t.text}
@@ -359,11 +359,11 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
         <Card icon={CheckCircle2} title="Community Tab Polls" subtitle="Drive engagement from transcript" count={a.community_polls.length}>
           <div className="space-y-2">
             {a.community_polls.map((p, i) => (
-              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03]">
+              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <CopyItem text={p.question} label="Poll copied" />
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {p.options.map((o, j) => (
-                    <span key={j} className="text-xs px-2 py-0.5 rounded-md bg-clip-surface border border-white/[0.03] text-clip-muted">
+                    <span key={j} className="text-xs px-2 py-0.5 rounded-md bg-clip-surface border border-white/[0.02] text-clip-muted">
                       {o}
                     </span>
                   ))}
@@ -379,7 +379,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
         <Card icon={Volume2} title="Sponsorship Sweet Spots" subtitle="Energy lulls for native mid-roll reads" count={a.sponsorship_spots.length} accent="amber">
           <div className="space-y-3">
             {a.sponsorship_spots.map((s, i) => (
-              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03]">
+              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <p className="text-[10px] text-clip-muted font-mono mb-2">
                   {formatTimestamp(s.start)} → {formatTimestamp(s.end)}
                 </p>
@@ -395,7 +395,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
         <Card icon={Flame} title="Controversy Hooks" subtitle="Unpopular opinions = algorithm fuel" count={a.unpopular_opinions.length} accent="amber">
           <div className="space-y-3">
             {a.unpopular_opinions.map((o, i) => (
-              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03]">
+              <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <p className="text-xs text-clip-muted mb-1">Quoted:</p>
                 <p className="text-sm italic text-clip-text mb-2">"{o.quote}"</p>
                 <p className="text-xs text-clip-muted mb-1">Contradicts:</p>
@@ -449,11 +449,11 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
         <Card icon={Activity} title="Pacing Analysis" subtitle="Words/min, silence, edit recs">
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03] text-center">
+              <div className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02] text-center">
                 <p className="text-2xl font-bold text-clip-cyan tabular-nums">{a.pacing_analysis.wpm ?? '—'}</p>
                 <p className="text-xs text-clip-muted">words/min</p>
               </div>
-              <div className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.03] text-center">
+              <div className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02] text-center">
                 <p className="text-2xl font-bold text-clip-amber tabular-nums">{a.pacing_analysis.silence_count ?? '—'}</p>
                 <p className="text-xs text-clip-muted">silence gaps</p>
               </div>
@@ -487,15 +487,15 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
               </div>
             )}
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-lg bg-clip-surface/50 p-2 border border-white/[0.03]">
+              <div className="rounded-lg bg-clip-surface/50 p-2 border border-white/[0.02]">
                 <p className="text-[10px] text-clip-muted uppercase">Emoji</p>
                 <p className="text-sm text-clip-text capitalize">{a.style_profile.emoji_freq}</p>
               </div>
-              <div className="rounded-lg bg-clip-surface/50 p-2 border border-white/[0.03]">
+              <div className="rounded-lg bg-clip-surface/50 p-2 border border-white/[0.02]">
                 <p className="text-[10px] text-clip-muted uppercase">Caps</p>
                 <p className="text-sm text-clip-text capitalize">{a.style_profile.caps_pref}</p>
               </div>
-              <div className="rounded-lg bg-clip-surface/50 p-2 border border-white/[0.03]">
+              <div className="rounded-lg bg-clip-surface/50 p-2 border border-white/[0.02]">
                 <p className="text-[10px] text-clip-muted uppercase">Punct</p>
                 <p className="text-sm text-clip-text capitalize">{a.style_profile.punctuation}</p>
               </div>
@@ -513,7 +513,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
               <p className="text-xs uppercase tracking-wider text-clip-muted mb-2">Detected topics</p>
               <div className="flex flex-wrap gap-1.5">
                 {a.viral_angles.topics.map((t, i) => (
-                  <span key={i} className="text-xs px-2 py-0.5 rounded-md bg-clip-surface border border-white/[0.03] text-clip-muted">
+                  <span key={i} className="text-xs px-2 py-0.5 rounded-md bg-clip-surface border border-white/[0.02] text-clip-muted">
                     {t.topic} <span className="text-clip-cyan">·{(t.heat * 100).toFixed(0)}%</span>
                   </span>
                 ))}

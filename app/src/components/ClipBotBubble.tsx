@@ -253,7 +253,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
           </span>
         )}
         {/* Hover tooltip */}
-        <span className="absolute right-full mr-3 px-3 py-1.5 rounded-lg bg-clip-surface border border-white/[0.06] text-xs text-clip-text whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+        <span className="absolute right-full mr-3 px-3 py-1.5 rounded-lg bg-clip-surface border border-white/[0.035] text-xs text-clip-text whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
           Ask ClipBot anything 💬
         </span>
       </button>
@@ -267,19 +267,19 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
     // FULL-PAGE: full viewport, centred max-w-3xl
     ? 'fixed inset-0 z-50 bg-clip-dark/95 backdrop-blur-xl flex flex-col'
     // SEMI-PAGE: 400px docked right panel, full height
-    : 'fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[400px] bg-clip-surface/95 backdrop-blur-xl border-l border-white/[0.06] flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.6)]';
+    : 'fixed top-0 right-0 bottom-0 z-50 w-full sm:w-[400px] bg-clip-surface/95 backdrop-blur-xl border-l border-white/[0.035] flex flex-col shadow-[0_0_60px_rgba(0,0,0,0.6)]';
 
   const headerClass = isFull
-    ? 'flex items-center justify-between py-4 px-6 border-b border-white/[0.04] max-w-3xl mx-auto w-full'
-    : 'flex items-center justify-between py-4 px-4 border-b border-white/[0.04]';
+    ? 'flex items-center justify-between py-4 px-6 border-b border-white/[0.025] max-w-3xl mx-auto w-full'
+    : 'flex items-center justify-between py-4 px-4 border-b border-white/[0.025]';
 
   const messagesWrapClass = isFull
     ? 'flex-1 overflow-y-auto py-8 px-6 max-w-3xl mx-auto w-full'
     : 'flex-1 overflow-y-auto py-6 px-4';
 
   const inputWrapClass = isFull
-    ? 'py-4 px-6 border-t border-white/[0.04] max-w-3xl mx-auto w-full'
-    : 'py-3 px-4 border-t border-white/[0.04]';
+    ? 'py-4 px-6 border-t border-white/[0.025] max-w-3xl mx-auto w-full'
+    : 'py-3 px-4 border-t border-white/[0.025]';
 
   return (
     <>
@@ -295,7 +295,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
         {/* Header */}
         <div className={headerClass}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
               <Bot className="w-5 h-5 text-clip-cyan" />
             </div>
             <div className="min-w-0">
@@ -315,7 +315,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
                 <button
                   onClick={() => setMode('semi')}
                   title="Dock to side panel"
-                  className="w-9 h-9 rounded-lg hover:bg-white/[0.05] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
+                  className="w-9 h-9 rounded-lg hover:bg-white/[0.02] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
                 >
                   <Minimize2 className="w-4 h-4" />
                 </button>
@@ -331,7 +331,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
                   }
                 }}
                 title="Expand to full page"
-                className="w-9 h-9 rounded-lg hover:bg-white/[0.05] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
+                className="w-9 h-9 rounded-lg hover:bg-white/[0.02] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
               >
                 <Maximize2 className="w-4 h-4" />
               </button>
@@ -341,7 +341,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
               <button
                 onClick={() => setMode('bubble')}
                 title="Close"
-                className="w-9 h-9 rounded-lg hover:bg-white/[0.05] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
+                className="w-9 h-9 rounded-lg hover:bg-white/[0.02] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -388,7 +388,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
           <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 ${isFull ? 'max-w-3xl mx-auto px-6' : 'px-4'} pb-3`}>
             {STARTER_PROMPTS.map((p, i) => (
               <button key={i} onClick={() => sendMessage(p.text)}
-                className="card-glass p-3 text-left hover:border-clip-cyan/30 hover:bg-clip-cyan/5 transition-all text-sm">
+                className="card-glass p-3 text-left hover:border-clip-cyan/30 hover:bg-clip-cyan/3 transition-all text-sm">
                 <span className="mr-2">{p.emoji}</span>
                 <span className="text-clip-text">{p.text}</span>
               </button>
@@ -399,7 +399,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
         {/* Input */}
         <div className={inputWrapClass}>
           {isAtLimit ? (
-            <div className="card-glass p-4 border-clip-amber/20 bg-clip-amber/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="card-glass p-4 border-clip-amber/20 bg-clip-amber/3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <Sparkles className="w-5 h-5 text-clip-amber flex-shrink-0" />
                 <p className="text-sm text-clip-text">
@@ -416,7 +416,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
           ) : (
             <form
               onSubmit={(e) => { e.preventDefault(); if (input.trim() && !isTyping) sendMessage(); }}
-              className="relative flex items-center bg-[#0B0B0F] border border-white/[0.05] rounded-[26px] pl-5 pr-2 py-2 transition-all duration-200 focus-within:border-clip-cyan/40 focus-within:ring-1 focus-within:ring-clip-cyan/20"
+              className="relative flex items-center bg-[#0B0B0F] border border-white/[0.02] rounded-[26px] pl-5 pr-2 py-2 transition-all duration-200 focus-within:border-clip-cyan/40 focus-within:ring-1 focus-within:ring-clip-cyan/20"
             >
               <input
                 ref={inputRef}
@@ -432,7 +432,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
                 type="submit"
                 disabled={!input.trim() || isTyping}
                 aria-label="Send message"
-                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.04] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:shadow-[0_0_20px_rgba(0,194,214,0.35)] enabled:hover:scale-105 enabled:active:scale-95"
+                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.025] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:shadow-[0_0_20px_rgba(0,194,214,0.35)] enabled:hover:scale-105 enabled:active:scale-95"
               >
                 {isTyping ? (
                   <Loader2 className="w-[18px] h-[18px] animate-spin" />

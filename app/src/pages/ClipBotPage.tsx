@@ -175,9 +175,9 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
       <div className="flex-1 max-w-3xl mx-auto w-full px-4 sm:px-6 flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between py-4 border-b border-white/[0.04]">
+        <div className="flex items-center justify-between py-4 border-b border-white/[0.025]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center">
               <Bot className="w-5 h-5 text-clip-cyan" />
             </div>
             <div>
@@ -231,7 +231,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
             {STARTER_PROMPTS.map((p, i) => (
               <button key={i} onClick={() => sendMessage(p.text)}
-                className="card-glass p-3 text-left hover:border-clip-cyan/30 hover:bg-clip-cyan/5 transition-all text-sm">
+                className="card-glass p-3 text-left hover:border-clip-cyan/30 hover:bg-clip-cyan/3 transition-all text-sm">
                 <span className="mr-2">{p.emoji}</span>
                 <span className="text-clip-text">{p.text}</span>
               </button>
@@ -240,9 +240,9 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
         )}
 
         {/* Input */}
-        <div className="py-4 border-t border-white/[0.04]">
+        <div className="py-4 border-t border-white/[0.025]">
           {isAtLimit ? (
-            <div className="card-glass p-4 border-clip-amber/20 bg-clip-amber/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="card-glass p-4 border-clip-amber/20 bg-clip-amber/3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <Sparkles className="w-5 h-5 text-clip-amber flex-shrink-0" />
                 <p className="text-sm text-clip-text">
@@ -256,7 +256,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
           ) : (
             <form
               onSubmit={(e) => { e.preventDefault(); if (input.trim() && !isTyping) sendMessage(); }}
-              className="relative flex items-center bg-[#0B0B0F] border border-white/[0.05] rounded-[26px] pl-5 pr-2 py-2 transition-all duration-200 focus-within:border-clip-cyan/40 focus-within:ring-1 focus-within:ring-clip-cyan/20"
+              className="relative flex items-center bg-[#0B0B0F] border border-white/[0.02] rounded-[26px] pl-5 pr-2 py-2 transition-all duration-200 focus-within:border-clip-cyan/40 focus-within:ring-1 focus-within:ring-clip-cyan/20"
             >
               <input
                 ref={inputRef}
@@ -272,7 +272,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
                 type="submit"
                 disabled={!input.trim() || isTyping}
                 aria-label="Send message"
-                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.04] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:shadow-[0_0_20px_rgba(0, 194, 214, 0.35)] enabled:hover:scale-105 enabled:active:scale-95"
+                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.025] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:shadow-[0_0_20px_rgba(0, 194, 214, 0.35)] enabled:hover:scale-105 enabled:active:scale-95"
               >
                 {isTyping ? (
                   <Loader2 className="w-[18px] h-[18px] animate-spin" />

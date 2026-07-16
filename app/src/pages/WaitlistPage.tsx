@@ -64,7 +64,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
       {/* Ambient glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-clip-cyan/8 rounded-full blur-[140px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-clip-amber/5 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-clip-amber/3 rounded-full blur-[100px]" />
       </div>
 
       <div className="relative max-w-4xl mx-auto">
@@ -86,7 +86,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
               user?.plan === 'creator' ? 'bg-clip-amber text-black' :
               user?.plan === 'pro'     ? 'bg-clip-cyan text-black' :
               user?.plan === 'starter' ? 'bg-blue-500/20 text-blue-500' :
-              'bg-clip-surface text-clip-muted border border-white/[0.05]'
+              'bg-clip-surface text-clip-muted border border-white/[0.02]'
             }`}>
               {PLAN_LIMITS[user?.plan ?? 'free'].label.toUpperCase()}
             </span>
@@ -143,8 +143,8 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
             { icon: Sparkles, title: 'Beat-Sync Renders', desc: 'Transitions land on the drop. Vertical 9:16 by default.' },
             { icon: Bell,     title: 'One-Tap Export',    desc: 'TikTok, Reels, Shorts — watermark-free on paid plans.' },
           ].map((f) => (
-            <div key={f.title} className="card-glass p-5 hover:border-white/[0.07] transition-all">
-              <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center mb-3">
+            <div key={f.title} className="card-glass p-5 hover:border-white/[0.025] transition-all">
+              <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center mb-3">
                 <f.icon className="w-5 h-5 text-clip-cyan" />
               </div>
               <h3 className="font-display font-semibold text-clip-text mb-1">{f.title}</h3>
@@ -218,7 +218,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
                   className={`px-3 py-2.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 justify-center ${
                     game === g.id
                       ? 'bg-clip-cyan text-black'
-                      : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04]'
+                      : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.025]'
                   }`}
                 >
                   <span>{g.emoji}</span>

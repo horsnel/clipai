@@ -25,10 +25,10 @@ interface Rank {
 }
 
 const RANKS: Rank[] = [
-  { id:'rookie',  name:'Rookie',        icon:'🎮', minXP:0,     maxXP:499,   color:'text-clip-muted',  bgColor:'bg-clip-surface',      borderColor:'border-white/[0.05]', perks:['Access to ClipBot (10 msgs/day)', 'Basic trend radar'] },
+  { id:'rookie',  name:'Rookie',        icon:'🎮', minXP:0,     maxXP:499,   color:'text-clip-muted',  bgColor:'bg-clip-surface',      borderColor:'border-white/[0.02]', perks:['Access to ClipBot (10 msgs/day)', 'Basic trend radar'] },
   { id:'clipper', name:'Clipper',       icon:'✂️', minXP:500,   maxXP:1499,  color:'text-green-600',   bgColor:'bg-green-500/10',      borderColor:'border-green-500/30', perks:['20 ClipBot msgs/day', 'Caption Battle access', 'Clipper badge on profile'] },
   { id:'reel',    name:'Highlight Reel',icon:'🎬', minXP:1500,  maxXP:3999,  color:'text-blue-600',    bgColor:'bg-blue-500/10',       borderColor:'border-blue-500/30',  perks:['Unlimited ClipBot', 'Priority trend data', 'Highlight Reel badge', 'Weekly challenge entry'] },
-  { id:'legend',  name:'Legend',        icon:'⚡', minXP:4000,  maxXP:9999,  color:'text-clip-cyan',   bgColor:'bg-clip-cyan/10',      borderColor:'border-clip-cyan/30', perks:['Everything above', 'Legend badge', 'Monthly creator spotlight', 'Early feature access'] },
+  { id:'legend',  name:'Legend',        icon:'⚡', minXP:4000,  maxXP:9999,  color:'text-clip-cyan',   bgColor:'bg-clip-cyan/6',      borderColor:'border-clip-cyan/30', perks:['Everything above', 'Legend badge', 'Monthly creator spotlight', 'Early feature access'] },
   { id:'godtier', name:'GOD TIER',      icon:'👑', minXP:10000, maxXP:Infinity, color:'text-clip-amber', bgColor:'bg-clip-amber/10',  borderColor:'border-clip-amber/40',perks:['All perks', 'GOD TIER crown', 'Free Pro plan for 1 month', 'Featured on leaderboard'] },
 ];
 
@@ -237,7 +237,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
               className={`px-4 py-2 rounded-xl text-sm font-medium capitalize whitespace-nowrap transition-all ${
                 activeTab === tab
                   ? 'bg-clip-cyan text-black'
-                  : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04]'
+                  : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.025]'
               }`}>
               {tab === 'earn' ? 'Earn XP' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
@@ -256,7 +256,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
                 <div className="flex-1 text-center sm:text-left min-w-0">
                   <div className="flex items-center gap-3 mb-1 justify-center sm:justify-start flex-wrap">
                     <h2 className={`font-display font-bold text-xl sm:text-2xl ${currentRank.color}`}>{currentRank.name}</h2>
-                    {plan !== 'free' && <span className="text-xs px-2 py-0.5 bg-clip-cyan/10 text-clip-cyan rounded-full border border-clip-cyan/20 flex-shrink-0">VERIFIED</span>}
+                    {plan !== 'free' && <span className="text-xs px-2 py-0.5 bg-clip-cyan/6 text-clip-cyan rounded-full border border-clip-cyan/20 flex-shrink-0">VERIFIED</span>}
                   </div>
                   <p className="text-clip-text font-medium">{user?.name ?? 'Creator'}</p>
                   <p className="text-clip-muted text-sm">{userXP.toLocaleString()} XP total</p>
@@ -323,7 +323,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
                 ))}
               </div>
               {nextRank && (
-                <div className="mt-4 pt-4 border-t border-white/[0.04]">
+                <div className="mt-4 pt-4 border-t border-white/[0.025]">
                   <p className="text-clip-muted text-xs mb-2">Unlock at {nextRank.name}:</p>
                   {nextRank.perks.slice(0, 2).map((perk, i) => (
                     <div key={i} className="flex items-center gap-2 text-sm text-clip-muted">
@@ -345,12 +345,12 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
               const isUnlocked = userXP >= rank.minXP;
               return (
                 <div key={rank.id} className={`card-glass p-4 sm:p-5 border transition-all ${
-                  isCurrent ? `${rank.borderColor} ${rank.bgColor}` : isUnlocked ? 'border-white/[0.05]' : 'border-white/[0.03] opacity-60'
+                  isCurrent ? `${rank.borderColor} ${rank.bgColor}` : isUnlocked ? 'border-white/[0.02]' : 'border-white/[0.02] opacity-60'
                 }`}>
                   <div className="flex items-center gap-3 sm:gap-4">
                     <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center text-xl sm:text-2xl flex-shrink-0 ${
                       isUnlocked ? rank.bgColor : 'bg-clip-surface'
-                    } border ${isUnlocked ? rank.borderColor : 'border-white/[0.03]'}`}>
+                    } border ${isUnlocked ? rank.borderColor : 'border-white/[0.02]'}`}>
                       {isUnlocked ? rank.icon : <Lock className="w-5 h-5 text-clip-muted" />}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -358,7 +358,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
                         <h3 className={`font-display font-bold text-base sm:text-lg ${isUnlocked ? rank.color : 'text-clip-muted'}`}>
                           {rank.name}
                         </h3>
-                        {isCurrent && <span className="text-xs px-2 py-0.5 bg-clip-cyan/10 text-clip-cyan rounded-full border border-clip-cyan/20 flex-shrink-0">CURRENT</span>}
+                        {isCurrent && <span className="text-xs px-2 py-0.5 bg-clip-cyan/6 text-clip-cyan rounded-full border border-clip-cyan/20 flex-shrink-0">CURRENT</span>}
                       </div>
                       <p className="text-clip-muted text-xs mb-2 font-mono">
                         {rank.minXP.toLocaleString()} – {rank.maxXP === Infinity ? '∞' : rank.maxXP.toLocaleString()} XP
@@ -366,7 +366,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
                       <div className="flex flex-wrap gap-2">
                         {rank.perks.map((perk, i) => (
                           <span key={i} className={`text-xs px-2 py-0.5 rounded-full border ${
-                            isUnlocked ? 'border-white/[0.05] text-clip-muted bg-clip-surface' : 'border-white/[0.03] text-white/20'
+                            isUnlocked ? 'border-white/[0.02] text-clip-muted bg-clip-surface' : 'border-white/[0.02] text-white/20'
                           }`}>{perk}</span>
                         ))}
                       </div>
@@ -387,21 +387,21 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
         {/* ── LEADERBOARD TAB ── */}
         {activeTab === 'leaderboard' && (
           <div className="card-glass overflow-hidden">
-            <div className="p-4 border-b border-white/[0.04] flex items-center gap-2">
+            <div className="p-4 border-b border-white/[0.025] flex items-center gap-2">
               <Crown className="w-4 h-4 text-clip-amber" />
               <span className="font-medium text-clip-text">Top Creators This Week</span>
             </div>
-            <div className="divide-y divide-white/[0.03]">
+            <div className="divide-y divide-white/[0.02]">
               {MOCK_TOP.map((creator, i) => (
                 <div key={i} className={`flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 ${
-                  creator.name === 'You' ? 'bg-clip-cyan/5' : 'hover:bg-white/[0.02]'
+                  creator.name === 'You' ? 'bg-clip-cyan/3' : 'hover:bg-white/[0.02]'
                 }`}>
                   <span className={`font-display font-bold text-base sm:text-lg w-6 sm:w-8 flex-shrink-0 text-center ${
                     i === 0 ? 'text-clip-amber' : i === 1 ? 'text-clip-muted' : i === 2 ? 'text-amber-700' : 'text-clip-muted'
                   }`}>
                     {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
                   </span>
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-clip-surface border border-white/[0.05] flex items-center justify-center text-base sm:text-lg flex-shrink-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-clip-surface border border-white/[0.02] flex items-center justify-center text-base sm:text-lg flex-shrink-0">
                     {creator.icon}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -415,9 +415,9 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
                 </div>
               ))}
               {/* User position */}
-              <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 bg-clip-cyan/5 border-t border-clip-cyan/10">
+              <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 bg-clip-cyan/3 border-t border-clip-cyan/10">
                 <span className="text-clip-muted font-bold w-6 sm:w-8 text-center text-sm">#{globalRank || '—'}</span>
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-clip-cyan/10 border border-clip-cyan/20 flex items-center justify-center text-sm flex-shrink-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-clip-cyan/6 border border-clip-cyan/20 flex items-center justify-center text-sm flex-shrink-0">
                   {currentRank.icon}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -436,12 +436,12 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
         {/* ── EARN XP TAB ── */}
         {activeTab === 'earn' && (
           <div className="space-y-4">
-            <div className="card-glass p-4 border-clip-cyan/20 bg-clip-cyan/5 flex items-center gap-3">
+            <div className="card-glass p-4 border-clip-cyan/20 bg-clip-cyan/3 flex items-center gap-3">
               <TrendingUp className="w-5 h-5 text-clip-cyan flex-shrink-0" />
               <p className="text-clip-text text-sm">Every action on ClipAI earns you XP. The more you create, the higher you rank.</p>
             </div>
             {XP_ACTIONS.map((action, i) => (
-              <div key={i} className="card-glass p-4 flex items-center gap-4 hover:border-white/[0.07] transition-all group">
+              <div key={i} className="card-glass p-4 flex items-center gap-4 hover:border-white/[0.025] transition-all group">
                 <span className="text-2xl flex-shrink-0">{action.icon}</span>
                 <p className="flex-1 text-clip-text text-sm group-hover:text-clip-cyan transition-colors">{action.label}</p>
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -450,7 +450,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
                 </div>
               </div>
             ))}
-            <div className="card-glass p-5 border-clip-amber/20 bg-clip-amber/5 text-center">
+            <div className="card-glass p-5 border-clip-amber/20 bg-clip-amber/3 text-center">
               <p className="text-clip-amber text-sm font-medium mb-1">🔥 Streak Bonus</p>
               <p className="text-clip-muted text-xs">Log in 7 days in a row and get a 2× XP multiplier for 24 hours</p>
             </div>

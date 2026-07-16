@@ -89,7 +89,7 @@ export function AudioTrendPanel({ user: _user, onNavigate: _onNavigate }: AudioT
     return (
       <div className="card-glass p-6 space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
             <Music className="w-5 h-5 text-clip-cyan" />
           </div>
           <div>
@@ -147,7 +147,7 @@ export function AudioTrendPanel({ user: _user, onNavigate: _onNavigate }: AudioT
       {/* Header */}
       <div className="card-glass p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
             <Music className="w-5 h-5 text-clip-cyan" />
           </div>
           <div className="min-w-0">
@@ -158,7 +158,7 @@ export function AudioTrendPanel({ user: _user, onNavigate: _onNavigate }: AudioT
           </div>
         </div>
         {result.cached_analysis && (
-          <span className="text-[10px] font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/10 px-1.5 py-0.5 rounded border border-clip-cyan/20 flex-shrink-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/6 px-1.5 py-0.5 rounded border border-clip-cyan/20 flex-shrink-0">
             Cached
           </span>
         )}
@@ -171,10 +171,10 @@ export function AudioTrendPanel({ user: _user, onNavigate: _onNavigate }: AudioT
         </h4>
         <ul className="space-y-3">
           {(r.trending_sounds || []).map((s, i) => (
-            <li key={i} className="p-3 rounded-lg bg-clip-surface border border-white/[0.03]">
+            <li key={i} className="p-3 rounded-lg bg-clip-surface border border-white/[0.02]">
               <div className="flex items-start justify-between gap-3 mb-1.5">
                 <p className="font-medium text-sm text-clip-text">{s.name}</p>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${VIBE_COLORS[s.vibe] || 'text-clip-muted bg-clip-surface border-white/[0.05]'} flex-shrink-0`}>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${VIBE_COLORS[s.vibe] || 'text-clip-muted bg-clip-surface border-white/[0.02]'} flex-shrink-0`}>
                   {s.vibe}
                 </span>
               </div>
@@ -205,13 +205,13 @@ export function AudioTrendPanel({ user: _user, onNavigate: _onNavigate }: AudioT
         </h4>
         <ul className="space-y-2">
           {(r.sync_points || []).map((sp, i) => (
-            <li key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-clip-surface border border-white/[0.03]">
+            <li key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-clip-surface border border-white/[0.02]">
               <span className="font-mono text-clip-amber text-sm w-12 flex-shrink-0">{fmtTime(sp.t)}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-clip-text">{sp.label}</p>
                 <p className="text-xs text-clip-muted mt-0.5">{sp.why}</p>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/10 px-1.5 py-0.5 rounded border border-clip-cyan/20 flex-shrink-0">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/6 px-1.5 py-0.5 rounded border border-clip-cyan/20 flex-shrink-0">
                 {sp.beat_action}
               </span>
             </li>
@@ -226,7 +226,7 @@ export function AudioTrendPanel({ user: _user, onNavigate: _onNavigate }: AudioT
         </h4>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {(r.alt_genres || []).map((g, i) => (
-            <div key={i} className="p-3 rounded-lg bg-clip-surface border border-white/[0.03]">
+            <div key={i} className="p-3 rounded-lg bg-clip-surface border border-white/[0.02]">
               <p className="font-medium text-sm text-clip-text mb-1">{g.genre}</p>
               <p className="text-xs text-clip-muted mb-1"><span className="text-clip-text/70">Best for:</span> {g.best_for}</p>
               <p className="text-xs text-clip-muted"><span className="text-clip-text/70">Risk:</span> {g.risk}</p>

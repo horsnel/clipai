@@ -63,7 +63,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         showBg
-          ? 'bg-clip-dark/90 backdrop-blur-md border-b border-white/[0.04]'
+          ? 'bg-clip-dark/90 backdrop-blur-md border-b border-white/[0.025]'
           : 'bg-transparent'
       }`}
     >
@@ -85,14 +85,14 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
                 onClick={() => handleNavClick(link.page, link.hash)}
                 className={`group inline-flex items-center gap-1.5 px-2.5 xl:px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
                   currentPage === link.page
-                    ? 'text-clip-cyan bg-clip-cyan/10'
-                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.03]'
+                    ? 'text-clip-cyan bg-clip-cyan/6'
+                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.02]'
                 }`}
               >
                 {link.label}
                 {link.badge && (
                   <span
-                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-clip-cyan/25 bg-clip-cyan/5 text-clip-cyan/80 group-hover:border-clip-cyan/40 group-hover:text-clip-cyan transition-colors"
+                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-clip-cyan/25 bg-clip-cyan/3 text-clip-cyan/80 group-hover:border-clip-cyan/40 group-hover:text-clip-cyan transition-colors"
                     title="This feature is under development"
                   >
                     {link.badge}
@@ -125,7 +125,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 text-clip-text hover:bg-white/[0.04] rounded-lg transition-colors"
+            className="lg:hidden p-2 text-clip-text hover:bg-white/[0.025] rounded-lg transition-colors"
             aria-label="Toggle menu"
           >
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -135,7 +135,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden bg-clip-dark/98 backdrop-blur-lg border-b border-white/[0.03] max-h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="lg:hidden bg-clip-dark/98 backdrop-blur-lg border-b border-white/[0.02] max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="px-4 py-4 space-y-2">
             {navLinks.map((link) => (
               <button
@@ -143,14 +143,14 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
                 onClick={() => handleNavClick(link.page, link.hash)}
                 className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium rounded-lg transition-all ${
                   currentPage === link.page
-                    ? 'text-clip-cyan bg-clip-cyan/10'
-                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.03]'
+                    ? 'text-clip-cyan bg-clip-cyan/6'
+                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.02]'
                 }`}
               >
                 <span>{link.label}</span>
                 {link.badge && (
                   <span
-                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-clip-cyan/25 bg-clip-cyan/5 text-clip-cyan/80"
+                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-clip-cyan/25 bg-clip-cyan/3 text-clip-cyan/80"
                     title="This feature is under development"
                   >
                     {link.badge}
@@ -158,12 +158,12 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
                 )}
               </button>
             ))}
-            <div className="pt-2 border-t border-white/[0.03]">
+            <div className="pt-2 border-t border-white/[0.02]">
               {isLoggedIn ? null : (
                 <div className="space-y-2">
                   <button
                     onClick={() => handleNavClick('auth')}
-                    className="w-full px-4 py-3 text-left text-sm font-medium text-clip-muted hover:text-clip-text hover:bg-white/[0.03] rounded-lg transition-all"
+                    className="w-full px-4 py-3 text-left text-sm font-medium text-clip-muted hover:text-clip-text hover:bg-white/[0.02] rounded-lg transition-all"
                   >
                     Login
                   </button>

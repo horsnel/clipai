@@ -87,7 +87,7 @@ export function RecentAnalysesWidget({
   const HookScoreBadge = ({ score }: { score: number | null }) => {
     if (score === null || score === undefined) {
       return (
-        <span className="text-[10px] font-medium text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.05]">
+        <span className="text-[10px] font-medium text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.02]">
           —
         </span>
       );
@@ -102,13 +102,13 @@ export function RecentAnalysesWidget({
     }
     if (s >= 6) {
       return (
-        <span className="text-[10px] font-bold text-clip-cyan px-1.5 py-0.5 rounded bg-clip-cyan/10 border border-clip-cyan/20">
+        <span className="text-[10px] font-bold text-clip-cyan px-1.5 py-0.5 rounded bg-clip-cyan/6 border border-clip-cyan/20">
           {s.toFixed(1)}/10
         </span>
       );
     }
     return (
-      <span className="text-[10px] font-semibold text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.05]">
+      <span className="text-[10px] font-semibold text-clip-muted px-1.5 py-0.5 rounded bg-clip-surface border border-white/[0.02]">
         {s.toFixed(1)}/10
       </span>
     );
@@ -118,9 +118,9 @@ export function RecentAnalysesWidget({
   return (
     <div className={`card-glass overflow-hidden ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 p-5 sm:p-6 pb-3 border-b border-white/[0.04]">
+      <div className="flex items-center justify-between gap-3 p-5 sm:p-6 pb-3 border-b border-white/[0.025]">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
             <Flame className="w-5 h-5 text-clip-cyan" />
           </div>
           <div className="min-w-0">
@@ -155,7 +155,7 @@ export function RecentAnalysesWidget({
 
         {state === 'empty' && (
           <div className="p-6 text-center">
-            <div className="w-12 h-12 rounded-xl bg-clip-cyan/10 flex items-center justify-center mx-auto mb-3">
+            <div className="w-12 h-12 rounded-xl bg-clip-cyan/6 flex items-center justify-center mx-auto mb-3">
               <Sparkles className="w-6 h-6 text-clip-cyan" />
             </div>
             <p className="font-display font-medium text-clip-text mb-1">
@@ -179,7 +179,7 @@ export function RecentAnalysesWidget({
         )}
 
         {state === 'ready' && (
-          <ul className="divide-y divide-white/[0.03]">
+          <ul className="divide-y divide-white/[0.02]">
             {analyses.map(a => {
               const ytId = a.source_video_id || '';
               const thumb = a.thumbnail_url || (ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : '');
@@ -259,7 +259,7 @@ export function RecentAnalysesWidget({
 
         {/* Footer CTA */}
         {state === 'ready' && onNavigate && (
-          <div className="pt-3 mt-2 border-t border-white/[0.04] flex items-center justify-between">
+          <div className="pt-3 mt-2 border-t border-white/[0.025] flex items-center justify-between">
             <span className="text-clip-muted text-xs">
               {analyses.length} {analyses.length === 1 ? 'analysis' : 'analyses'} this month
             </span>
@@ -282,11 +282,11 @@ export function RecentAnalysesWidget({
           onClick={() => setPlayingId(null)}
         >
           <div
-            className="relative w-full max-w-3xl bg-clip-dark rounded-2xl overflow-hidden border border-white/[0.06] shadow-2xl"
+            className="relative w-full max-w-3xl bg-clip-dark rounded-2xl overflow-hidden border border-white/[0.035] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header bar */}
-            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.04]">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.025]">
               <div className="flex items-center gap-2 min-w-0">
                 <Youtube className="w-4 h-4 text-red-500 flex-shrink-0" />
                 <p className="text-sm font-medium text-clip-text truncate">
@@ -295,7 +295,7 @@ export function RecentAnalysesWidget({
               </div>
               <button
                 onClick={() => setPlayingId(null)}
-                className="p-1.5 text-clip-muted hover:text-clip-text hover:bg-white/[0.04] rounded-lg transition-colors flex-shrink-0"
+                className="p-1.5 text-clip-muted hover:text-clip-text hover:bg-white/[0.025] rounded-lg transition-colors flex-shrink-0"
                 aria-label="Close player"
               >
                 <X className="w-4 h-4" />
@@ -314,7 +314,7 @@ export function RecentAnalysesWidget({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-clip-muted border-t border-white/[0.04]">
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-clip-muted border-t border-white/[0.025]">
               <span className="truncate">by {playingAnalysis.video_author || 'Unknown'}</span>
               <a
                 href={playingAnalysis.source_url}

@@ -156,7 +156,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 relative">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-clip-cyan/5 rounded-full blur-[150px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-clip-cyan/3 rounded-full blur-[150px]" />
         </div>
 
         <div className="w-full max-w-md text-center relative z-10">
@@ -235,7 +235,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
         </div>
 
         <div className="flex justify-center mb-8">
-          <div className="inline-flex bg-clip-surface rounded-xl p-1 border border-white/[0.04]">
+          <div className="inline-flex bg-clip-surface rounded-xl p-1 border border-white/[0.025]">
             {(['upload', 'youtube'] as const).map((tab) => (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all ${
@@ -254,12 +254,12 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
               <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={`card-glass p-8 text-center cursor-pointer transition-all duration-300 ${
-                  isDragging ? 'border-clip-cyan bg-clip-cyan/5' : 'hover:border-white/[0.07]'
+                  isDragging ? 'border-clip-cyan bg-clip-cyan/3' : 'hover:border-white/[0.025]'
                 }`}>
                 <input ref={fileInputRef} type="file" accept="video/mp4,video/*" onChange={handleFileSelect} className="hidden" />
                 {selectedFile ? (
                   <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-14 h-14 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
                       <FileVideo className="w-7 h-7 text-clip-cyan" />
                     </div>
                     <div className="flex-1 text-left">
@@ -273,7 +273,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
                   </div>
                 ) : (
                   <>
-                    <div className="w-16 h-16 rounded-2xl bg-clip-cyan/10 flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 rounded-2xl bg-clip-cyan/6 flex items-center justify-center mx-auto mb-4">
                       <Upload className="w-8 h-8 text-clip-cyan" />
                     </div>
                     <p className="font-medium text-clip-text mb-2">Drop your video here, or click to browse</p>
@@ -305,7 +305,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
                     className={`px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                       selectedGame === game
                         ? 'bg-clip-cyan text-black'
-                        : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04] hover:border-white/[0.07]'
+                        : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.025] hover:border-white/[0.025]'
                     }`}>
                     {game}
                   </button>
@@ -347,7 +347,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
               </div>
             </div>
 
-            <div className="card-glass p-4 bg-clip-cyan/5 border-clip-cyan/20">
+            <div className="card-glass p-4 bg-clip-cyan/3 border-clip-cyan/20">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="w-4 h-4 text-clip-cyan" />
                 <span className="text-sm font-medium text-clip-text capitalize">{user?.plan ?? 'Free'} Plan</span>
@@ -364,7 +364,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between"><span className="text-clip-muted">AI scan</span><span className="text-clip-text">10 cr</span></div>
                 <div className="flex justify-between"><span className="text-clip-muted">AI captions</span><span className="text-clip-text">{captionsEnabled ? '5 cr' : '—'}</span></div>
-                <div className="border-t border-white/[0.04] mt-2 pt-2 flex justify-between font-medium">
+                <div className="border-t border-white/[0.025] mt-2 pt-2 flex justify-between font-medium">
                   <span className="text-clip-muted">Total</span>
                   <span className="text-clip-cyan">{captionsEnabled ? 15 : 10} cr</span>
                 </div>
