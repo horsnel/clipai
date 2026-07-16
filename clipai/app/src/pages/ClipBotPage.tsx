@@ -1,10 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Page } from '../App';
-import { Send, Bot, Zap, Sparkles, RefreshCw } from 'lucide-react';
+import { Send, Bot, User, Zap, Sparkles, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import ReactMarkdown from 'react-markdown';
-import { getClipBotHistory, apiClient } from '@/services/api';
-import { TypingDots } from '../components/Loading';
 
 interface ClipBotPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -17,6 +14,8 @@ interface Message {
   content: string;
   timestamp: Date;
 }
+
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const STARTER_PROMPTS = [
   { emoji: '🎮', text: 'What captions are blowing up for Free Fire this week?' },
@@ -44,48 +43,6 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
 
   const FREE_LIMIT = 10;
   const isAtLimit  = user?.plan === 'free' && msgCount >= FREE_LIMIT;
-
-  // ─── Persist chat history to localStorage (per-user) ─────────────────────
-  const STORAGE_KEY = `clipai_clipbot_history_${user?.email ?? 'anon'}`;
-
-  useEffect(() => {
-    // Restore from localStorage first for instant UX
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed: Message[] = JSON.parse(saved);
-        if (parsed.length > 0) {
-          setMessages(parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) })));
-          setMsgCount(parsed.filter(m => m.role === 'user').length);
-          return;
-        }
-      }
-    } catch {}
-
-    // Then try fetching from backend
-    getClipBotHistory().then((data) => {
-      if (data.history?.length) {
-        const restored: Message[] = [
-          WELCOME_MSG,
-          ...data.history.map((h: any) => ({
-            id: String(h.created_at),
-            role: h.role as 'user' | 'assistant',
-            content: h.content,
-            timestamp: new Date(h.created_at),
-          })),
-        ];
-        setMessages(restored);
-        setMsgCount(data.history.filter((h: any) => h.role === 'user').length);
-      }
-    }).catch(() => {});
-  }, [STORAGE_KEY]);
-
-  // Persist on every message change
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-    } catch {}
-  }, [messages, STORAGE_KEY]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -117,19 +74,20 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
         .filter(m => m.id !== 'welcome')
         .map(m => ({ role: m.role, content: m.content }));
 
-      // Use apiClient which automatically includes the Supabase JWT.
-      // If the user is out of credits, the apiClient fires the UPGRADE_REQUIRED
-      // event and the global modal appears - we just remove the user's message
-      // and bail out (no fallback reply, since the user didn't get a real answer).
-      const data = await apiClient.post<{ reply?: string; error?: string; credits_remaining?: number }>('/clipbot', {
-        message: content,
-        history,
-        user: { name: user?.name, plan: user?.plan },
+      const res = await fetch(`${API_BASE}/clipbot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: content,
+          history,
+          user: { name: user?.name, plan: user?.plan },
+        }),
       });
 
       let reply: string;
-      if (data.reply) {
-        reply = data.reply;
+      if (res.ok) {
+        const data = await res.json();
+        reply = data.reply ?? getFallbackReply(content);
       } else {
         reply = getFallbackReply(content);
       }
@@ -141,15 +99,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, botMsg]);
-    } catch (e: any) {
-      // 402 = out of credits or daily limit - apiClient has already opened the
-      // UpgradeModal. Roll back the user message we just appended.
-      if (e?.status === 402) {
-        setMessages(prev => prev.filter(m => m.id !== userMsg.id));
-        setMsgCount(n => Math.max(0, n - 1));
-        setIsTyping(false);
-        return;
-      }
+    } catch {
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -207,35 +157,44 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
           </div>
         </div>
 
-        {/* Messages — Gemini-style: user = minimal pill, AI = no bubble */}
-        <div className="flex-1 overflow-y-auto py-8 space-y-6" style={{ minHeight: 0 }}>
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto py-6 space-y-4" style={{ minHeight: 0 }}>
           {messages.map(msg => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {msg.role === 'user' ? (
-                // User: minimal dark-gray pill bubble, right-aligned
-                <div
-                  className="max-w-[80%] bg-[#1F1F26] text-clip-text px-4 py-2.5 text-[15px] leading-relaxed"
-                  style={{ borderRadius: '22px' }}
-                >
-                  <FormattedMessage content={msg.content} />
-                </div>
-              ) : (
-                // AI: no bubble — text directly on background, left-aligned
-                <div className="max-w-[88%] text-clip-text text-[15px] leading-relaxed">
-                  <FormattedMessage content={msg.content} />
-                </div>
-              )}
+            <div key={msg.id} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+              {/* Avatar */}
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                msg.role === 'assistant' ? 'bg-clip-cyan/10' : 'bg-clip-surface border border-white/[0.08]'
+              }`}>
+                {msg.role === 'assistant'
+                  ? <Bot className="w-4 h-4 text-clip-cyan" />
+                  : <User className="w-4 h-4 text-clip-muted" />
+                }
+              </div>
+
+              {/* Bubble */}
+              <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                msg.role === 'user'
+                  ? 'bg-clip-cyan/10 border border-clip-cyan/20 text-clip-text'
+                  : 'bg-clip-surface border border-white/[0.06] text-clip-text'
+              }`}>
+                <FormattedMessage content={msg.content} />
+                <p className="text-clip-muted text-xs mt-2 opacity-60">
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
             </div>
           ))}
 
-          {/* Typing indicator — no bubble */}
+          {/* Typing indicator */}
           {isTyping && (
-            <div className="flex justify-start">
-              <div className="px-1 py-2">
-                <TypingDots />
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
+                <Bot className="w-4 h-4 text-clip-cyan" />
+              </div>
+              <div className="bg-clip-surface border border-white/[0.06] rounded-2xl px-4 py-3 flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-clip-muted animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 rounded-full bg-clip-muted animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 rounded-full bg-clip-muted animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           )}
@@ -289,7 +248,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
             </div>
           )}
           <p className="text-clip-muted text-xs mt-2 text-center">
-            ClipBot knows gaming content inside out
+            Powered by Groq Llama 3.3 70B · ClipBot knows gaming content inside out
           </p>
         </div>
 
@@ -298,27 +257,27 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
   );
 }
 
-// ── Format markdown-ish bot messages (safe, no dangerouslySetInnerHTML) ─────
+// ── Format markdown-ish bot messages ─────────────────────────────────────────
 
 function FormattedMessage({ content }: { content: string }) {
+  const lines = content.split('\n');
   return (
-    <div className="text-sm leading-relaxed prose prose-invert prose-sm max-w-none
-                    [&_ul]:space-y-1 [&_ul]:my-1
-                    [&_li]:flex [&_li]:gap-2 [&_li]:items-start
-                    [&_strong]:text-clip-cyan [&_strong]:font-semibold">
-      <ReactMarkdown
-        components={{
-          // Render bullet list items with a Zap icon prefix
-          li: ({ children }) => (
-            <li className="flex gap-2">
+    <div className="space-y-1.5 text-sm leading-relaxed">
+      {lines.map((line, i) => {
+        if (!line.trim()) return <div key={i} className="h-1" />;
+        // Bold: **text**
+        const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // Bullet
+        if (line.startsWith('• ') || line.startsWith('- ')) {
+          return (
+            <div key={i} className="flex gap-2">
               <Zap className="w-3 h-3 text-clip-cyan flex-shrink-0 mt-1" />
-              <span>{children}</span>
-            </li>
-          ),
-        }}
-      >
-        {content}
-      </ReactMarkdown>
+              <span dangerouslySetInnerHTML={{ __html: formatted.replace(/^[•\-]\s/, '') }} />
+            </div>
+          );
+        }
+        return <p key={i} dangerouslySetInnerHTML={{ __html: formatted }} />;
+      })}
     </div>
   );
 }

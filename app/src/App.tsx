@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { Logo } from './components/Logo';
 import { LandingPage } from './pages/LandingPage';
 import { AuthPage } from './pages/AuthPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -215,11 +216,76 @@ function AppContentInner({
 
   const FOOTER_PAGES: Page[] = ['landing', 'pricing', 'terms', 'privacy'];
 
-  // Loading spinner while auth session resolves
+  // Premium branded loading screen while auth session resolves
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-clip-dark flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-clip-cyan/30 border-t-clip-cyan rounded-full animate-spin" />
+      <div className="min-h-screen bg-clip-dark flex flex-col items-center justify-center gap-10 relative overflow-hidden">
+        {/* Ambient cyan glow halo */}
+        <div
+          className="absolute w-[480px] h-[480px] rounded-full blur-3xl opacity-25 pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, #00F0FF 0%, transparent 65%)',
+            animation: 'clipai-boot-pulse 2.4s ease-in-out infinite',
+          }}
+        />
+
+        {/* Logo + wordmark with fade-in */}
+        <div
+          className="relative flex flex-col items-center gap-4"
+          style={{ animation: 'clipai-boot-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both' }}
+        >
+          <div className="relative">
+            {/* Subtle ring around the logo mark */}
+            <div
+              className="absolute -inset-3 rounded-2xl border border-clip-cyan/20"
+              style={{ animation: 'clipai-boot-ring 2s linear infinite' }}
+            />
+            <Logo size="xl" showWord />
+          </div>
+        </div>
+
+        {/* Minimal progress indicator */}
+        <div
+          className="relative flex items-center gap-3 text-clip-muted text-sm"
+          style={{ animation: 'clipai-boot-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both' }}
+        >
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-clip-cyan animate-pulse" />
+          <span>Loading ClipAI…</span>
+        </div>
+
+        {/* Slim animated progress bar */}
+        <div
+          className="relative w-48 h-0.5 bg-clip-border rounded-full overflow-hidden"
+          style={{ animation: 'clipai-boot-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both' }}
+        >
+          <div
+            className="absolute inset-y-0 w-1/3 rounded-full"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, #00F0FF 50%, transparent 100%)',
+              animation: 'clipai-boot-sweep 1.4s ease-in-out infinite',
+            }}
+          />
+        </div>
+
+        <style>{`
+          @keyframes clipai-boot-pulse {
+            0%, 100% { opacity: 0.25; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(1.05); }
+          }
+          @keyframes clipai-boot-rise {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes clipai-boot-ring {
+            from { transform: rotate(0deg); opacity: 0.2; }
+            50% { opacity: 0.5; }
+            to { transform: rotate(360deg); opacity: 0.2; }
+          }
+          @keyframes clipai-boot-sweep {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+          }
+        `}</style>
       </div>
     );
   }
