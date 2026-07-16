@@ -323,3 +323,79 @@ export interface PlaylistResponse {
   processing_ms: number;
   credits_remaining: number;
 }
+
+// ─── Phase 4: Audio Trend Sync types ─────────────────────────────────────────
+export interface AudioTrendResult {
+  trending_sounds: Array<{
+    name: string;
+    vibe: string;
+    why_it_fits: string;
+    usage_tip: string;
+    platform_fit: string[];
+  }>;
+  sync_points: Array<{
+    t: number;
+    label: string;
+    beat_action: string;
+    why: string;
+  }>;
+  alt_genres: Array<{ genre: string; best_for: string; risk: string }>;
+  miss_warning: string;
+}
+
+export interface AudioTrendResponse {
+  audio_trend: AudioTrendResult;
+  video: { title: string; author: string; video_id: string; url: string };
+  cached_analysis: boolean;
+  processing_ms: number;
+  credits_remaining: number;
+}
+
+// ─── Phase 4: Predictive Comments Lite types ────────────────────────────────
+export interface PredictedCommentsResult {
+  praise:      Array<{ comment: string; intensity: string; why_likely: string }>;
+  criticism:   Array<{ comment: string; tone: string;       why_likely: string }>;
+  questions:   Array<{ comment: string; intent: string;     why_likely: string }>;
+  debate:      Array<{ comment: string; side: string;       why_likely: string }>;
+  spam:        Array<{ comment: string; pattern: string;    why_likely: string }>;
+  pinned_suggestion: { comment: string; why: string };
+}
+
+export interface CommentsResponse {
+  comments: PredictedCommentsResult;
+  video: { title: string; author: string; video_id: string; url: string };
+  cached_analysis: boolean;
+  processing_ms: number;
+  credits_remaining: number;
+}
+
+// ─── Phase 4: Shadow Editor (faceless script) types ──────────────────────────
+export interface ShadowEditorResult {
+  full_script: {
+    act1_hook: string;
+    act2_setup: string;
+    act3_payoff: string;
+    cta: string;
+  };
+  b_roll_cues: Array<{
+    t: string;
+    visual: string;
+    duration_seconds: number;
+    text_overlay: string | null;
+  }>;
+  tts_settings: {
+    voice_recommendation: string;
+    pace_wpm: number;
+    pitch: string;
+    pause_strategy: string;
+  };
+  legal_disclaimer: string;
+}
+
+export interface ShadowResponse {
+  shadow: ShadowEditorResult;
+  video: { title: string; author: string; video_id: string; url: string };
+  cached_analysis: boolean;
+  processing_ms: number;
+  credits_remaining: number;
+}

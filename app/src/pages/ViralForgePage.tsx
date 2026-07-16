@@ -3,13 +3,18 @@ import type { Page } from '../App';
 import { Zap, Copy, ThumbsUp, RefreshCw,
   Hash, Type, Sparkles, ChevronRight, CheckCheck,
   TrendingUp, Flame, Trophy, Crown, Youtube, ListOrdered,
+  Music, MessageSquare, Ghost,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { voteOnCaption, getTopCaptions, apiClient, analyseYouTube } from '@/services/api';
+import { voteOnCaption, getTopCaptions, apiClient, analyseYouTube, getAnalysis } from '@/services/api';
 import { ParticleLoader } from '../components/Loading';
 import { AnalysisCards } from '../components/AnalysisCards';
 import { ComparePanel } from '../components/ComparePanel';
 import { PlaylistPanel } from '../components/PlaylistPanel';
+import { AudioTrendPanel } from '../components/AudioTrendPanel';
+import { CommentsPanel } from '../components/CommentsPanel';
+import { ShadowPanel } from '../components/ShadowPanel';
+import { consumePendingAnalysisId } from '@/lib/navState';
 import type { UnifiedAnalysis } from '../types';
 
 interface ViralForgePageProps {
@@ -17,7 +22,7 @@ interface ViralForgePageProps {
   onNavigate: (page: Page, data?: unknown[]) => void;
 }
 
-type ActiveTool = 'titles' | 'captions' | 'hashtags' | 'hooks' | 'analysis' | 'compare' | 'playlist';
+type ActiveTool = 'titles' | 'captions' | 'hashtags' | 'hooks' | 'analysis' | 'compare' | 'playlist' | 'audio' | 'comments' | 'shadow';
 
 interface GeneratedTitle {
   id: string;
@@ -91,6 +96,52 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
   }, []);
 
   useEffect(() => { fetchTopCaptions(); }, [fetchTopCaptions]);
+
+  // ── Re-open a saved analysis from Dashboard (no credit charge) ────────────
+  // When the user clicks a row in RecentAnalysesWidget on the Dashboard, we
+  // stash the analysis_id in navState and navigate here. On mount, consume
+  // the id, fetch the saved JSON, switch to the Deep Analysis tab, and render
+  // the cards instantly — no LLM call, no credit spend.
+  useEffect(() => {
+    const pendingId = consumePendingAnalysisId();
+    if (!pendingId) return;
+    setActiveTool('analysis');
+    setAnalysisLoading(true);
+    setAnalysis(null);
+    setAnalysisMeta(null);
+    getAnalysis(pendingId)
+      .then((res) => {
+        const row = res.analysis as any;
+        if (!row || !row.analysis_raw) {
+          toast.error('Could not load that analysis');
+          return;
+        }
+        let parsed: UnifiedAnalysis;
+        try {
+          parsed = typeof row.analysis_raw === 'string'
+            ? JSON.parse(row.analysis_raw)
+            : row.analysis_raw;
+        } catch {
+          toast.error('Saved analysis was corrupt');
+          return;
+        }
+        setAnalysis(parsed);
+        setAnalysisMeta({
+          title: row.video_title,
+          author: row.video_author,
+          ms: row.processing_ms,
+          cached: true,
+        });
+        // Pre-fill the URL box with the source so a re-run is one click away
+        if (row.source_url) setYtUrl(row.source_url);
+        toast.success('Re-opened saved analysis — no credit charged');
+      })
+      .catch((e: any) => {
+        toast.error(e?.message || 'Could not load that analysis');
+      })
+      .finally(() => setAnalysisLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleTopVote = async (caption: string, vote: 1 | -1) => {
     if (votedSet.has(caption)) {
@@ -193,11 +244,18 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
     { key: 'analysis', label: 'Deep Analysis', icon: Sparkles, desc: 'Paste a YouTube URL → 14 outputs' },
     { key: 'compare',  label: 'Compare',       icon: Trophy,    desc: 'Head-to-head competitor analysis' },
     { key: 'playlist', label: 'Playlist',      icon: ListOrdered, desc: 'Sequence + distribute 2–10 videos' },
+    { key: 'audio',    label: 'Audio Sync',    icon: Music,     desc: 'Match clip to trending sounds + beat drops' },
+    { key: 'comments', label: 'Comments',      icon: MessageSquare, desc: 'Predict viewer reactions + pinned comment' },
+    { key: 'shadow',   label: 'Shadow Editor', icon: Ghost,     desc: 'Faceless-creator voiceover script from any URL' },
     { key: 'titles',   label: 'Title Forge',   icon: TrendingUp, desc: 'SEO-optimised viral titles ranked by score' },
     { key: 'captions', label: 'Caption Battle',icon: Flame,      desc: 'Generate & vote your best caption' },
     { key: 'hashtags', label: 'Hashtag Pack',  icon: Hash,       desc: 'Perfectly sized hashtag combos' },
     { key: 'hooks',    label: 'Hook Library',  icon: Type,       desc: 'Addictive opening lines for your video' },
   ];
+
+  // Tools that manage their own input panel (no left-column input UI)
+  const SELF_MANAGED_TOOLS: ActiveTool[] = ['compare', 'playlist', 'audio', 'comments', 'shadow'];
+  const isSelfManaged = SELF_MANAGED_TOOLS.includes(activeTool);
 
   // ── Deep analysis: paste URL → /api/analyse/youtube → 14 cards ───────────
   const runAnalysis = async () => {
@@ -258,8 +316,8 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Input panel — hidden for Compare + Playlist which manage their own inputs */}
-          {(activeTool !== 'compare' && activeTool !== 'playlist') && (
+          {/* Input panel — hidden for self-managed tools (Compare/Playlist/Audio/Comments/Shadow) which have their own inputs */}
+          {!isSelfManaged && (
           <div className="lg:col-span-2 space-y-4">
             <div className="card-glass p-5 space-y-4">
               {activeTool === 'analysis' ? (
@@ -388,8 +446,8 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
           </div>
           )}
 
-          {/* Results panel — spans full width when Compare/Playlist (which have no input column) */}
-          <div className={activeTool === 'compare' || activeTool === 'playlist' ? 'lg:col-span-5' : 'lg:col-span-3'}>
+          {/* Results panel — spans full width when self-managed (no input column) */}
+          <div className={isSelfManaged ? 'lg:col-span-5' : 'lg:col-span-3'}>
             {/* ── COMPARE (Phase 2) ── */}
             {activeTool === 'compare' && (
               <ComparePanel user={user} onNavigate={onNavigate} />
@@ -398,6 +456,21 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             {/* ── PLAYLIST (Phase 3) ── */}
             {activeTool === 'playlist' && (
               <PlaylistPanel user={user} onNavigate={onNavigate} />
+            )}
+
+            {/* ── AUDIO TREND SYNC (Phase 4) ── */}
+            {activeTool === 'audio' && (
+              <AudioTrendPanel user={user} onNavigate={onNavigate} />
+            )}
+
+            {/* ── PREDICTIVE COMMENTS (Phase 4) ── */}
+            {activeTool === 'comments' && (
+              <CommentsPanel user={user} onNavigate={onNavigate} />
+            )}
+
+            {/* ── SHADOW EDITOR (Phase 4) ── */}
+            {activeTool === 'shadow' && (
+              <ShadowPanel user={user} onNavigate={onNavigate} />
             )}
 
             {/* ── DEEP ANALYSIS ── */}

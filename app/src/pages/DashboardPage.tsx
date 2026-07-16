@@ -10,6 +10,8 @@ import {
 import { listClips } from '@/services/api';
 import { TopicStealWidget } from '@/components/TopicStealWidget';
 import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
+import { setPendingAnalysisId } from '@/lib/navState';
+import type { AnalysisSummary } from '../types';
 
 interface DashboardPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number; clipsUsed?: number; xp?: number } | null;
@@ -301,7 +303,15 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
 
         {/* Recent Deep Analyses — re-open past URLs instantly (Phase 1) */}
         <div className="mb-10">
-          <RecentAnalysesWidget limit={5} onNavigate={onNavigate} />
+          <RecentAnalysesWidget
+            limit={5}
+            onNavigate={onNavigate}
+            onReopen={(a: AnalysisSummary) => {
+              // Stash the id so ViralForgePage picks it up on mount, then navigate.
+              setPendingAnalysisId(a.id);
+              onNavigate('forge');
+            }}
+          />
         </div>
 
         {/* Recent Clips */}

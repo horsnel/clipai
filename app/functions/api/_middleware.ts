@@ -38,6 +38,9 @@
  *   GET  /topic-steal              (require_auth) — anonymized trending topics dashboard
  *   POST /analyse/compare          (require_auth + pro/creator + 10 credits) — Phase 2 Competitor Lab
  *   POST /playlist/sequence        (require_auth + pro/creator + 5 credits)  — Phase 3 Playlist Architect
+ *   POST /analyse/audio-trend      (require_auth + 3 credits) — Phase 4 Audio Trend Sync
+ *   POST /analyse/comments         (require_auth + 2 credits) — Phase 4 Predictive Comments Lite
+ *   POST /analyse/shadow           (require_auth + 4 credits) — Phase 4 Shadow Editor (faceless script)
  */
 import { Hono } from 'hono';
 import { jwtVerify, decodeJwt } from 'jose';
@@ -2608,20 +2611,52 @@ app.get('/analyses/:id', requireAuth, async (c) => {
 
 // ─── GET /api/topic-steal — anonymized trending topics dashboard ─────────────
 // Public (requireAuth only to keep it user-gated; data itself is anonymous).
+//
+// Query params:
+//   game  — filter by game (default: all)
+//   limit — max rows (default 20, max 100)
+//   days  — aggregation window: 7, 14, 30, or 90 (default 14)
+//           14 uses the pre-aggregated view; others call get_topic_steal(days) RPC.
 app.get('/topic-steal', requireAuth, async (c) => {
   const env = c.env as Env;
   const game = c.req.query('game') || '';
   const limit = Math.min(parseInt(c.req.query('limit') || '20', 10), 100);
+  const allowedDays = new Set([7, 14, 30, 90]);
+  const daysNum = parseInt(c.req.query('days') || '14', 10);
+  const days = allowedDays.has(daysNum) ? daysNum : 14;
 
   // Cache 5min globally — same data for every user
-  const cacheKey = await hashKey('topic_steal', game, limit);
+  const cacheKey = await hashKey('topic_steal', game, limit, days);
   const data = await withCache(env, cacheKey, 300, async () => {
-    const filter = game ? `&game=eq.${encodeURIComponent(game)}` : '';
-    const rows = await sbFetch<any[]>(
-      env,
-      `topic_steal_dashboard?order=mention_count.desc,avg_heat.desc&limit=${limit}${filter}`,
-    );
-    return { topics: rows || [], generated_at: new Date().toISOString() };
+    let rows: any[] | null;
+    if (days === 14) {
+      // Fast path: use the pre-aggregated view
+      const filter = game ? `&game=eq.${encodeURIComponent(game)}` : '';
+      rows = await sbFetch<any[]>(
+        env,
+        `topic_steal_dashboard?order=mention_count.desc,avg_heat.desc&limit=${limit}${filter}`,
+      );
+    } else {
+      // RPC path: call get_topic_steal(p_days) — returns aggregated rows
+      // filtered by the time window. We then optionally filter by game in JS.
+      const rpcRes = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc/get_topic_steal`, {
+        method: 'POST',
+        headers: {
+          apikey: env.SUPABASE_SERVICE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify({ p_days: days }),
+      });
+      rows = rpcRes.ok ? await rpcRes.json() as any[] : [];
+      if (game) {
+        rows = (rows || []).filter((r) => r.game === game);
+      }
+      // Apply limit (RPC already orders by mention_count desc, avg_heat desc)
+      rows = (rows || []).slice(0, limit);
+    }
+    return { topics: rows || [], days, generated_at: new Date().toISOString() };
   });
 
   return json(data);
@@ -2915,6 +2950,373 @@ app.post('/playlist/sequence', requireAuth, requirePlan('pro', 'creator'), requi
       author: it.author,
       hook_score: it.analysis?.hook_score ?? null,
     })),
+    processing_ms: Date.now() - startedAt,
+    credits_remaining: newBalance,
+  });
+});
+
+// ─── POST /api/analyse/audio-trend — Phase 4: Audio Trend Sync ───────────────
+// Takes a YouTube URL. Reuses the cached analysis if available, otherwise
+// runs a fresh Deep Analysis (no extra charge for the analysis itself — only
+// the audio-trend call is charged). Returns:
+//   - trending_sounds: 5-8 fictional-but-plausible trending audio suggestions
+//     mapped to the video's vibe + game, each with usage notes
+//   - sync_points: 3-5 timestamps where the audio beat drop should hit
+//   - alt_genres: 3 alternative audio genres that fit the content
+//   - miss_warning: what happens if uploaded without trending audio
+//
+// Charges 3 credits. Available to all logged-in users.
+const AUDIO_TREND_SYSTEM_PROMPT = `You are ClipAI's Audio Trend Sync engine — an expert in short-form audio trends across TikTok, Reels, and YouTube Shorts. You understand which sound types pair with which content vibes, where to place beat drops for maximum retention, and how platform algorithms favor trending audio.
+
+ALWAYS return a single valid JSON object. No prose, no code fences, no commentary.`;
+
+function buildAudioTrendPrompt(item: { title: string; author: string; analysis: any; transcriptText: string }): string {
+  const topics = (item.analysis?.viral_angles?.topics ?? []).slice(0, 5).map((t: any) => t.topic);
+  const style = item.analysis?.style_profile ?? {};
+  return `Given this YouTube video, suggest an audio strategy for repurposing it as a short-form clip (TikTok / Reels / Shorts).
+
+VIDEO
+Title: ${item.title}
+Channel: ${item.author}
+Hook score: ${item.analysis?.hook_score ?? 'n/a'}/10
+Game/Category: ${item.analysis?.viral_angles?.game ?? 'general'}
+Topics: ${JSON.stringify(topics)}
+Style: ${JSON.stringify(style)}
+
+Transcript excerpt:
+${item.transcriptText.slice(0, 2500)}
+
+Return JSON with EXACTLY this structure:
+
+{
+  "trending_sounds": [
+    {
+      "name": "<plausible trending sound name, can be fictional>",
+      "vibe": "<hype|emotional|comedic|cinematic|chill>",
+      "why_it_fits": "<one sentence>",
+      "usage_tip": "<one sentence on how to apply: e.g. 'use as background, lower volume 30%'>",
+      "platform_fit": ["tiktok", "reels", "shorts"]
+    }
+  ],
+  "sync_points": [
+    {
+      "t": <seconds: number>,
+      "label": "<what happens at this moment>",
+      "beat_action": "<cut on beat|speed ramp|zoom punch|freeze frame>",
+      "why": "<one sentence>"
+    }
+  ],
+  "alt_genres": [
+    {"genre": "<genre>", "best_for": "<one phrase>", "risk": "<one phrase>"}
+  ],
+  "miss_warning": "<2-3 sentence warning about uploading without trending audio — algorithmic penalty, lower reach, etc.>"
+}
+
+Rules:
+- trending_sounds: 5-8 entries
+- sync_points: 3-5 entries, t must be a number in seconds
+- alt_genres: 3 entries
+- Quote real moments from the transcript in sync_points labels where possible.`;
+}
+
+app.post('/analyse/audio-trend', requireAuth, requireCredits(3), async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const startedAt = Date.now();
+  const body = await c.req.json().catch(() => ({}));
+  const url: string = (body.youtubeUrl || body.url || '').trim();
+
+  if (!url) return json({ error: 'youtubeUrl is required' }, 400);
+  const videoId = parseYouTubeId(url);
+  if (!videoId) return json({ error: 'Could not parse a YouTube video ID from that URL' }, 400);
+
+  // Reuse cached analysis if available (within 24h)
+  const cached = await sbFetch<any[]>(
+    env,
+    `analyses?user_id=eq.${userId}&source_url=eq.${encodeURIComponent(url)}&status=eq.completed&select=id,analysis_raw,transcript,video_title,video_author&order=created_at.desc&limit=1`,
+  );
+  let analysis: any;
+  let title: string;
+  let author: string;
+  let transcriptText: string;
+
+  if (cached && cached.length > 0 && cached[0].analysis_raw) {
+    const row = cached[0];
+    analysis = typeof row.analysis_raw === 'string' ? JSON.parse(row.analysis_raw) : row.analysis_raw;
+    title = row.video_title || 'Untitled';
+    author = row.video_author || 'Unknown';
+    let transcript: { t: number; text: string }[] = [];
+    try { transcript = typeof row.transcript === 'string' ? JSON.parse(row.transcript) : (row.transcript || []); } catch { /* ignore */ }
+    transcriptText = transcript.map((s: any) => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
+  } else {
+    // Fetch fresh
+    const meta = await fetchYouTubeMeta(videoId);
+    if (!meta) return json({ error: 'Could not fetch video metadata' }, 422);
+    const tr = await fetchYouTubeTranscript(videoId);
+    if (!tr || tr.segments.length === 0) return json({ error: 'This video has no English transcript available' }, 422);
+    analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    title = meta.title;
+    author = meta.author;
+    transcriptText = tr.segments.map(s => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
+  }
+
+  let audioTrend: any;
+  try {
+    audioTrend = await llmJson(env, buildAudioTrendPrompt({ title, author, analysis, transcriptText }), AUDIO_TREND_SYSTEM_PROMPT, 3000);
+  } catch (e: any) {
+    return json({ error: 'Audio trend AI failed: ' + e.message }, 502);
+  }
+
+  const newBalance = await spendCredits(env, userId, 3, 'analyse_audio_trend');
+
+  return json({
+    audio_trend: audioTrend,
+    video: { title, author, video_id: videoId, url },
+    cached_analysis: !!(cached && cached.length > 0 && cached[0].analysis_raw),
+    processing_ms: Date.now() - startedAt,
+    credits_remaining: newBalance,
+  });
+});
+
+// ─── POST /api/analyse/comments — Phase 4: Predictive Comments Lite ──────────
+// Takes a YouTube URL. Returns predicted viewer comments for that single video:
+//   - praise: 3-5 likely positive comments
+//   - criticism: 3-5 likely negative comments
+//   - questions: 3-5 likely questions
+//   - debate: 2-4 controversial takes likely to spark thread
+//   - spam: 2-3 likely spam comments (for moderation training)
+//   - pinned_suggestion: the comment the creator should pin to seed engagement
+//
+// Charges 2 credits. Reuses cached analysis + transcript where possible.
+const COMMENTS_SYSTEM_PROMPT = `You are ClipAI's Predictive Comments engine — you predict the exact kinds of comments a YouTube video will receive based on its transcript. You understand viewer psychology, gaming community in-jokes, and which phrasings spark thread replies.
+
+ALWAYS return a single valid JSON object. No prose, no code fences, no commentary.`;
+
+function buildCommentsPrompt(item: { title: string; author: string; analysis: any; transcriptText: string }): string {
+  const unpopular = (item.analysis?.unpopular_opinions ?? []).slice(0, 2).map((u: any) => u.quote);
+  return `Given this YouTube video, predict the kinds of comments it will receive.
+
+VIDEO
+Title: ${item.title}
+Channel: ${item.author}
+Hook score: ${item.analysis?.hook_score ?? 'n/a'}/10
+Game/Category: ${item.analysis?.viral_angles?.game ?? 'general'}
+Controversial takes surfaced: ${JSON.stringify(unpopular)}
+
+Transcript excerpt:
+${item.transcriptText.slice(0, 2500)}
+
+Return JSON with EXACTLY this structure:
+
+{
+  "praise": [
+    {"comment": "<likely viewer praise comment>", "intensity": "<mild|strong|fanboy>", "why_likely": "<one phrase>"}
+  ],
+  "criticism": [
+    {"comment": "<likely criticism>", "tone": "<constructive|harsh|trollish>", "why_likely": "<one phrase>"}
+  ],
+  "questions": [
+    {"comment": "<likely question>", "intent": "<curious|challenging|clarifying>", "why_likely": "<one phrase>"}
+  ],
+  "debate": [
+    {"comment": "<comment designed to spark a reply thread>", "side": "<pro|con>", "why_likely": "<one phrase>"}
+  ],
+  "spam": [
+    {"comment": "<likely spam or self-promo comment>", "pattern": "<emoji-heavy|link-dropping|generic-praise>", "why_likely": "<one phrase>"}
+  ],
+  "pinned_suggestion": {
+    "comment": "<the single comment the creator should pin to seed engagement>",
+    "why": "<2-3 sentence rationale: drives replies, signals community, etc.>"
+  }
+}
+
+Rules:
+- praise: 3-5 entries
+- criticism: 3-5 entries
+- questions: 3-5 entries
+- debate: 2-4 entries
+- spam: 2-3 entries
+- Comments must sound like real viewer phrasing — slang, lowercased, abbreviations OK
+- Reference specific moments or claims from the transcript where possible.`;
+}
+
+app.post('/analyse/comments', requireAuth, requireCredits(2), async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const startedAt = Date.now();
+  const body = await c.req.json().catch(() => ({}));
+  const url: string = (body.youtubeUrl || body.url || '').trim();
+
+  if (!url) return json({ error: 'youtubeUrl is required' }, 400);
+  const videoId = parseYouTubeId(url);
+  if (!videoId) return json({ error: 'Could not parse a YouTube video ID from that URL' }, 400);
+
+  // Reuse cached analysis if available (within 24h)
+  const cached = await sbFetch<any[]>(
+    env,
+    `analyses?user_id=eq.${userId}&source_url=eq.${encodeURIComponent(url)}&status=eq.completed&select=id,analysis_raw,transcript,video_title,video_author&order=created_at.desc&limit=1`,
+  );
+  let analysis: any;
+  let title: string;
+  let author: string;
+  let transcriptText: string;
+
+  if (cached && cached.length > 0 && cached[0].analysis_raw) {
+    const row = cached[0];
+    analysis = typeof row.analysis_raw === 'string' ? JSON.parse(row.analysis_raw) : row.analysis_raw;
+    title = row.video_title || 'Untitled';
+    author = row.video_author || 'Unknown';
+    let transcript: { t: number; text: string }[] = [];
+    try { transcript = typeof row.transcript === 'string' ? JSON.parse(row.transcript) : (row.transcript || []); } catch { /* ignore */ }
+    transcriptText = transcript.map((s: any) => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
+  } else {
+    const meta = await fetchYouTubeMeta(videoId);
+    if (!meta) return json({ error: 'Could not fetch video metadata' }, 422);
+    const tr = await fetchYouTubeTranscript(videoId);
+    if (!tr || tr.segments.length === 0) return json({ error: 'This video has no English transcript available' }, 422);
+    analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    title = meta.title;
+    author = meta.author;
+    transcriptText = tr.segments.map(s => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
+  }
+
+  let comments: any;
+  try {
+    comments = await llmJson(env, buildCommentsPrompt({ title, author, analysis, transcriptText }), COMMENTS_SYSTEM_PROMPT, 3000);
+  } catch (e: any) {
+    return json({ error: 'Comments AI failed: ' + e.message }, 502);
+  }
+
+  const newBalance = await spendCredits(env, userId, 2, 'analyse_comments');
+
+  return json({
+    comments,
+    video: { title, author, video_id: videoId, url },
+    cached_analysis: !!(cached && cached.length > 0 && cached[0].analysis_raw),
+    processing_ms: Date.now() - startedAt,
+    credits_remaining: newBalance,
+  });
+});
+
+// ─── POST /api/analyse/shadow — Phase 4: Shadow Editor ───────────────────────
+// Takes a YouTube URL. Returns a faceless-creator script derived from the
+// source video — letting the user re-record the same content without showing
+// their face. Uses the cached analysis's shadow_editor_script as a starting
+// point, then expands it into a full 3-act voiceover script with:
+//   - full_script: ~600-900 word voiceover
+//   - b_roll_cues: 6-10 visual descriptions to overlay
+//   - tts_settings: voice / pace / pitch recommendations
+//   - legal_disclaimer: short note about fair use / transformative content
+//
+// Charges 4 credits. Available to all logged-in users.
+const SHADOW_SYSTEM_PROMPT = `You are ClipAI's Shadow Editor — you transform a YouTube video's transcript into a faceless-creator voiceover script. The creator will re-record the audio themselves (or use TTS) and overlay stock/b-roll footage. You preserve the viral angle while making the script original enough to count as transformative content.
+
+ALWAYS return a single valid JSON object. No prose, no code fences, no commentary.`;
+
+function buildShadowPrompt(item: { title: string; author: string; analysis: any; transcriptText: string }): string {
+  const seedScript = item.analysis?.shadow_editor_script ?? {};
+  const hidden = (item.analysis?.hidden_gems ?? []).slice(0, 2).map((g: any) => g.angle);
+  return `Transform this YouTube video into a faceless-creator voiceover script.
+
+VIDEO
+Title: ${item.title}
+Channel: ${item.author}
+Hook score: ${item.analysis?.hook_score ?? 'n/a'}/10
+Game/Category: ${item.analysis?.viral_angles?.game ?? 'general'}
+Seed act 1: ${seedScript.act1 ?? ''}
+Seed act 2: ${seedScript.act2 ?? ''}
+Seed act 3: ${seedScript.act3 ?? ''}
+Hidden gem angles: ${JSON.stringify(hidden)}
+
+Transcript excerpt:
+${item.transcriptText.slice(0, 3500)}
+
+Return JSON with EXACTLY this structure:
+
+{
+  "full_script": {
+    "act1_hook": "<2-3 sentence cold open that hooks in the first 3 seconds>",
+    "act2_setup": "<3-5 sentence setup that introduces the stakes>",
+    "act3_payoff": "<3-5 sentence payoff with a twist or satisfying conclusion>",
+    "cta": "<1-2 sentence call to action — subscribe / comment / watch next>"
+  },
+  "b_roll_cues": [
+    {
+      "t": "<relative to script: 'act1-open' | 'act2-mid' | 'act3-climax'>",
+      "visual": "<specific b-roll description: 'gameplay clip of clutch moment' | 'stock footage of crowd cheering'>",
+      "duration_seconds": <number>,
+      "text_overlay": "<short on-screen text or null>"
+    }
+  ],
+  "tts_settings": {
+    "voice_recommendation": "<narrator|energetic-hype|calm-explainer|comedic>",
+    "pace_wpm": <number, typically 140-180>,
+    "pitch": "<low|medium|high>",
+    "pause_strategy": "<one phrase: e.g. 'pause before act3 twist'>"
+  },
+  "legal_disclaimer": "<2-3 sentence note on fair use, transformative content, and avoiding direct copy>"
+}
+
+Rules:
+- full_script total: ~600-900 words (act1 ~150, act2 ~300, act3 ~300, cta ~50)
+- b_roll_cues: 6-10 entries
+- The script MUST be transformative — same angle, original wording. Never copy transcript verbatim.
+- Make the hook genuinely attention-grabbing for shorts/tiktok.`;
+}
+
+app.post('/analyse/shadow', requireAuth, requireCredits(4), async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const startedAt = Date.now();
+  const body = await c.req.json().catch(() => ({}));
+  const url: string = (body.youtubeUrl || body.url || '').trim();
+
+  if (!url) return json({ error: 'youtubeUrl is required' }, 400);
+  const videoId = parseYouTubeId(url);
+  if (!videoId) return json({ error: 'Could not parse a YouTube video ID from that URL' }, 400);
+
+  // Reuse cached analysis if available (within 24h)
+  const cached = await sbFetch<any[]>(
+    env,
+    `analyses?user_id=eq.${userId}&source_url=eq.${encodeURIComponent(url)}&status=eq.completed&select=id,analysis_raw,transcript,video_title,video_author&order=created_at.desc&limit=1`,
+  );
+  let analysis: any;
+  let title: string;
+  let author: string;
+  let transcriptText: string;
+
+  if (cached && cached.length > 0 && cached[0].analysis_raw) {
+    const row = cached[0];
+    analysis = typeof row.analysis_raw === 'string' ? JSON.parse(row.analysis_raw) : row.analysis_raw;
+    title = row.video_title || 'Untitled';
+    author = row.video_author || 'Unknown';
+    let transcript: { t: number; text: string }[] = [];
+    try { transcript = typeof row.transcript === 'string' ? JSON.parse(row.transcript) : (row.transcript || []); } catch { /* ignore */ }
+    transcriptText = transcript.map((s: any) => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
+  } else {
+    const meta = await fetchYouTubeMeta(videoId);
+    if (!meta) return json({ error: 'Could not fetch video metadata' }, 422);
+    const tr = await fetchYouTubeTranscript(videoId);
+    if (!tr || tr.segments.length === 0) return json({ error: 'This video has no English transcript available' }, 422);
+    analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments), ANALYSIS_SYSTEM_PROMPT, 8000);
+    title = meta.title;
+    author = meta.author;
+    transcriptText = tr.segments.map(s => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
+  }
+
+  let shadow: any;
+  try {
+    shadow = await llmJson(env, buildShadowPrompt({ title, author, analysis, transcriptText }), SHADOW_SYSTEM_PROMPT, 4000);
+  } catch (e: any) {
+    return json({ error: 'Shadow Editor AI failed: ' + e.message }, 502);
+  }
+
+  const newBalance = await spendCredits(env, userId, 4, 'analyse_shadow');
+
+  return json({
+    shadow,
+    video: { title, author, video_id: videoId, url },
+    cached_analysis: !!(cached && cached.length > 0 && cached[0].analysis_raw),
     processing_ms: Date.now() - startedAt,
     credits_remaining: newBalance,
   });

@@ -14,6 +14,10 @@ interface TopicStealWidgetProps {
   limit?: number;
   /** Compact mode for dashboard (no header). Default false. */
   compact?: boolean;
+  /** Show the time-range toggle (7d / 14d / 30d / 90d). Default true. */
+  showRangeToggle?: boolean;
+  /** Initial time window. Default 14. */
+  initialDays?: 7 | 14 | 30 | 90;
   /** Navigation callback — clicking a topic could open Viral Forge. */
   onNavigate?: (page: Page) => void;
   /** Optional className for the outer card. */
@@ -21,6 +25,8 @@ interface TopicStealWidgetProps {
 }
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error' | 'empty';
+type DaysWindow = 7 | 14 | 30 | 90;
+const DAYS_OPTIONS: DaysWindow[] = [7, 14, 30, 90];
 
 /**
  * Topic Steal widget — shows anonymized trending topics aggregated
@@ -37,17 +43,20 @@ export function TopicStealWidget({
   game,
   limit = 6,
   compact = false,
+  showRangeToggle = true,
+  initialDays = 14,
   onNavigate,
   className = '',
 }: TopicStealWidgetProps) {
   const [topics, setTopics] = useState<TopicStealEntry[]>([]);
   const [state, setState] = useState<LoadState>('idle');
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [days, setDays] = useState<DaysWindow>(initialDays);
 
   const load = async () => {
     setState(s => (s === 'idle' ? 'loading' : 'ready'));
     try {
-      const data = await getTopicSteal(game, limit);
+      const data = await getTopicSteal(game, limit, days);
       setTopics(data.topics || []);
       setUpdatedAt(new Date(data.generated_at || Date.now()));
       setState(data.topics && data.topics.length > 0 ? 'ready' : 'empty');
@@ -60,7 +69,7 @@ export function TopicStealWidget({
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, limit]);
+  }, [game, limit, days]);
 
   // ─── Derived render helpers ────────────────────────────────────────────────
   const maxMentions = topics.length > 0 ? Math.max(...topics.map(t => t.mention_count)) : 1;
@@ -171,6 +180,34 @@ export function TopicStealWidget({
           >
             <RefreshCw className={`w-4 h-4 ${state === 'loading' ? 'animate-spin' : ''}`} />
           </button>
+        </div>
+      )}
+
+      {/* Time-range toggle */}
+      {!compact && showRangeToggle && (
+        <div className="px-5 sm:px-6 pt-3 pb-1 flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] uppercase tracking-wider text-clip-muted font-semibold">
+            Window
+          </span>
+          <div className="flex items-center gap-1 bg-clip-surface rounded-lg p-0.5 border border-white/[0.04]">
+            {DAYS_OPTIONS.map(d => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                  days === d
+                    ? 'bg-clip-amber/15 text-clip-amber border border-clip-amber/30'
+                    : 'text-clip-muted hover:text-clip-text border border-transparent'
+                }`}
+                aria-pressed={days === d}
+              >
+                {d}d
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] text-clip-muted ml-auto">
+            Growth vs prior {Math.floor(days / 2)}d
+          </span>
         </div>
       )}
 

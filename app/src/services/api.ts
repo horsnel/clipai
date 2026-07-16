@@ -19,11 +19,14 @@ import type {
   AnalysisResult,
   AnalyseYouTubeResponse,
   AnalysisSummary,
+  AudioTrendResponse,
+  CommentsResponse,
   CompareResponse,
   DetectedClip,
   ExportOptions,
   PlaylistResponse,
   RenderJob,
+  ShadowResponse,
   TopicStealEntry,
   UploadResult,
 } from '../types';
@@ -354,9 +357,16 @@ export async function getAnalysis(id: string): Promise<{ analysis: AnalysisSumma
   return apiClient.get<{ analysis: AnalysisSummary & Record<string, unknown> }>(`/analyses/${id}`);
 }
 
-export async function getTopicSteal(game?: string, limit = 20): Promise<{ topics: TopicStealEntry[]; generated_at: string }> {
-  const qs = game ? `?game=${encodeURIComponent(game)}&limit=${limit}` : `?limit=${limit}`;
-  return apiClient.get<{ topics: TopicStealEntry[]; generated_at: string }>(`/topic-steal${qs}`);
+export async function getTopicSteal(
+  game?: string,
+  limit = 20,
+  days: 7 | 14 | 30 | 90 = 14,
+): Promise<{ topics: TopicStealEntry[]; days: number; generated_at: string }> {
+  const params = new URLSearchParams();
+  if (game) params.set('game', game);
+  params.set('limit', String(limit));
+  params.set('days', String(days));
+  return apiClient.get<{ topics: TopicStealEntry[]; days: number; generated_at: string }>(`/topic-steal?${params.toString()}`);
 }
 
 // ─── Phase 2: Competitor Lab — POST /api/analyse/compare (10 credits, pro/creator)
@@ -367,4 +377,19 @@ export async function compareVideos(urlA: string, urlB: string): Promise<Compare
 // ─── Phase 3: Playlist Architect — POST /api/playlist/sequence (5 credits, pro/creator)
 export async function sequencePlaylist(urls: string[]): Promise<PlaylistResponse> {
   return apiClient.post<PlaylistResponse>('/playlist/sequence', { urls });
+}
+
+// ─── Phase 4: Audio Trend Sync — POST /api/analyse/audio-trend (3 credits)
+export async function analyseAudioTrend(youtubeUrl: string): Promise<AudioTrendResponse> {
+  return apiClient.post<AudioTrendResponse>('/analyse/audio-trend', { youtubeUrl });
+}
+
+// ─── Phase 4: Predictive Comments Lite — POST /api/analyse/comments (2 credits)
+export async function analyseComments(youtubeUrl: string): Promise<CommentsResponse> {
+  return apiClient.post<CommentsResponse>('/analyse/comments', { youtubeUrl });
+}
+
+// ─── Phase 4: Shadow Editor (faceless script) — POST /api/analyse/shadow (4 credits)
+export async function analyseShadow(youtubeUrl: string): Promise<ShadowResponse> {
+  return apiClient.post<ShadowResponse>('/analyse/shadow', { youtubeUrl });
 }
