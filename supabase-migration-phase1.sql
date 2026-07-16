@@ -217,10 +217,12 @@ drop policy if exists "topic_signals_deny_all" on public.topic_signals;
 create policy topic_signals_deny_all on public.topic_signals
   for all using (false) with check (false);
 
--- The aggregated dashboard view is public-read (no PII, fully anonymous)
+-- The aggregated dashboard view is public-read (no PII, fully anonymous).
+-- Views do not have RLS policies — instead we GRANT SELECT to anon + authenticated.
+-- The view runs with owner (postgres) privileges, so it bypasses the deny-all
+-- policy on topic_signals. Safe because the view is fully aggregated.
 drop policy if exists "topic_steal_dashboard_public" on public.topic_steal_dashboard;
-create policy topic_steal_dashboard_public on public.topic_steal_dashboard
-  for select using (true);
+grant select on public.topic_steal_dashboard to anon, authenticated;
 
 -- ============================================================================
 -- Done. Verify with:
