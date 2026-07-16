@@ -127,7 +127,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             ref={phoneRef}
             className="relative mx-auto w-full max-w-sm sm:max-w-md lg:max-w-lg perspective-1000 preserve-3d"
           >
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.08]">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.05]">
               <img 
                 src="/hero-phone.jpg" 
                 alt="ClipAI Phone Mockup"
@@ -222,7 +222,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             ].map((feature, i) => (
               <div
                 key={feature.title}
-                className="card-glass p-8 hover:-translate-y-2 hover:border-white/[0.12] transition-all duration-300 group"
+                className="card-glass p-8 hover:-translate-y-2 hover:border-white/[0.07] transition-all duration-300 group"
                 style={{ transitionDelay: `${i * 100}ms` }}
               >
                 <div className={`w-14 h-14 rounded-2xl bg-${feature.color}/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
@@ -271,7 +271,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 <img
                   src="/avatar-tobi.jpg"
                   alt="Tobi"
-                  className="w-12 h-12 rounded-xl object-cover border border-white/[0.08] flex-shrink-0"
+                  className="w-12 h-12 rounded-xl object-cover border border-white/[0.05] flex-shrink-0"
                 />
                 <div className="min-w-0 flex-1">
                   <p className="font-display font-semibold text-clip-text">Tobi</p>
@@ -292,7 +292,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center max-w-6xl mx-auto">
             {/* Phone mockup */}
             <div className="relative">
-              <div className="relative rounded-3xl overflow-hidden shadow-card border border-white/[0.08] max-w-sm mx-auto lg:mx-0">
+              <div className="relative rounded-3xl overflow-hidden shadow-card border border-white/[0.05] max-w-sm mx-auto lg:mx-0">
                 <img 
                   src="/gameplay-thumb-1.jpg" 
                   alt="Smart Cuts Preview"
@@ -302,13 +302,13 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 
                 {/* Overlay UI elements */}
                 <div className="absolute bottom-4 left-4 right-4">
-                  <div className="bg-clip-dark/90 backdrop-blur-sm rounded-xl p-3 border border-white/[0.08]">
+                  <div className="bg-clip-dark/90 backdrop-blur-sm rounded-xl p-3 border border-white/[0.05]">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-clip-muted">Beat Sync</span>
                       <span className="text-xs text-clip-cyan">ON</span>
                     </div>
                     <div className="h-1 bg-clip-surface rounded-full overflow-hidden">
-                      <div className="h-full w-2/3 bg-gradient-to-r from-clip-cyan to-blue-400" />
+                      <div className="h-full w-2/3 bg-gradient-to-r from-clip-cyan to-blue-600" />
                     </div>
                   </div>
                 </div>
@@ -359,7 +359,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         
         <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 relative z-10">
           <div className="max-w-xl mx-auto">
-            <div className="card-glass p-8 lg:p-10 border-white/[0.08]">
+            <div className="card-glass p-8 lg:p-10 border-white/[0.05]">
               <h2 className="font-display font-bold text-2xl sm:text-3xl text-clip-text text-center mb-3">
                 Get 50 free credits
               </h2>

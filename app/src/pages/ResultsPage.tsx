@@ -165,7 +165,7 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
             {clips.map((clip) => (
               <div key={clip.id} onClick={() => handleClipSelect(clip)}
                 className={`card-glass overflow-hidden cursor-pointer transition-all duration-300 ${
-                  clip.selected ? 'border-clip-cyan/50 ring-1 ring-clip-cyan/30' : 'hover:border-white/[0.12]'
+                  clip.selected ? 'border-clip-cyan/50 ring-1 ring-clip-cyan/30' : 'hover:border-white/[0.07]'
                 }`}>
                 <div className="relative aspect-video">
                   <img src={clip.thumbnail} alt={`Clip ${clip.id}`} className="w-full h-full object-cover" />
@@ -235,7 +235,7 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
                       </div>
                     )}
                   </div>
-                  <div className="p-4 border-t border-white/[0.06]">
+                  <div className="p-4 border-t border-white/[0.04]">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-clip-muted text-xs">Trim</span>
                       <span className="text-clip-cyan text-xs font-mono">{selectedClip.startTime} – {selectedClip.endTime}</span>
@@ -258,7 +258,7 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
                       {(['tiktok', 'reels', 'shorts'] as VideoFormat[]).map((f) => (
                         <button key={f} onClick={() => setFormat(f)}
                           className={`px-3 py-2 rounded-lg text-xs font-medium uppercase transition-all ${
-                            format === f ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.06]'
+                            format === f ? 'bg-clip-cyan text-black' : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04]'
                           }`}>
                           {f}
                         </button>
@@ -276,8 +276,8 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
                           <button key={q} onClick={() => !locked && setQuality(q)}
                             className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                               quality === q && !locked ? 'bg-clip-cyan text-black' :
-                              locked ? 'bg-clip-surface text-clip-muted opacity-40 cursor-not-allowed border border-white/[0.04]' :
-                              'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.06]'
+                              locked ? 'bg-clip-surface text-clip-muted opacity-40 cursor-not-allowed border border-white/[0.03]' :
+                              'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04]'
                             }`}>
                             {q.toUpperCase()}{locked ? ' 🔒' : ` (${QUALITY_CREDITS[q]}cr)`}
                           </button>
@@ -317,7 +317,7 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
                 {/* Engine badge */}
                 {exportEngine && (
                   <div className={`text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-2 ${
-                    exportEngine === 'json2video' ? 'bg-clip-cyan/10 text-clip-cyan' : 'bg-amber-500/10 text-amber-400'
+                    exportEngine === 'json2video' ? 'bg-clip-cyan/10 text-clip-cyan' : 'bg-amber-500/10 text-amber-600'
                   }`}>
                     <Zap className="w-3 h-3" />
                     Rendered via {exportEngine === 'json2video' ? 'JSON2Video API' : 'FFmpeg (fallback)'}
@@ -326,9 +326,9 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
 
                 {exportError && (
                   <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-red-400 text-sm font-medium">Export Error</p>
+                      <p className="text-red-600 text-sm font-medium">Export Error</p>
                       <p className="text-red-300 text-xs mt-1">{exportError}</p>
                     </div>
                   </div>

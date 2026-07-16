@@ -51,7 +51,7 @@ const plans: Plan[] = [
     priceAnnual: 800,
     clips: '200 credits',
     icon: Sparkles,
-    color: 'text-blue-400',
+    color: 'text-blue-600',
     features: [
       { text: '200 ViralForge credits / month', included: true },
       { text: 'Unlimited ClipBot coach', included: true },
@@ -200,7 +200,7 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
               className={`relative card-glass p-6 lg:p-8 flex flex-col ${
                 plan.popular 
                   ? 'border-clip-cyan/50 ring-1 ring-clip-cyan/30 md:scale-105 z-10 pt-8 sm:pt-6 lg:pt-8' 
-                  : 'hover:border-white/[0.12]'
+                  : 'hover:border-white/[0.07]'
               } transition-all duration-300`}
             >
               {/* Popular badge */}

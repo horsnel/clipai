@@ -51,14 +51,14 @@ export function LogoMark({
       <defs>
         {variant === 'gradient' && (
           <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#00F0FF" />
+            <stop offset="0%" stopColor="#00C2D6" />
             <stop offset="100%" stopColor="#8B5CF6" />
           </linearGradient>
         )}
         {variant === 'gradient' && (
           <linearGradient id={`${id}-tri`} x1="30" y1="25" x2="80" y2="80" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#F4F6FA" stopOpacity="0.85" />
+            <stop offset="100%" stopColor="#C8CDD8" stopOpacity="0.85" />
           </linearGradient>
         )}
       </defs>
@@ -66,7 +66,7 @@ export function LogoMark({
       {/* Rounded square container */}
       <rect
         x="4" y="4" width="92" height="92" rx="24" ry="24"
-        fill={variant === 'gradient' ? `url(#${id}-bg)` : variant === 'flat' ? '#00F0FF' : 'currentColor'}
+        fill={variant === 'gradient' ? `url(#${id}-bg)` : variant === 'flat' ? '#00C2D6' : 'currentColor'}
       />
 
       {/* Inner shadow / depth ring (gradient variant only) */}
@@ -86,13 +86,13 @@ export function LogoMark({
           than the bottom-right vertex. */}
       <path
         d="M 32 26 L 32 74 L 76 50 Z"
-        fill={variant === 'gradient' ? `url(#${id}-tri)` : '#0B0B0D'}
+        fill={variant === 'gradient' ? `url(#${id}-tri)` : '#08080A'}
       />
 
       {/* Spark accent — 4 small lines radiating from top-right corner of triangle.
           Signals "AI magic" + energy. */}
       <g
-        stroke={variant === 'gradient' ? '#FFFFFF' : '#0B0B0D'}
+        stroke={variant === 'gradient' ? '#FFFFFF' : '#08080A'}
         strokeWidth="3.5"
         strokeLinecap="round"
         opacity={variant === 'gradient' ? '0.9' : '1'}
@@ -106,7 +106,7 @@ export function LogoMark({
       <circle
         cx="90" cy="20"
         r="2.5"
-        fill={variant === 'gradient' ? '#FFFFFF' : '#0B0B0D'}
+        fill={variant === 'gradient' ? '#FFFFFF' : '#08080A'}
         opacity={variant === 'gradient' ? '0.8' : '1'}
       />
     </svg>

@@ -69,7 +69,7 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
             onClick={() => onNavigate('landing')}
             className="inline-flex items-center gap-2 group mb-6"
           >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center group-hover:shadow-glow-cyan transition-shadow">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-clip-cyan to-blue-600 flex items-center justify-center group-hover:shadow-glow-cyan transition-shadow">
               <Zap className="w-6 h-6 text-black" />
             </div>
             <span className="font-display font-bold text-2xl text-clip-text">
@@ -91,7 +91,7 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
           {/* Google Auth */}
           <button
             onClick={handleGoogleAuth}
-            className="w-full flex items-center justify-center gap-3 bg-clip-surface hover:bg-white/[0.05] border border-white/[0.08] hover:border-white/[0.12] text-clip-text font-medium py-3 px-4 rounded-xl transition-all duration-200 mb-6"
+            className="w-full flex items-center justify-center gap-3 bg-clip-surface hover:bg-white/[0.04] border border-white/[0.05] hover:border-white/[0.07] text-clip-text font-medium py-3 px-4 rounded-xl transition-all duration-200 mb-6"
           >
             <Chrome className="w-5 h-5" />
             Continue with Google
@@ -99,9 +99,9 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
 
           {/* Divider */}
           <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 h-px bg-white/[0.08]" />
+            <div className="flex-1 h-px bg-white/[0.05]" />
             <span className="text-clip-muted text-xs uppercase tracking-wider">or</span>
-            <div className="flex-1 h-px bg-white/[0.08]" />
+            <div className="flex-1 h-px bg-white/[0.05]" />
           </div>
 
           {/* Form */}
@@ -230,7 +230,7 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
           <button type="button" onClick={() => onNavigate('privacy')} className="text-clip-cyan hover:underline">Privacy Policy</button>.
         </p>
         {!isConfigured && (
-          <p className="text-center text-amber-500 text-xs mt-3">
+          <p className="text-center text-amber-600 text-xs mt-3">
             Supabase not configured — auth will not work until env vars are set.
           </p>
         )}

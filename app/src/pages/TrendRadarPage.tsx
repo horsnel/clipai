@@ -45,39 +45,39 @@ const API_BASE = import.meta.env.VITE_API_URL ?? '/api';
 
 const PLATFORMS: { id: TrendPlatform; label: string; color: string }[] = [
   { id: 'all',            label: 'All',           color: 'bg-clip-cyan text-black' },
-  { id: 'youtube',        label: 'YouTube',        color: 'bg-red-500/15 text-red-400' },
-  { id: 'reddit',         label: 'Reddit',         color: 'bg-orange-500/15 text-orange-400' },
-  { id: 'google_trends',  label: 'Google',         color: 'bg-blue-500/15 text-blue-400' },
-  { id: 'tiktok',         label: 'TikTok',         color: 'bg-pink-500/15 text-pink-400' },
+  { id: 'youtube',        label: 'YouTube',        color: 'bg-red-500/15 text-red-600' },
+  { id: 'reddit',         label: 'Reddit',         color: 'bg-orange-500/15 text-orange-600' },
+  { id: 'google_trends',  label: 'Google',         color: 'bg-blue-500/15 text-blue-600' },
+  { id: 'tiktok',         label: 'TikTok',         color: 'bg-pink-500/15 text-pink-600' },
   { id: 'twitter',        label: 'X',              color: 'bg-slate-500/15 text-slate-300' },
 ];
 
 const PlatformBadge: Record<TrendPlatform, string> = {
-  youtube:        'bg-red-500/15 text-red-400 border-red-500/20',
-  reddit:         'bg-orange-500/15 text-orange-400 border-orange-500/20',
-  google_trends:  'bg-blue-500/15 text-blue-400 border-blue-500/20',
-  tiktok:         'bg-pink-500/15 text-pink-400 border-pink-500/20',
+  youtube:        'bg-red-500/15 text-red-600 border-red-500/20',
+  reddit:         'bg-orange-500/15 text-orange-600 border-orange-500/20',
+  google_trends:  'bg-blue-500/15 text-blue-600 border-blue-500/20',
+  tiktok:         'bg-pink-500/15 text-pink-600 border-pink-500/20',
   twitter:        'bg-slate-500/15 text-slate-300 border-slate-400/20',
   all:            'bg-clip-cyan/15 text-clip-cyan border-clip-cyan/20',
 };
 
 const StatusIcon = ({ status }: { status: TrendStatus }) => {
-  if (status === 'rising')  return <ChevronUp className="w-4 h-4 text-green-400" />;
+  if (status === 'rising')  return <ChevronUp className="w-4 h-4 text-green-600" />;
   if (status === 'peaked')  return <Minus className="w-4 h-4 text-clip-amber" />;
-  return <ChevronDown className="w-4 h-4 text-red-400" />;
+  return <ChevronDown className="w-4 h-4 text-red-600" />;
 };
 
 const StatusColor: Record<TrendStatus, string> = {
-  rising:  'text-green-400 bg-green-400/10',
+  rising:  'text-green-600 bg-green-500/10',
   peaked:  'text-clip-amber bg-clip-amber/10',
-  falling: 'text-red-400 bg-red-400/10',
+  falling: 'text-red-600 bg-red-500/10',
 };
 
 const CategoryIcon = ({ cat }: { cat: TrendItem['category'] }) => {
   if (cat === 'hashtag')   return <Hash className="w-4 h-4 text-clip-cyan" />;
-  if (cat === 'sound')     return <Music className="w-4 h-4 text-purple-400" />;
+  if (cat === 'sound')     return <Music className="w-4 h-4 text-purple-600" />;
   if (cat === 'challenge') return <Flame className="w-4 h-4 text-clip-amber" />;
-  return <TrendingUp className="w-4 h-4 text-green-400" />;
+  return <TrendingUp className="w-4 h-4 text-green-600" />;
 };
 
 export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
@@ -128,8 +128,8 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-green-400 text-xs font-medium uppercase tracking-wider">Live</span>
+              <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
+              <span className="text-green-600 text-xs font-medium uppercase tracking-wider">Live</span>
             </div>
             <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
               Trend <span className="gradient-text">Radar</span>
@@ -163,18 +163,18 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <button
                 key={t.id}
                 onClick={() => setSelectedTrend(t)}
-                className="card-glass p-4 border-green-400/20 bg-green-400/5 relative overflow-hidden text-left hover:bg-green-400/10 transition-colors cursor-pointer focus:outline-none focus:bg-green-400/10 group"
+                className="card-glass p-4 border-green-500/20 bg-green-500/5 relative overflow-hidden text-left hover:bg-green-500/10 transition-colors cursor-pointer focus:outline-none focus:bg-green-500/10 group"
               >
-                <div className="absolute top-0 right-0 w-16 h-16 bg-green-400/5 rounded-full -translate-y-4 translate-x-4" />
+                <div className="absolute top-0 right-0 w-16 h-16 bg-green-500/5 rounded-full -translate-y-4 translate-x-4" />
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-green-400 font-bold text-lg">#{i + 1}</span>
-                  <span className="text-green-400 text-xs px-2 py-0.5 rounded-full bg-green-400/10 font-medium">🔥 HOT</span>
+                  <span className="text-green-600 font-bold text-lg">#{i + 1}</span>
+                  <span className="text-green-600 text-xs px-2 py-0.5 rounded-full bg-green-500/10 font-medium">🔥 HOT</span>
                   <Sparkles className="w-3.5 h-3.5 text-clip-cyan ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <p className="font-display font-semibold text-clip-text truncate">{t.name}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-clip-muted text-xs capitalize">{t.category}</span>
-                  <span className="text-green-400 text-xs font-mono">+{t.change}%</span>
+                  <span className="text-green-600 text-xs font-mono">+{t.change}%</span>
                 </div>
               </button>
             ))}
@@ -190,7 +190,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
                   selectedGame === g
                     ? 'bg-clip-cyan text-black'
-                    : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.06]'
+                    : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04]'
                 }`}>
                 {g}
               </button>
@@ -220,7 +220,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
                 activePlatform === p.id
                   ? p.color + ' border-transparent'
-                  : 'bg-clip-surface text-clip-muted hover:text-clip-text border-white/[0.06]'
+                  : 'bg-clip-surface text-clip-muted hover:text-clip-text border-white/[0.04]'
               }`}>
               {p.label}
             </button>
@@ -234,7 +234,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
 
         {/* Trends table */}
         <div className="card-glass overflow-hidden">
-          <div className="p-4 border-b border-white/[0.06] flex items-center justify-between">
+          <div className="p-4 border-b border-white/[0.04] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Globe className="w-4 h-4 text-clip-cyan" />
               <span className="text-sm font-medium text-clip-text">
@@ -249,7 +249,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
             )}
           </div>
 
-          <div className="divide-y divide-white/[0.04]">
+          <div className="divide-y divide-white/[0.03]">
             {isLoading ? (
               <ParticleLoader
                 stages={[
@@ -338,7 +338,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
 
                 {/* Change % */}
                 <span className={`text-xs font-mono w-12 sm:w-14 text-right flex-shrink-0 ${
-                  trend.change > 0 ? 'text-green-400' : trend.change < 0 ? 'text-red-400' : 'text-clip-muted'
+                  trend.change > 0 ? 'text-green-600' : trend.change < 0 ? 'text-red-600' : 'text-clip-muted'
                 }`}>
                   {trend.change > 0 ? '+' : ''}{trend.change}%
                 </span>
@@ -353,7 +353,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
 
           {/* Hint below table */}
           {filtered.length > 0 && (
-            <div className="px-4 py-3 border-t border-white/[0.04] flex items-center gap-2 text-clip-muted text-xs">
+            <div className="px-4 py-3 border-t border-white/[0.03] flex items-center gap-2 text-clip-muted text-xs">
               <Sparkles className="w-3.5 h-3.5 text-clip-cyan flex-shrink-0" />
               <span>Tap any trend to get keywords, titles, captions & hashtags</span>
             </div>

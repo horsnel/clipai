@@ -79,7 +79,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
   const getPlanBadge = (plan: string) => {
     if (plan === 'creator') return <span className="text-[10px] px-1.5 py-0.5 bg-clip-amber text-black rounded font-bold">CREATOR</span>;
     if (plan === 'pro') return <span className="text-[10px] px-1.5 py-0.5 bg-clip-cyan text-black rounded font-bold">PRO</span>;
-    return <span className="text-[10px] px-1.5 py-0.5 bg-clip-surface text-clip-muted border border-white/[0.08] rounded font-bold">FREE</span>;
+    return <span className="text-[10px] px-1.5 py-0.5 bg-clip-surface text-clip-muted border border-white/[0.05] rounded font-bold">FREE</span>;
   };
 
   const getRankIcon = (rank: number) => {
@@ -95,7 +95,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-clip-amber to-orange-500 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-clip-amber to-orange-600 flex items-center justify-center">
               <Trophy className="w-6 h-6 text-black" />
             </div>
           </div>
@@ -109,7 +109,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
 
         {/* Tab Switcher */}
         <div className="flex justify-center mb-8">
-          <div className="inline-flex bg-clip-surface rounded-xl p-1 border border-white/[0.06]">
+          <div className="inline-flex bg-clip-surface rounded-xl p-1 border border-white/[0.04]">
             <button
               onClick={() => setActiveTab('alltime')}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium text-sm transition-all ${
@@ -156,7 +156,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
           {/* 1st Place */}
           <div className="flex flex-col items-center justify-end order-2 min-w-0">
             <div className="relative mb-3">
-              <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-clip-amber to-orange-500 flex items-center justify-center text-black font-display font-bold text-xl sm:text-3xl ring-4 ring-clip-amber/30">
+              <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-clip-amber to-orange-600 flex items-center justify-center text-black font-display font-bold text-xl sm:text-3xl ring-4 ring-clip-amber/30">
                 {top3[0].avatar}
               </div>
               <div className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-clip-amber flex items-center justify-center">
@@ -188,7 +188,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
 
         {/* Rankings List */}
         <div className="card-glass overflow-hidden mb-6">
-          <div className="p-4 border-b border-white/[0.06]">
+          <div className="p-4 border-b border-white/[0.04]">
             <div className="flex items-center justify-between text-xs text-clip-muted uppercase tracking-wider">
               <span className="w-12">Rank</span>
               <span className="flex-1">Player</span>
@@ -197,7 +197,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
             </div>
           </div>
           
-          <div className="divide-y divide-white/[0.04]">
+          <div className="divide-y divide-white/[0.03]">
             {rest.map((player) => (
               <div 
                 key={player.rank} 
@@ -232,7 +232,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
         {/* Your Rank Card */}
         <div className="card-glass p-4 sm:p-5 border-clip-cyan/30 mb-6">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center flex-shrink-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-clip-cyan to-blue-600 flex items-center justify-center flex-shrink-0">
               <span className="text-black font-bold">{user?.name?.[0] || 'Y'}</span>
             </div>
             <div className="flex-1 min-w-0">
@@ -254,7 +254,7 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
           <div className="mt-4">
             <div className="h-2 bg-clip-surface rounded-full overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-clip-cyan to-blue-400 rounded-full"
+                className="h-full bg-gradient-to-r from-clip-cyan to-blue-600 rounded-full"
                 style={{ width: `${(currentUserScore / nextRankScore) * 100}%` }}
               />
             </div>

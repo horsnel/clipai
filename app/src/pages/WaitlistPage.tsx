@@ -90,7 +90,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
             { icon: Sparkles, title: 'Beat-Sync Renders', desc: 'Transitions land on the drop. Vertical 9:16 by default.' },
             { icon: Bell,     title: 'One-Tap Export',    desc: 'TikTok, Reels, Shorts — watermark-free on paid plans.' },
           ].map((f) => (
-            <div key={f.title} className="card-glass p-5 hover:border-white/[0.12] transition-all">
+            <div key={f.title} className="card-glass p-5 hover:border-white/[0.07] transition-all">
               <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center mb-3">
                 <f.icon className="w-5 h-5 text-clip-cyan" />
               </div>
@@ -103,8 +103,8 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
         {/* Waitlist form OR success state */}
         {joined ? (
           <div className="card-glass p-8 lg:p-10 text-center max-w-xl mx-auto border-clip-cyan/30">
-            <div className="w-16 h-16 rounded-full bg-green-400/10 flex items-center justify-center mx-auto mb-5">
-              <Check className="w-8 h-8 text-green-400" />
+            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-5">
+              <Check className="w-8 h-8 text-green-600" />
             </div>
             <h2 className="font-display font-bold text-2xl text-clip-text mb-2">
               You're in! Position #{joined.position}
@@ -165,7 +165,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
                   className={`px-3 py-2.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 justify-center ${
                     game === g.id
                       ? 'bg-clip-cyan text-black'
-                      : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.06]'
+                      : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04]'
                   }`}
                 >
                   <span>{g.emoji}</span>

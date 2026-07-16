@@ -129,13 +129,13 @@ export function TrendCardModal({ trend, onClose }: TrendCardModalProps) {
       className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
     >
       <div
-        className="bg-clip-dark border border-white/[0.08] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] flex flex-col shadow-2xl"
+        className="bg-clip-dark border border-white/[0.05] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[90vh] sm:max-h-[85vh] flex flex-col shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label={`Content assets for ${trend.name}`}
       >
         {/* Header */}
-        <div className="p-5 border-b border-white/[0.06] flex items-start justify-between gap-3 flex-shrink-0">
+        <div className="p-5 border-b border-white/[0.04] flex items-start justify-between gap-3 flex-shrink-0">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="text-clip-cyan text-xs font-medium uppercase tracking-wider flex items-center gap-1 flex-shrink-0">
@@ -143,11 +143,11 @@ export function TrendCardModal({ trend, onClose }: TrendCardModalProps) {
                 Content Pack
               </span>
               {trend.platform && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/[0.08] text-clip-muted uppercase tracking-wide flex-shrink-0">
+                <span className="text-[10px] px-1.5 py-0.5 rounded border border-white/[0.05] text-clip-muted uppercase tracking-wide flex-shrink-0">
                   {trend.platform === 'google_trends' ? 'Google' : trend.platform === 'twitter' ? 'X' : trend.platform}
                 </span>
               )}
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-400/10 text-green-400 uppercase tracking-wide flex-shrink-0">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-600 uppercase tracking-wide flex-shrink-0">
                 {trend.status}
               </span>
             </div>
@@ -160,7 +160,7 @@ export function TrendCardModal({ trend, onClose }: TrendCardModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.05] rounded-lg transition-colors flex-shrink-0"
+            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.04] rounded-lg transition-colors flex-shrink-0"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -183,7 +183,7 @@ export function TrendCardModal({ trend, onClose }: TrendCardModalProps) {
           {error && !isLoading && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                <X className="w-6 h-6 text-red-400" />
+                <X className="w-6 h-6 text-red-600" />
               </div>
               <p className="text-clip-text font-medium">Couldn't generate assets</p>
               <p className="text-clip-muted text-xs text-center max-w-xs">{error}</p>
@@ -311,7 +311,7 @@ export function TrendCardModal({ trend, onClose }: TrendCardModalProps) {
 
         {/* Footer */}
         {assets && !isLoading && !error && (
-          <div className="p-4 border-t border-white/[0.06] flex-shrink-0">
+          <div className="p-4 border-t border-white/[0.04] flex-shrink-0">
             <p className="text-clip-muted text-xs text-center">
               Tap any item to copy · <span className="text-clip-cyan">{assets.hashtags.length}</span> hashtags ready
             </p>
@@ -351,8 +351,8 @@ function Section({ icon, title, hint, onCopyAll, copiedKey, copyId, children }: 
           onClick={onCopyAll}
           className={`text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all flex-shrink-0 ${
             copiedKey === copyId
-              ? 'bg-green-500/15 text-green-400'
-              : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.06]'
+              ? 'bg-green-500/15 text-green-600'
+              : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04]'
           }`}
         >
           {copiedKey === copyId ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -373,10 +373,10 @@ interface CopyRowProps {
 }
 
 const BadgeColors: Record<string, string> = {
-  green: 'bg-green-400/10 text-green-400',
+  green: 'bg-green-500/10 text-green-600',
   cyan: 'bg-clip-cyan/10 text-clip-cyan',
   amber: 'bg-clip-amber/10 text-clip-amber',
-  purple: 'bg-purple-400/10 text-purple-400',
+  purple: 'bg-purple-500/10 text-purple-600',
 };
 
 function CopyRow({ text, badge, badgeColor = 'cyan', onCopy, copied }: CopyRowProps) {
@@ -386,7 +386,7 @@ function CopyRow({ text, badge, badgeColor = 'cyan', onCopy, copied }: CopyRowPr
       className={`group flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
         copied
           ? 'bg-clip-cyan/10 border-clip-cyan/40'
-          : 'bg-clip-surface border-white/[0.04] hover:border-white/[0.1] hover:bg-white/[0.03]'
+          : 'bg-clip-surface border-white/[0.03] hover:border-white/[0.06] hover:bg-white/[0.03]'
       }`}
     >
       <p className="flex-1 text-sm text-clip-text min-w-0 break-words leading-snug">
@@ -399,7 +399,7 @@ function CopyRow({ text, badge, badgeColor = 'cyan', onCopy, copied }: CopyRowPr
       )}
       <div className="flex-shrink-0">
         {copied ? (
-          <Check className="w-4 h-4 text-green-400" />
+          <Check className="w-4 h-4 text-green-600" />
         ) : (
           <Copy className="w-4 h-4 text-clip-muted group-hover:text-clip-cyan transition-colors" />
         )}

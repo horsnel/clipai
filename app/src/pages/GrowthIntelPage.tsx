@@ -140,8 +140,8 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                 activeTool === t.key
                   ? 'border-clip-cyan/50 bg-clip-cyan/5'
                   : t.locked
-                  ? 'border-white/[0.04] bg-clip-surface/50 opacity-60 cursor-pointer'
-                  : 'border-white/[0.06] bg-clip-surface hover:border-white/[0.12]'
+                  ? 'border-white/[0.03] bg-clip-surface/50 opacity-60 cursor-pointer'
+                  : 'border-white/[0.04] bg-clip-surface hover:border-white/[0.07]'
               }`}>
               {t.locked && (
                 <span className="absolute top-2 right-2 text-xs px-1.5 py-0.5 bg-clip-amber/10 text-clip-amber rounded border border-clip-amber/20 flex-shrink-0">PRO</span>
@@ -260,7 +260,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                     {PLATFORMS.map(p => (
                       <button key={p} onClick={() => setTimingPlatform(p)}
                         className={`w-full px-3 py-2 rounded-lg text-sm text-left transition-all ${
-                          timingPlatform === p ? 'bg-clip-cyan text-black font-medium' : 'bg-clip-surface text-clip-muted border border-white/[0.06] hover:text-clip-text'
+                          timingPlatform === p ? 'bg-clip-cyan text-black font-medium' : 'bg-clip-surface text-clip-muted border border-white/[0.04] hover:text-clip-text'
                         }`}>{p}</button>
                     ))}
                   </div>
@@ -291,22 +291,22 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             {timingResult && (
               <div className="space-y-4">
                 <div className="card-glass overflow-hidden">
-                  <div className="p-4 border-b border-white/[0.06]">
+                  <div className="p-4 border-b border-white/[0.04]">
                     <p className="font-medium text-clip-text">{timingResult.platform} — Nigeria (WAT)</p>
                   </div>
-                  <div className="divide-y divide-white/[0.04]">
+                  <div className="divide-y divide-white/[0.03]">
                     {timingResult.slots.map((slot, i) => (
                       <div key={i} className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3">
                         <span className="text-clip-muted text-xs sm:text-sm w-16 sm:w-20 font-medium flex-shrink-0">{slot.day}</span>
                         <span className="text-clip-text font-mono text-xs sm:text-sm flex-shrink-0 whitespace-nowrap">{slot.time} WAT</span>
                         <div className="flex-1 mx-2 sm:mx-4 h-2 bg-clip-surface rounded-full overflow-hidden min-w-0">
                           <div className={`h-full rounded-full ${
-                            slot.score >= 85 ? 'bg-clip-cyan' : slot.score >= 70 ? 'bg-green-400' : 'bg-clip-amber'
+                            slot.score >= 85 ? 'bg-clip-cyan' : slot.score >= 70 ? 'bg-green-600' : 'bg-clip-amber'
                           }`} style={{ width: `${slot.score}%` }} />
                         </div>
                         <span className={`text-xs font-medium flex-shrink-0 px-2 py-0.5 rounded whitespace-nowrap ${
                           slot.label === 'PEAK' ? 'bg-clip-cyan/10 text-clip-cyan' :
-                          slot.label === 'GREAT' ? 'bg-green-400/10 text-green-400' :
+                          slot.label === 'GREAT' ? 'bg-green-500/10 text-green-600' :
                           'bg-clip-amber/10 text-clip-amber'
                         }`}>{slot.label}</span>
                       </div>

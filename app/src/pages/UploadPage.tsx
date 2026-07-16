@@ -203,9 +203,9 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
 
           {error && (
             <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3 text-left">
-              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-red-400 text-sm font-medium">Error</p>
+                <p className="text-red-600 text-sm font-medium">Error</p>
                 <p className="text-red-300 text-xs mt-1">{error}</p>
               </div>
             </div>
@@ -230,7 +230,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
         </div>
 
         <div className="flex justify-center mb-8">
-          <div className="inline-flex bg-clip-surface rounded-xl p-1 border border-white/[0.06]">
+          <div className="inline-flex bg-clip-surface rounded-xl p-1 border border-white/[0.04]">
             {(['upload', 'youtube'] as const).map((tab) => (
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`flex items-center gap-2 px-6 py-3 rounded-lg font-medium text-sm transition-all ${
@@ -249,7 +249,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
               <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
                 className={`card-glass p-8 text-center cursor-pointer transition-all duration-300 ${
-                  isDragging ? 'border-clip-cyan bg-clip-cyan/5' : 'hover:border-white/[0.12]'
+                  isDragging ? 'border-clip-cyan bg-clip-cyan/5' : 'hover:border-white/[0.07]'
                 }`}>
                 <input ref={fileInputRef} type="file" accept="video/mp4,video/*" onChange={handleFileSelect} className="hidden" />
                 {selectedFile ? (
@@ -262,7 +262,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
                       <p className="text-clip-muted text-sm">{formatFileSize(selectedFile.size)}</p>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
-                      className="p-2 text-clip-muted hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all">
+                      className="p-2 text-clip-muted hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all">
                       <X className="w-5 h-5" />
                     </button>
                   </div>
@@ -300,7 +300,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
                     className={`px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                       selectedGame === game
                         ? 'bg-clip-cyan text-black'
-                        : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.06] hover:border-white/[0.12]'
+                        : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.04] hover:border-white/[0.07]'
                     }`}>
                     {game}
                   </button>
@@ -359,7 +359,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between"><span className="text-clip-muted">AI scan</span><span className="text-clip-text">10 cr</span></div>
                 <div className="flex justify-between"><span className="text-clip-muted">AI captions</span><span className="text-clip-text">{captionsEnabled ? '5 cr' : '—'}</span></div>
-                <div className="border-t border-white/[0.06] mt-2 pt-2 flex justify-between font-medium">
+                <div className="border-t border-white/[0.04] mt-2 pt-2 flex justify-between font-medium">
                   <span className="text-clip-muted">Total</span>
                   <span className="text-clip-cyan">{captionsEnabled ? 15 : 10} cr</span>
                 </div>

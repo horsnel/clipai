@@ -42,12 +42,12 @@ const FEATURE_CARDS: FeatureCard[] = [
   {
     page: 'trends',
     icon: Radio,
-    iconColor: 'text-green-400',
-    iconBg: 'bg-green-400/10',
+    iconColor: 'text-green-600',
+    iconBg: 'bg-green-500/10',
     label: 'Trend Radar',
     desc: 'Live gaming trends updated every hour',
     badge: 'LIVE',
-    badgeColor: 'bg-green-400/10 text-green-400 border-green-400/20',
+    badgeColor: 'bg-green-500/10 text-green-600 border-green-500/20',
   },
   {
     page: 'forge',
@@ -70,18 +70,18 @@ const FEATURE_CARDS: FeatureCard[] = [
   {
     page: 'rank',
     icon: Trophy,
-    iconColor: 'text-purple-400',
-    iconBg: 'bg-purple-400/10',
+    iconColor: 'text-purple-600',
+    iconBg: 'bg-purple-500/10',
     label: 'Creator Rank',
     desc: 'XP, streaks, ranks & badges',
     badge: 'NEW',
-    badgeColor: 'bg-purple-400/10 text-purple-400 border-purple-400/20',
+    badgeColor: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
   },
   {
     page: 'growth',
     icon: BarChart2,
-    iconColor: 'text-blue-400',
-    iconBg: 'bg-blue-400/10',
+    iconColor: 'text-blue-600',
+    iconBg: 'bg-blue-500/10',
     label: 'Growth Intel',
     desc: 'Competitor spy, A/B titles & timing',
   },
@@ -93,7 +93,7 @@ const FEATURE_CARDS: FeatureCard[] = [
     label: 'Video Export',
     desc: 'AI clip rendering & editing',
     badge: 'SOON',
-    badgeColor: 'bg-clip-surface text-clip-muted border-white/[0.08]',
+    badgeColor: 'bg-clip-surface text-clip-muted border-white/[0.05]',
     locked: true,
   },
 ];
@@ -174,8 +174,8 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
               <span className={`text-xs px-2 py-1 rounded font-medium flex-shrink-0 ${
                 user?.plan === 'creator' ? 'bg-clip-amber text-black' :
                 user?.plan === 'pro'     ? 'bg-clip-cyan text-black' :
-                user?.plan === 'starter' ? 'bg-blue-400/20 text-blue-400' :
-                'bg-clip-surface text-clip-muted border border-white/[0.08]'
+                user?.plan === 'starter' ? 'bg-blue-500/20 text-blue-600' :
+                'bg-clip-surface text-clip-muted border border-white/[0.05]'
               }`}>
                 {currentPlan.label.toUpperCase()}
               </span>
@@ -191,14 +191,14 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
           <div className="card-glass p-5 sm:p-6">
             <div className="flex items-center gap-3 mb-2 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                <TrendingUp className="w-5 h-5 text-green-400" />
+                <TrendingUp className="w-5 h-5 text-green-600" />
               </div>
               <div className="min-w-0">
                 <p className="text-clip-muted text-sm">Total Views</p>
                 <p className="font-display font-semibold text-2xl text-clip-text">24.5K</p>
               </div>
             </div>
-            <p className="text-green-400 text-xs flex items-center gap-1">
+            <p className="text-green-600 text-xs flex items-center gap-1">
               <TrendingUp className="w-3 h-3 flex-shrink-0" /> +12% from last week
             </p>
           </div>
@@ -228,8 +228,8 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
               <span className={`text-xs px-2 py-1 rounded font-medium capitalize flex-shrink-0 ${
                 user?.plan === 'creator' ? 'bg-clip-amber text-black' :
                 user?.plan === 'pro'     ? 'bg-clip-cyan text-black' :
-                user?.plan === 'starter' ? 'bg-blue-400/20 text-blue-400' :
-                'bg-clip-surface text-clip-muted border border-white/[0.08]'
+                user?.plan === 'starter' ? 'bg-blue-500/20 text-blue-600' :
+                'bg-clip-surface text-clip-muted border border-white/[0.05]'
               }`}>
                 {(user?.plan ?? 'free')} plan
               </span>
@@ -317,7 +317,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {clips.map(clip => (
                 <div key={clip.id} onClick={() => onNavigate('results')}
-                  className="card-glass overflow-hidden cursor-pointer group hover:-translate-y-1 hover:border-white/[0.12] transition-all duration-300">
+                  className="card-glass overflow-hidden cursor-pointer group hover:-translate-y-1 hover:border-white/[0.07] transition-all duration-300">
                   <div className="relative aspect-video overflow-hidden">
                     <img src={clip.thumbnail} alt={clip.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />

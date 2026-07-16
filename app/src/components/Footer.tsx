@@ -10,7 +10,7 @@ export function Footer({ onNavigate }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-clip-dark border-t border-white/[0.06]">
+    <footer className="bg-clip-dark border-t border-white/[0.04]">
       <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 lg:gap-16">
           {/* Brand */}
@@ -29,7 +29,7 @@ export function Footer({ onNavigate }: FooterProps) {
                 href="https://x.com/Olhmescraxes1"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.06] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
+                className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.04] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
               >
                 <Twitter className="w-4 h-4" />
               </a>
@@ -37,7 +37,7 @@ export function Footer({ onNavigate }: FooterProps) {
                 href="https://instagram.com/olhmescraxes1"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.06] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
+                className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.04] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
               >
                 <Instagram className="w-4 h-4" />
               </a>
@@ -45,7 +45,7 @@ export function Footer({ onNavigate }: FooterProps) {
                 href="https://github.com/horsnel/clipai"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.06] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
+                className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.04] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
               >
                 <Github className="w-4 h-4" />
               </a>
@@ -144,7 +144,7 @@ export function Footer({ onNavigate }: FooterProps) {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 pt-8 border-t border-white/[0.06] flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="mt-12 pt-8 border-t border-white/[0.04] flex flex-col sm:flex-row items-center justify-center gap-4">
           <p className="text-clip-muted text-sm text-center">
             &copy; {currentYear} ClipAI by OLHMES. Built in Lagos, Nigeria.
           </p>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
-import { Menu, X, Coins } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { Logo } from './Logo';
 
 interface NavbarProps {
@@ -11,7 +11,7 @@ interface NavbarProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number } | null;
 }
 
-export function Navbar({ currentPage, onNavigate, isLoggedIn, user }: NavbarProps) {
+export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -26,7 +26,12 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user }: NavbarProp
   const isLanding = currentPage === 'landing';
   const showBg = isScrolled || !isLanding;
 
-  const navLinks = isLoggedIn
+  const navLinks: Array<{
+    label: string;
+    page: Page;
+    hash?: string;
+    badge?: string;
+  }> = isLoggedIn
     ? [
         { label: 'Dashboard', page: 'dashboard' as Page },
         { label: 'Trend Radar', page: 'trends' as Page },
@@ -34,7 +39,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user }: NavbarProp
         { label: 'ClipBot', page: 'clipbot' as Page },
         { label: 'My Rank', page: 'rank' as Page },
         { label: 'Growth Intel', page: 'growth' as Page },
-        { label: 'Editor (Soon)', page: 'upload' as Page },
+        { label: 'Editor', page: 'upload' as Page, badge: 'Coming Soon' },
         { label: 'Leaderboard', page: 'leaderboard' as Page },
         { label: 'Pricing', page: 'pricing' as Page },
         { label: 'Settings', page: 'settings' as Page },
@@ -59,7 +64,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user }: NavbarProp
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         showBg
-          ? 'bg-clip-dark/90 backdrop-blur-md border-b border-white/[0.06]'
+          ? 'bg-clip-dark/90 backdrop-blur-md border-b border-white/[0.04]'
           : 'bg-transparent'
       }`}
     >
@@ -79,39 +84,28 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user }: NavbarProp
               <button
                 key={link.label}
                 onClick={() => handleNavClick(link.page, link.hash)}
-                className={`px-2.5 xl:px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
+                className={`group inline-flex items-center gap-1.5 px-2.5 xl:px-4 py-2 text-sm font-medium rounded-lg transition-all whitespace-nowrap ${
                   currentPage === link.page
                     ? 'text-clip-cyan bg-clip-cyan/10'
-                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.05]'
+                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.03]'
                 }`}
               >
                 {link.label}
+                {link.badge && (
+                  <span
+                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-clip-cyan/25 bg-clip-cyan/5 text-clip-cyan/80 group-hover:border-clip-cyan/40 group-hover:text-clip-cyan transition-colors"
+                    title="This feature is under development"
+                  >
+                    {link.badge}
+                  </span>
+                )}
               </button>
             ))}
           </div>
 
           {/* Auth Buttons */}
           <div className="hidden lg:flex items-center gap-3">
-            {isLoggedIn ? (
-              <div className="flex items-center gap-2 sm:gap-3">
-                {/* Credits chip — always visible while logged in */}
-                <button
-                  onClick={() => onNavigate('pricing')}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-all flex-shrink-0 ${
-                    (user?.credits ?? 0) <= 5
-                      ? 'border-clip-amber/40 bg-clip-amber/10 hover:bg-clip-amber/20'
-                      : 'border-clip-cyan/30 bg-clip-cyan/10 hover:bg-clip-cyan/20'
-                  }`}
-                  title="Your credit balance - click to upgrade"
-                  aria-label={`${user?.credits ?? 0} credits available`}
-                >
-                  <Coins className={`w-3.5 h-3.5 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
-                  <span className={`text-xs font-bold tabular-nums ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`}>
-                    {user?.credits ?? 0}
-                  </span>
-                </button>
-              </div>
-            ) : (
+            {!isLoggedIn && (
               <>
                 <button
                   onClick={() => onNavigate('auth')}
@@ -132,7 +126,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user }: NavbarProp
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 text-clip-text hover:bg-white/[0.05] rounded-lg transition-colors"
+            className="lg:hidden p-2 text-clip-text hover:bg-white/[0.04] rounded-lg transition-colors"
             aria-label="Toggle menu"
           >
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -142,42 +136,35 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user }: NavbarProp
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="lg:hidden bg-clip-dark/98 backdrop-blur-lg border-b border-white/[0.06] max-h-[calc(100vh-4rem)] overflow-y-auto">
+        <div className="lg:hidden bg-clip-dark/98 backdrop-blur-lg border-b border-white/[0.03] max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="px-4 py-4 space-y-2">
             {navLinks.map((link) => (
               <button
                 key={link.label}
                 onClick={() => handleNavClick(link.page, link.hash)}
-                className={`w-full px-4 py-3 text-left text-sm font-medium rounded-lg transition-all ${
+                className={`w-full flex items-center justify-between gap-2 px-4 py-3 text-left text-sm font-medium rounded-lg transition-all ${
                   currentPage === link.page
                     ? 'text-clip-cyan bg-clip-cyan/10'
-                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.05]'
+                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.03]'
                 }`}
               >
-                {link.label}
+                <span>{link.label}</span>
+                {link.badge && (
+                  <span
+                    className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-clip-cyan/25 bg-clip-cyan/5 text-clip-cyan/80"
+                    title="This feature is under development"
+                  >
+                    {link.badge}
+                  </span>
+                )}
               </button>
             ))}
-            <div className="pt-2 border-t border-white/[0.06]">
+            <div className="pt-2 border-t border-white/[0.03]">
               {isLoggedIn ? (
                 <div className="space-y-2">
-                  {/* Credit chip on mobile */}
-                  <button
-                    onClick={() => handleNavClick('pricing')}
-                    className={`w-full flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-lg border transition-all ${
-                      (user?.credits ?? 0) <= 5
-                        ? 'border-clip-amber/40 bg-clip-amber/10'
-                        : 'border-clip-cyan/30 bg-clip-cyan/10'
-                    }`}
-                    aria-label={`${user?.credits ?? 0} credits available`}
-                  >
-                    <Coins className={`w-3.5 h-3.5 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
-                    <span className={`text-xs font-bold tabular-nums ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`}>
-                      {user?.credits ?? 0} credits
-                    </span>
-                  </button>
                   <button
                     onClick={() => handleNavClick('settings')}
-                    className="w-full px-4 py-3 text-left text-sm font-medium text-clip-text hover:bg-white/[0.05] rounded-lg transition-all"
+                    className="w-full px-4 py-3 text-left text-sm font-medium text-clip-text hover:bg-white/[0.03] rounded-lg transition-all"
                   >
                     Account Settings
                   </button>
@@ -186,7 +173,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn, user }: NavbarProp
                 <div className="space-y-2">
                   <button
                     onClick={() => handleNavClick('auth')}
-                    className="w-full px-4 py-3 text-left text-sm font-medium text-clip-muted hover:text-clip-text hover:bg-white/[0.05] rounded-lg transition-all"
+                    className="w-full px-4 py-3 text-left text-sm font-medium text-clip-muted hover:text-clip-text hover:bg-white/[0.03] rounded-lg transition-all"
                   >
                     Login
                   </button>

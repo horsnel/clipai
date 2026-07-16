@@ -102,7 +102,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => onNavigate('dashboard')}
-            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.05] rounded-lg transition-all"
+            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.04] rounded-lg transition-all"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -127,7 +127,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     activeTab === tab.id
                       ? 'bg-clip-cyan text-black'
-                      : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.05]'
+                      : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.04]'
                   }`}
                 >
                   <tab.icon className="w-4 h-4" />
@@ -139,7 +139,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
             {/* User Card */}
             <div className="card-glass p-4 mt-4">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-clip-cyan to-blue-500 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-clip-cyan to-blue-600 flex items-center justify-center flex-shrink-0">
                   <User className="w-5 h-5 text-black" />
                 </div>
                 <div className="min-w-0">
@@ -153,7 +153,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                     ? 'bg-clip-amber text-black' 
                     : user?.plan === 'pro'
                     ? 'bg-clip-cyan text-black'
-                    : 'bg-clip-surface text-clip-muted border border-white/[0.08]'
+                    : 'bg-clip-surface text-clip-muted border border-white/[0.05]'
                 }`}>
                   {user?.plan === 'creator' && <CrownIcon className="w-3 h-3" />}
                   {user?.plan === 'pro' && <Sparkles className="w-3 h-3" />}
@@ -268,7 +268,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                         ? 'bg-clip-amber text-black' 
                         : user?.plan === 'pro'
                         ? 'bg-clip-cyan text-black'
-                        : 'bg-clip-surface text-clip-muted border border-white/[0.08]'
+                        : 'bg-clip-surface text-clip-muted border border-white/[0.05]'
                     }`}>
                       {user?.plan?.toUpperCase()}
                     </span>
@@ -311,7 +311,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                     Share this code with friends and earn 5 free clips for each signup!
                   </p>
                   <div className="flex gap-3">
-                    <div className="flex-1 bg-clip-surface border border-white/[0.08] rounded-xl px-4 py-3 font-mono text-clip-text">
+                    <div className="flex-1 bg-clip-surface border border-white/[0.05] rounded-xl px-4 py-3 font-mono text-clip-text">
                       {referralCode}
                     </div>
                     <button
@@ -363,7 +363,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                       <button
                         onClick={() => setNotifications(prev => ({ ...prev, [item.key]: !prev[item.key as keyof typeof notifications] }))}
                         className={`w-12 h-6 rounded-full transition-colors relative flex-shrink-0 ${
-                          notifications[item.key as keyof typeof notifications] ? 'bg-clip-cyan' : 'bg-clip-surface border border-white/[0.08]'
+                          notifications[item.key as keyof typeof notifications] ? 'bg-clip-cyan' : 'bg-clip-surface border border-white/[0.05]'
                         }`}
                       >
                         <div

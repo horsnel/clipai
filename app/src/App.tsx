@@ -224,7 +224,7 @@ function AppContentInner({
         <div
           className="absolute w-[480px] h-[480px] rounded-full blur-3xl opacity-25 pointer-events-none"
           style={{
-            background: 'radial-gradient(circle, #00F0FF 0%, transparent 65%)',
+            background: 'radial-gradient(circle, #00C2D6 0%, transparent 65%)',
             animation: 'clipai-boot-pulse 2.4s ease-in-out infinite',
           }}
         />
@@ -261,7 +261,7 @@ function AppContentInner({
           <div
             className="absolute inset-y-0 w-1/3 rounded-full"
             style={{
-              background: 'linear-gradient(90deg, transparent 0%, #00F0FF 50%, transparent 100%)',
+              background: 'linear-gradient(90deg, transparent 0%, #00C2D6 50%, transparent 100%)',
               animation: 'clipai-boot-sweep 1.4s ease-in-out infinite',
             }}
           />
@@ -305,9 +305,9 @@ function AppContentInner({
         position="bottom-right"
         toastOptions={{
           style: {
-            background: '#121216',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: '#F4F6FA',
+            background: '#101014',
+            border: '1px solid rgba(255, 255, 255, 0.04)',
+            color: '#C8CDD8',
           },
         }}
       />

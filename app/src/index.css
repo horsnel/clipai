@@ -6,34 +6,34 @@
 
 @layer base {
   :root {
-    --background: 0 0% 4.7%;
-    --foreground: 230 30% 97%;
-    --card: 240 7% 8%;
-    --card-foreground: 230 30% 97%;
-    --popover: 240 7% 8%;
-    --popover-foreground: 230 30% 97%;
-    --primary: 183 100% 50%;
+    --background: 0 0% 3.9%;
+    --foreground: 228 18% 82%;
+    --card: 240 7% 7%;
+    --card-foreground: 228 18% 82%;
+    --popover: 240 7% 7%;
+    --popover-foreground: 228 18% 82%;
+    --primary: 187 100% 42%;
     --primary-foreground: 0 0% 0%;
-    --secondary: 240 7% 12%;
-    --secondary-foreground: 230 30% 97%;
-    --muted: 240 7% 12%;
-    --muted-foreground: 225 8% 69%;
-    --accent: 183 100% 50%;
+    --secondary: 240 7% 10%;
+    --secondary-foreground: 228 18% 82%;
+    --muted: 240 7% 10%;
+    --muted-foreground: 225 6% 47%;
+    --accent: 187 100% 42%;
     --accent-foreground: 0 0% 0%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 7% 14%;
-    --input: 240 7% 14%;
-    --ring: 183 100% 50%;
+    --destructive: 0 70% 48%;
+    --destructive-foreground: 0 0% 90%;
+    --border: 240 7% 12%;
+    --input: 240 7% 12%;
+    --ring: 187 100% 42%;
     --radius: 0.625rem;
-    --sidebar-background: 240 7% 8%;
-    --sidebar-foreground: 230 30% 97%;
-    --sidebar-primary: 183 100% 50%;
+    --sidebar-background: 240 7% 7%;
+    --sidebar-foreground: 228 18% 82%;
+    --sidebar-primary: 187 100% 42%;
     --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 240 7% 12%;
-    --sidebar-accent-foreground: 230 30% 97%;
-    --sidebar-border: 240 7% 14%;
-    --sidebar-ring: 183 100% 50%;
+    --sidebar-accent: 240 7% 10%;
+    --sidebar-accent-foreground: 228 18% 82%;
+    --sidebar-border: 240 7% 12%;
+    --sidebar-ring: 187 100% 42%;
   }
 }
 
@@ -48,7 +48,7 @@
   
   body {
     @apply bg-clip-dark text-clip-text font-body antialiased;
-    background-color: #0B0B0D;
+    background-color: #08080A;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -58,11 +58,11 @@
 
 @layer components {
   .gradient-text {
-    @apply bg-gradient-to-r from-clip-cyan to-blue-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-clip-cyan to-blue-600 bg-clip-text text-transparent;
   }
   
   .card-glass {
-    @apply bg-clip-surface/80 backdrop-blur-sm border border-white/[0.06] rounded-2xl;
+    @apply bg-clip-surface/80 backdrop-blur-sm border border-white/[0.04] rounded-2xl;
   }
   
   .btn-primary {
@@ -73,19 +73,19 @@
   
   .btn-secondary {
     @apply bg-clip-surface text-clip-text font-medium px-6 py-3 rounded-xl 
-           border border-white/[0.08] hover:bg-white/[0.05] hover:-translate-y-0.5 
+           border border-white/[0.05] hover:bg-white/[0.04] hover:-translate-y-0.5 
            transition-all duration-200;
   }
   
   .input-dark {
-    @apply bg-clip-surface border border-white/[0.08] rounded-xl px-4 py-3 
+    @apply bg-clip-surface border border-white/[0.05] rounded-xl px-4 py-3 
            text-clip-text placeholder:text-clip-muted/60
            focus:outline-none focus:border-clip-cyan/50 focus:ring-1 focus:ring-clip-cyan/30
            transition-all duration-200;
   }
   
   .vignette {
-    background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.4) 100%);
+    background: radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.55) 100%);
   }
   
   .grain-overlay {
@@ -101,15 +101,15 @@
   }
   
   .hype-badge-gold {
-    @apply bg-gradient-to-r from-amber-400 to-yellow-500 text-black text-xs font-bold px-2 py-0.5 rounded;
+    @apply bg-gradient-to-r from-amber-600 to-amber-700 text-black text-xs font-bold px-2 py-0.5 rounded;
   }
   
   .hype-badge-blue {
-    @apply bg-gradient-to-r from-clip-cyan to-cyan-400 text-black text-xs font-bold px-2 py-0.5 rounded;
+    @apply bg-gradient-to-r from-clip-cyan to-cyan-700 text-black text-xs font-bold px-2 py-0.5 rounded;
   }
   
   .hype-badge-gray {
-    @apply bg-clip-surface text-clip-muted text-xs font-bold px-2 py-0.5 rounded border border-white/[0.08];
+    @apply bg-clip-surface text-clip-muted text-xs font-bold px-2 py-0.5 rounded border border-white/[0.05];
   }
 }
 
@@ -134,20 +134,20 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #0B0B0D;
+  background: #08080A;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1F1F26;
+  background: #1A1A20;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #2a2a35;
+  background: #232329;
 }
 
 /* Selection */
 ::selection {
-  background: rgba(0, 240, 255, 0.3);
-  color: #F4F6FA;
+  background: rgba(0, 194, 214, 0.25);
+  color: #C8CDD8;
 }
