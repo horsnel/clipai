@@ -1940,6 +1940,99 @@ Rules:
   return json(data);
 });
 
+// ─── Trending Videos (Dashboard widget) ─────────────────────────────────────
+// Returns 6 trending YouTube gaming videos + a per-video copy pack (optimized
+// title + 1 caption + 8 hashtags). No auth, no credits — this is a free
+// dashboard-level inspiration widget. Cached 6h globally (trends + videos
+// don't shift faster than that, and one LLM call covers all 6 videos).
+app.get('/trending-videos', async (c) => {
+  const env = c.env as Env;
+  const game = (c.req.query('game') || '').trim();
+  const gameLabel = game || 'gaming';
+
+  const cacheKey = `trending_videos:${gameLabel.toLowerCase()}`;
+  const data = await withCache(env, cacheKey, 6 * 60 * 60, async () => {
+    // Fetch top 6 trending YouTube videos
+    const ytItems = await ytTrending(env, game || 'gaming', 6);
+    if (!ytItems.length) {
+      return { videos: [], generatedAt: new Date().toISOString(), game: gameLabel };
+    }
+
+    // Map raw YouTube data → lightweight video objects
+    const videos = ytItems.map((it: any) => {
+      const vid = it.id?.videoId || it.id || '';
+      return {
+        id: vid,
+        title: it.snippet?.title || 'Untitled',
+        channel: it.snippet?.channelTitle || 'Unknown',
+        thumbnail: vid ? `https://i.ytimg.com/vi/${vid}/mqdefault.jpg` : '',
+        url: vid ? `https://www.youtube.com/watch?v=${vid}` : '',
+        platform: 'youtube',
+        publishedAt: it.snippet?.publishedAt || '',
+      };
+    }).filter((v: any) => v.id);
+
+    if (!videos.length) {
+      return { videos: [], generatedAt: new Date().toISOString(), game: gameLabel };
+    }
+
+    // ONE LLM call → copy pack for each video (much cheaper than 6 separate calls)
+    const videoList = videos.map((v: any, i: number) =>
+      `${i + 1}. "${v.title}" by ${v.channel}`
+    ).join('\n');
+
+    const system = 'You are a viral gaming content strategist for African creators. Return ONLY valid JSON.';
+    const prompt = `For each of these ${videos.length} trending YouTube gaming videos, generate a ready-to-post copy pack.
+
+Videos:
+${videoList}
+
+Game focus: ${gameLabel}
+
+Return JSON:
+{
+  "packs": [
+    {
+      "title": "<6-12 word optimized viral title with 1-2 emojis>",
+      "caption": "<under 120 chars, includes comment bait, 1-2 emojis>",
+      "hashtags": ["#tag1", "#tag2", "... 8 total"]
+    }
+  ]
+}
+
+Rules:
+- packs array MUST have exactly ${videos.length} items, in the same order as the videos above.
+- Each hashtag array: 8 items, mix of mega (e.g. #gaming) + mid (#naijagamer) + niche. ALL lowercase.
+- ALWAYS include #naijagamer and #gamingafrica in every pack.
+- Titles should feel authentic, not corporate. Optimise for clicks.
+- Captions should reference the gaming moment / Nigerian-African creator culture where natural.
+- Return ONLY the JSON, no markdown fences.`;
+
+    let packs: any[] = [];
+    try {
+      const llmData: any = await llmJson(env, prompt, system, 2500);
+      packs = Array.isArray(llmData.packs) ? llmData.packs : [];
+    } catch {
+      // LLM failure — fall back to empty packs (videos still show, just no copy button)
+      packs = [];
+    }
+
+    // Merge packs into videos
+    videos.forEach((v: any, i: number) => {
+      const p = packs[i] || {};
+      v.copyPack = {
+        title: typeof p.title === 'string' ? p.title : '',
+        caption: typeof p.caption === 'string' ? p.caption : '',
+        hashtags: Array.isArray(p.hashtags) ? p.hashtags.slice(0, 12) : [],
+      };
+    });
+
+    return { videos, generatedAt: new Date().toISOString(), game: gameLabel };
+  });
+
+  return json(data);
+});
+
 // ─── Trend Assets (per-trend copyable content) ──────────────────────────────
 // Given a trend name + game + platform, generates 4 sections of copyable assets:
 //   - keywords: 4 search phrases (3-5 words each)

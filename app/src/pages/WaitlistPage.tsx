@@ -3,13 +3,13 @@ import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import {
   Sparkles, Lock, Mail, Gamepad2, ChevronRight,
-  Check, Loader2, Gift, Bell, Trophy, Zap,
+  Check, Loader2, Gift, Bell, Trophy, Zap, Scissors,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { joinWaitlist } from '@/services/api';
 
 interface WaitlistPageProps {
-  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
+  user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number; clipsUsed?: number } | null;
   onNavigate: (page: Page, clips?: unknown[]) => void;
 }
 
@@ -23,6 +23,13 @@ const GAMES = [
   { id: 'warzone',    label: 'Warzone'     , emoji: '💀' },
   { id: 'mobile',     label: 'Mobile (PUBG/FF/ML)', emoji: '📱' },
 ];
+
+const PLAN_LIMITS = {
+  free:    { clips: 3,        label: 'Free'    },
+  starter: { clips: 30,       label: 'Starter' },
+  pro:     { clips: 100,      label: 'Pro'     },
+  creator: { clips: Infinity, label: 'Creator' },
+};
 
 export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
   const [email, setEmail]       = useState(user?.email ?? '');
@@ -61,6 +68,52 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
       </div>
 
       <div className="relative max-w-4xl mx-auto">
+        {/* Clips This Month stat card — moved here from the Dashboard */}
+        <div className="card-glass p-5 sm:p-6 mb-8 relative overflow-hidden">
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-12 h-12 rounded-full bg-clip-cyan/15 flex items-center justify-center flex-shrink-0">
+                <Scissors className="w-6 h-6 text-clip-cyan" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-clip-muted text-xs uppercase tracking-wider font-medium">Clips This Month</p>
+                <p className="font-display font-bold text-3xl text-clip-text tabular-nums leading-tight mt-0.5">
+                  {(user?.clipsUsed ?? 0)} <span className="text-clip-muted text-xl font-medium">/ {PLAN_LIMITS[user?.plan ?? 'free'].clips === Infinity ? '∞' : PLAN_LIMITS[user?.plan ?? 'free'].clips}</span>
+                </p>
+              </div>
+            </div>
+            <span className={`text-xs px-2 py-1 rounded font-medium flex-shrink-0 ${
+              user?.plan === 'creator' ? 'bg-clip-amber text-black' :
+              user?.plan === 'pro'     ? 'bg-clip-cyan text-black' :
+              user?.plan === 'starter' ? 'bg-blue-500/20 text-blue-500' :
+              'bg-clip-surface text-clip-muted border border-white/[0.05]'
+            }`}>
+              {PLAN_LIMITS[user?.plan ?? 'free'].label.toUpperCase()}
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div className="h-2 bg-clip-surface rounded-full overflow-hidden mb-2">
+            <div
+              className="h-full bg-gradient-to-r from-clip-cyan to-violet-500 rounded-full"
+              style={{
+                width: `${
+                  PLAN_LIMITS[user?.plan ?? 'free'].clips === Infinity
+                    ? 0
+                    : Math.min(100, ((user?.clipsUsed ?? 0) / PLAN_LIMITS[user?.plan ?? 'free'].clips) * 100)
+                }%`,
+              }}
+            />
+          </div>
+          <p className="text-clip-muted text-xs">
+            {PLAN_LIMITS[user?.plan ?? 'free'].clips === Infinity
+              ? 'Unlimited clips on your Creator plan — editor ships soon.'
+              : `${Math.max(0, PLAN_LIMITS[user?.plan ?? 'free'].clips - (user?.clipsUsed ?? 0))} clips remaining this month · editor ships soon.`}
+          </p>
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 opacity-30 pointer-events-none">
+            <Lock className="w-5 h-5 text-clip-amber" />
+          </div>
+        </div>
+
         {/* Coming Soon badge */}
         <div className="flex justify-center mb-6">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-clip-amber/10 border border-clip-amber/30">

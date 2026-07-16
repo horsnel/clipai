@@ -28,6 +28,7 @@ import type {
   RenderJob,
   ShadowResponse,
   TopicStealEntry,
+  TrendingVideosResponse,
   UploadResult,
 } from '../types';
 
@@ -255,6 +256,13 @@ export async function waitForRender(
 // ─── Clips (list own) ───────────────────────────────────────────────────────
 export async function listClips(): Promise<{ clips: any[] }> {
   return apiClient.get<{ clips: any[] }>('/clips');
+}
+
+// ─── Trending Videos (Dashboard widget, public, 6h cache) ───────────────────
+export async function getTrendingVideos(game?: string): Promise<TrendingVideosResponse> {
+  const params = new URLSearchParams();
+  if (game) params.set('game', game);
+  return apiClient.get<TrendingVideosResponse>(`/trending-videos?${params.toString()}`);
 }
 
 // ─── Leaderboard ────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import {
-  Clock, Play, ChevronRight, Flame, ExternalLink, Sparkles,
+  Clock, Play, ChevronRight, Flame, ExternalLink, Sparkles, Youtube, X,
 } from 'lucide-react';
 import { listAnalyses } from '@/services/api';
 import type { AnalysisSummary } from '../types';
@@ -36,6 +36,7 @@ export function RecentAnalysesWidget({
 }: RecentAnalysesWidgetProps) {
   const [analyses, setAnalyses] = useState<AnalysisSummary[]>([]);
   const [state, setState] = useState<LoadState>('idle');
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   const load = async () => {
     setState(s => (s === 'idle' ? 'loading' : 'ready'));
@@ -53,6 +54,22 @@ export function RecentAnalysesWidget({
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit]);
+
+  // Lock body scroll while the player modal is open
+  useEffect(() => {
+    if (playingId) {
+      document.body.style.overflow = 'hidden';
+      const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPlayingId(null); };
+      window.addEventListener('keydown', onKey);
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', onKey);
+      };
+    }
+  }, [playingId]);
+
+  // The currently playing analysis row (so we can pull its title + id)
+  const playingAnalysis = playingId ? analyses.find(a => a.id === playingId) : null;
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
   const timeAgo = (iso: string): string => {
@@ -172,21 +189,35 @@ export function RecentAnalysesWidget({
                   className="relative group flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-lg hover:bg-white/[0.02] transition-colors cursor-pointer"
                   onClick={() => onReopen?.(a)}
                 >
-                  {/* Thumbnail */}
-                  <div className="relative w-16 h-10 rounded-md overflow-hidden flex-shrink-0 bg-clip-surface">
+                  {/* Thumbnail — click to play inline, doesn't trigger row click */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (ytId) setPlayingId(a.id);
+                    }}
+                    className="relative w-16 h-10 rounded-md overflow-hidden flex-shrink-0 bg-clip-surface group/thumb"
+                    title={ytId ? 'Play video' : 'No video ID'}
+                    aria-label={ytId ? `Play ${a.video_title}` : 'No video'}
+                  >
                     {thumb ? (
                       <img
                         src={thumb}
                         alt=""
                         loading="lazy"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                       />
                     ) : null}
-                    <div className="absolute inset-0 bg-clip-dark/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Play className="w-4 h-4 text-clip-cyan ml-0.5" />
+                    <div className="absolute inset-0 bg-clip-dark/40 flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+                      <Play className="w-4 h-4 text-clip-cyan ml-0.5" fill="currentColor" />
                     </div>
-                  </div>
+                    {ytId && (
+                      <span className="absolute top-0.5 left-0.5 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-bold bg-red-500/90 text-white">
+                        <Youtube className="w-2 h-2" /> YT
+                      </span>
+                    )}
+                  </button>
 
                   {/* Title + author */}
                   <div className="flex-1 min-w-0">
@@ -241,6 +272,62 @@ export function RecentAnalysesWidget({
           </div>
         )}
       </div>
+
+      {/* ── Inline YouTube player modal ───────────────────────────────────────
+          Click thumbnail → opens this modal with a YouTube iframe embed.
+          Escape or click-outside closes it. */}
+      {playingAnalysis && playingAnalysis.source_video_id && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 sm:p-8"
+          onClick={() => setPlayingId(null)}
+        >
+          <div
+            className="relative w-full max-w-3xl bg-clip-dark rounded-2xl overflow-hidden border border-white/[0.06] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header bar */}
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.04]">
+              <div className="flex items-center gap-2 min-w-0">
+                <Youtube className="w-4 h-4 text-red-500 flex-shrink-0" />
+                <p className="text-sm font-medium text-clip-text truncate">
+                  {playingAnalysis.video_title || 'Untitled video'}
+                </p>
+              </div>
+              <button
+                onClick={() => setPlayingId(null)}
+                className="p-1.5 text-clip-muted hover:text-clip-text hover:bg-white/[0.04] rounded-lg transition-colors flex-shrink-0"
+                aria-label="Close player"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* 16:9 iframe */}
+            <div className="relative aspect-video bg-black">
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${playingAnalysis.source_video_id}?autoplay=1&rel=0`}
+                title={playingAnalysis.video_title || 'YouTube video'}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="absolute inset-0 w-full h-full"
+              />
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 text-xs text-clip-muted border-t border-white/[0.04]">
+              <span className="truncate">by {playingAnalysis.video_author || 'Unknown'}</span>
+              <a
+                href={playingAnalysis.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-clip-cyan hover:underline flex items-center gap-1 flex-shrink-0"
+              >
+                Open on YouTube <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

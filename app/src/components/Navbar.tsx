@@ -33,16 +33,16 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
     badge?: string;
   }> = isLoggedIn
     ? [
-        { label: 'Dashboard', page: 'dashboard' as Page },
-        { label: 'Trend Radar', page: 'trends' as Page },
+        { label: 'Dashboard',   page: 'dashboard' as Page },
         { label: 'Viral Forge', page: 'forge' as Page },
-        { label: 'ClipBot', page: 'clipbot' as Page },
-        { label: 'My Rank', page: 'rank' as Page },
-        { label: 'Growth Intel', page: 'growth' as Page },
-        { label: 'Editor', page: 'upload' as Page, badge: 'Coming Soon' },
+        { label: 'Trend Radar', page: 'trends' as Page },
+        { label: 'ClipBot',     page: 'clipbot' as Page },
+        { label: 'Growth Intel',page: 'growth' as Page },
+        { label: 'My Rank',     page: 'rank' as Page },
         { label: 'Leaderboard', page: 'leaderboard' as Page },
-        { label: 'Pricing', page: 'pricing' as Page },
-        { label: 'Settings', page: 'settings' as Page },
+        { label: 'Pricing',     page: 'pricing' as Page },
+        { label: 'Editor',      page: 'upload' as Page, badge: 'Coming Soon' },
+        { label: 'Settings',    page: 'settings' as Page },
       ]
     : [
         { label: 'Features', page: 'landing' as Page, hash: '#features' },

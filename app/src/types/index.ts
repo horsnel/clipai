@@ -258,6 +258,28 @@ export interface TopicStealEntry {
   growth_multiplier: number | null;
 }
 
+// ─── Trending Videos (Dashboard widget) ─────────────────────────────────────
+export interface TrendingVideo {
+  id: string;
+  title: string;
+  channel: string;
+  thumbnail: string;
+  url: string;
+  platform: 'youtube';
+  publishedAt: string;
+  copyPack?: {
+    title: string;
+    caption: string;
+    hashtags: string[];
+  };
+}
+
+export interface TrendingVideosResponse {
+  videos: TrendingVideo[];
+  generatedAt: string;
+  game: string;
+}
+
 // ─── Phase 2: Competitor Lab comparison types ─────────────────────────────────
 export interface ComparisonResult {
   winner: 'A' | 'B' | 'tie';

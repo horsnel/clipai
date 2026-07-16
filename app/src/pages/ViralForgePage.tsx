@@ -72,7 +72,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
   // Deep analysis (Phase 1)
   const [ytUrl, setYtUrl]             = useState('');
   const [analysis, setAnalysis]       = useState<UnifiedAnalysis | null>(null);
-  const [analysisMeta, setAnalysisMeta] = useState<{ title?: string; author?: string; ms?: number; cached?: boolean } | null>(null);
+  const [analysisMeta, setAnalysisMeta] = useState<{ title?: string; author?: string; ms?: number; cached?: boolean; videoId?: string; url?: string } | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
 
   // Top voted captions (community battle board)
@@ -127,6 +127,8 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
           author: row.video_author,
           ms: row.processing_ms,
           cached: true,
+          videoId: row.source_video_id,
+          url: row.source_url,
         });
         // Pre-fill the URL box with the source so a re-run is one click away
         if (row.source_url) setYtUrl(row.source_url);
@@ -273,6 +275,8 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
           author: res.video?.author,
           ms: res.processing_ms,
           cached: res.cached,
+          videoId: res.video?.video_id,
+          url: ytUrl.trim(),
         });
         toast.success(res.cached ? 'Loaded cached analysis' : `Analysis done in ${((res.processing_ms ?? 0) / 1000).toFixed(1)}s`);
       }
@@ -485,6 +489,8 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                     analysis={analysis}
                     videoTitle={analysisMeta?.title}
                     videoAuthor={analysisMeta?.author}
+                    videoId={analysisMeta?.videoId}
+                    videoUrl={analysisMeta?.url}
                     processingMs={analysisMeta?.ms}
                     cached={analysisMeta?.cached}
                   />

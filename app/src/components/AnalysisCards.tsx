@@ -6,8 +6,8 @@
 import { useState } from 'react';
 import {
   Activity, BarChart3, Camera, CheckCircle2, Copy, Flame, Hash,
-  Layers, Lightbulb, MessageSquare, Pencil, Pin,
-  Sparkles, TrendingUp, Volume2, Zap,
+  Layers, Lightbulb, MessageSquare, Pencil, Pin, Play,
+  Sparkles, TrendingUp, Volume2, Youtube, Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { UnifiedAnalysis } from '../types';
@@ -16,8 +16,24 @@ interface Props {
   analysis: UnifiedAnalysis;
   videoTitle?: string;
   videoAuthor?: string;
+  videoId?: string;
+  videoUrl?: string;
   processingMs?: number;
   cached?: boolean;
+}
+
+// Extract YouTube video ID from any YouTube URL format
+function extractYouTubeId(url: string): string {
+  if (!url) return '';
+  // Already an ID (11 chars, no slashes)
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+  // youtu.be/ID
+  const short = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (short) return short[1];
+  // youtube.com/watch?v=ID or youtube.com/embed/ID or /shorts/ID
+  const long = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/) || url.match(/embed\/([a-zA-Z0-9_-]{11})/) || url.match(/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (long) return long[1];
+  return '';
 }
 
 function formatTimestamp(seconds: number): string {
@@ -87,23 +103,66 @@ function CopyItem({ text, label }: { text: string; label?: string }) {
 }
 
 // ─── Main component ─────────────────────────────────────────────────────────
-export function AnalysisCards({ analysis, videoTitle, videoAuthor, processingMs, cached }: Props) {
+export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, videoUrl, processingMs, cached }: Props) {
   const a = analysis;
+  const [showPlayer, setShowPlayer] = useState(false);
+  const embedId = videoId || (videoUrl ? extractYouTubeId(videoUrl) : '');
 
   return (
     <div className="space-y-3">
-      {/* Header banner */}
+      {/* Header banner with playable thumbnail */}
       {videoTitle && (
-        <div className="card-glass p-4 flex items-center gap-3">
-          <Sparkles className="w-5 h-5 text-clip-cyan flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-clip-text truncate">{videoTitle}</p>
-            {videoAuthor && <p className="text-xs text-clip-muted">by {videoAuthor}</p>}
+        <div className="card-glass p-4">
+          <div className="flex items-center gap-3">
+            <Sparkles className="w-5 h-5 text-clip-cyan flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-clip-text truncate">{videoTitle}</p>
+              {videoAuthor && <p className="text-xs text-clip-muted">by {videoAuthor}</p>}
+            </div>
+            <div className="flex items-center gap-2 text-xs text-clip-muted">
+              {cached && <span className="px-2 py-0.5 rounded-md bg-clip-cyan/10 text-clip-cyan">cached</span>}
+              {processingMs && <span>{(processingMs / 1000).toFixed(1)}s</span>}
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-clip-muted">
-            {cached && <span className="px-2 py-0.5 rounded-md bg-clip-cyan/10 text-clip-cyan">cached</span>}
-            {processingMs && <span>{(processingMs / 1000).toFixed(1)}s</span>}
-          </div>
+
+          {/* Playable YouTube embed — click thumbnail to load iframe */}
+          {embedId && (
+            <div className="mt-3">
+              {showPlayer ? (
+                <div className="relative aspect-video rounded-lg overflow-hidden bg-black">
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${embedId}?autoplay=1&rel=0`}
+                    title={videoTitle}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="absolute inset-0 w-full h-full"
+                  />
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowPlayer(true)}
+                  className="relative w-full aspect-video rounded-lg overflow-hidden bg-black group"
+                  aria-label={`Play ${videoTitle}`}
+                >
+                  <img
+                    src={`https://i.ytimg.com/vi/${embedId}/hqdefault.jpg`}
+                    alt={videoTitle}
+                    loading="lazy"
+                    className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-clip-cyan/95 flex items-center justify-center backdrop-blur-sm shadow-glow-cyan group-hover:scale-110 transition-transform">
+                      <Play className="w-7 h-7 text-black ml-1" fill="currentColor" />
+                    </div>
+                  </div>
+                  <span className="absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/90 text-white">
+                    <Youtube className="w-3 h-3" /> YouTube
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

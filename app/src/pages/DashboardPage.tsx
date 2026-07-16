@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import {
   Zap, Upload, TrendingUp, Clock, Play,
   ExternalLink, Sparkles, Radio, Flame, Bot,
-  Trophy, BarChart2, Scissors, ChevronRight, Coins, ArrowRight,
+  Trophy, BarChart2, Scissors, ChevronRight, Coins, ArrowRight, Eye,
 } from 'lucide-react';
 import { listClips } from '@/services/api';
 import { TopicStealWidget } from '@/components/TopicStealWidget';
 import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
+import { TrendingVideosSection } from '@/components/TrendingVideosSection';
 import { setPendingAnalysisId } from '@/lib/navState';
 import type { AnalysisSummary } from '../types';
 
@@ -44,16 +44,6 @@ interface FeatureCard {
 
 const FEATURE_CARDS: FeatureCard[] = [
   {
-    page: 'trends',
-    icon: Radio,
-    iconColor: 'text-green-600',
-    iconBg: 'bg-green-500/10',
-    label: 'Trend Radar',
-    desc: 'Live gaming trends updated every hour',
-    badge: 'LIVE',
-    badgeColor: 'bg-green-500/10 text-green-600 border-green-500/20',
-  },
-  {
     page: 'forge',
     icon: Flame,
     iconColor: 'text-clip-amber',
@@ -64,12 +54,30 @@ const FEATURE_CARDS: FeatureCard[] = [
     badgeColor: 'bg-clip-amber/10 text-clip-amber border-clip-amber/20',
   },
   {
+    page: 'trends',
+    icon: Radio,
+    iconColor: 'text-green-600',
+    iconBg: 'bg-green-500/10',
+    label: 'Trend Radar',
+    desc: 'Live gaming trends updated every hour',
+    badge: 'LIVE',
+    badgeColor: 'bg-green-500/10 text-green-600 border-green-500/20',
+  },
+  {
     page: 'clipbot',
     icon: Bot,
     iconColor: 'text-clip-cyan',
     iconBg: 'bg-clip-cyan/10',
     label: 'ClipBot',
     desc: 'Your personal AI content coach',
+  },
+  {
+    page: 'growth',
+    icon: BarChart2,
+    iconColor: 'text-blue-600',
+    iconBg: 'bg-blue-500/10',
+    label: 'Growth Intel',
+    desc: 'Competitor spy, A/B titles & timing',
   },
   {
     page: 'rank',
@@ -80,14 +88,6 @@ const FEATURE_CARDS: FeatureCard[] = [
     desc: 'XP, streaks, ranks & badges',
     badge: 'NEW',
     badgeColor: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
-  },
-  {
-    page: 'growth',
-    icon: BarChart2,
-    iconColor: 'text-blue-600',
-    iconBg: 'bg-blue-500/10',
-    label: 'Growth Intel',
-    desc: 'Competitor spy, A/B titles & timing',
   },
   {
     page: 'upload',
@@ -125,18 +125,6 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
     return () => { mounted = false; };
   }, []);
 
-  const PLAN_LIMITS = {
-    free:    { clips: 3,        label: 'Free'    },
-    starter: { clips: 30,       label: 'Starter' },
-    pro:     { clips: 100,      label: 'Pro'     },
-    creator: { clips: Infinity, label: 'Creator' },
-  };
-
-  const currentPlan  = PLAN_LIMITS[user?.plan ?? 'free'];
-  const clipsUsed    = user?.clipsUsed ?? clips.length;
-  const usagePercent = currentPlan.clips === Infinity ? 0 : (clipsUsed / currentPlan.clips) * 100;
-  const remaining    = currentPlan.clips === Infinity ? '∞' : Math.max(0, currentPlan.clips - clipsUsed);
-
   const getHypeBadge = (score: number) => {
     if (score >= 90) return <span className="hype-badge-gold">{score} HYPE</span>;
     if (score >= 70) return <span className="hype-badge-blue">{score} HYPE</span>;
@@ -160,98 +148,101 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
           </Button>
         </div>
 
-        {/* Stats */}
+        {/* Stats — 3 redesigned cards: Total Views + Credits Balance + Trending Snapshot */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-10">
-          <div className="card-glass p-5 sm:p-6">
-            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-clip-cyan/10 flex items-center justify-center flex-shrink-0">
-                  <Zap className="w-5 h-5 text-clip-cyan" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-clip-muted text-sm">Clips This Month</p>
-                  <p className="font-display font-semibold text-clip-text">
-                    {clipsUsed} / {currentPlan.clips === Infinity ? '∞' : currentPlan.clips}
-                  </p>
-                </div>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded font-medium flex-shrink-0 ${
-                user?.plan === 'creator' ? 'bg-clip-amber text-black' :
-                user?.plan === 'pro'     ? 'bg-clip-cyan text-black' :
-                user?.plan === 'starter' ? 'bg-blue-500/20 text-blue-600' :
-                'bg-clip-surface text-clip-muted border border-white/[0.05]'
-              }`}>
-                {currentPlan.label.toUpperCase()}
-              </span>
-            </div>
-            <Progress value={usagePercent} className="h-2 bg-clip-surface" />
-            <p className="text-clip-muted text-xs mt-2">
-              {currentPlan.clips === Infinity
-                ? 'Unlimited clips on your Creator plan!'
-                : `${remaining} remaining this month`}
-            </p>
-          </div>
-
-          <div className="card-glass p-5 sm:p-6">
-            <div className="flex items-center gap-3 mb-2 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                <TrendingUp className="w-5 h-5 text-green-600" />
+          {/* Total Views — redesigned with colored icon circle */}
+          <div className="card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all">
+            <div className="flex items-center gap-4 mb-3">
+              <div className="w-12 h-12 rounded-full bg-blue-500/15 flex items-center justify-center flex-shrink-0">
+                <Eye className="w-6 h-6 text-blue-500" />
               </div>
               <div className="min-w-0">
-                <p className="text-clip-muted text-sm">Total Views</p>
-                <p className="font-display font-semibold text-2xl text-clip-text">24.5K</p>
+                <p className="text-clip-muted text-xs uppercase tracking-wider font-medium">Total Views</p>
+                <p className="font-display font-bold text-3xl text-clip-text tabular-nums leading-tight mt-0.5">24.5K</p>
               </div>
             </div>
-            <p className="text-green-600 text-xs flex items-center gap-1">
-              <TrendingUp className="w-3 h-3 flex-shrink-0" /> +12% from last week
-            </p>
+            <div className="flex items-center justify-between gap-2 mt-2">
+              <p className="text-green-600 text-xs flex items-center gap-1 font-medium">
+                <TrendingUp className="w-3 h-3 flex-shrink-0" /> +12% this week
+              </p>
+              <span className="text-[10px] text-clip-muted/70 uppercase tracking-wider">Last 7 days</span>
+            </div>
           </div>
 
-          {/* Credits card — replaces "Current Plan" (plan name already shown in chip on card 1) */}
-          <div className={`card-glass p-5 sm:p-6 relative overflow-hidden ${
+          {/* Credits Balance — redesigned with colored icon circle */}
+          <div className={`card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all ${
             (user?.credits ?? 0) <= 5
               ? 'border-clip-amber/30 bg-clip-amber/5'
               : 'border-clip-cyan/20 bg-clip-cyan/5'
           }`}>
-            <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  (user?.credits ?? 0) <= 5 ? 'bg-clip-amber/15' : 'bg-clip-cyan/15'
-                }`}>
-                  <Coins className={`w-5 h-5 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-clip-muted text-sm">Credits Balance</p>
-                  <p className={`font-display font-bold text-2xl tabular-nums ${
-                    (user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-text'
-                  }`}>
-                    {user?.credits ?? 0}
-                  </p>
-                </div>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded font-medium capitalize flex-shrink-0 ${
-                user?.plan === 'creator' ? 'bg-clip-amber text-black' :
-                user?.plan === 'pro'     ? 'bg-clip-cyan text-black' :
-                user?.plan === 'starter' ? 'bg-blue-500/20 text-blue-600' :
-                'bg-clip-surface text-clip-muted border border-white/[0.05]'
+            <div className="flex items-center gap-4 mb-3">
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                (user?.credits ?? 0) <= 5 ? 'bg-clip-amber/15' : 'bg-clip-cyan/15'
               }`}>
-                {(user?.plan ?? 'free')} plan
-              </span>
+                <Coins className={`w-6 h-6 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-clip-muted text-xs uppercase tracking-wider font-medium">Credits Balance</p>
+                <p className={`font-display font-bold text-3xl tabular-nums leading-tight mt-0.5 ${
+                  (user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-text'
+                }`}>
+                  {user?.credits ?? 0}
+                </p>
+              </div>
             </div>
             {(user?.credits ?? 0) <= 5 ? (
               <button onClick={() => onNavigate('pricing')}
-                className="w-full mt-2 px-3 py-2 rounded-lg bg-clip-amber text-black text-sm font-semibold hover:brightness-110 flex items-center justify-center gap-2 transition-all">
-                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                className="w-full px-3 py-2 rounded-lg bg-clip-amber text-black text-xs font-semibold hover:brightness-110 flex items-center justify-center gap-2 transition-all">
+                <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
                 Get more credits
-                <ArrowRight className="w-4 h-4 flex-shrink-0" />
+                <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
               </button>
             ) : (
-              <p className="text-clip-muted text-xs mt-1 flex items-center gap-1.5">
-                <Sparkles className="w-3 h-3 text-clip-cyan flex-shrink-0" />
-                1 credit = 1 trend pack or ClipBot msg · 2 = ViralForge
-              </p>
+              <div className="flex items-center justify-between gap-2 mt-2">
+                <p className="text-clip-muted text-xs flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-clip-cyan flex-shrink-0" />
+                  1 credit = 1 trend pack
+                </p>
+                <span className={`text-[10px] uppercase tracking-wider font-medium ${
+                  user?.plan === 'creator' ? 'text-clip-amber' :
+                  user?.plan === 'pro'     ? 'text-clip-cyan' :
+                  user?.plan === 'starter' ? 'text-blue-500' :
+                  'text-clip-muted'
+                }`}>
+                  {user?.plan ?? 'free'} plan
+                </span>
+              </div>
             )}
           </div>
+
+          {/* Trending Snapshot — replaces Clips This Month card; deep-links to Trend Radar */}
+          <button
+            onClick={() => onNavigate('trends')}
+            className="card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all text-left cursor-pointer"
+          >
+            <div className="flex items-center gap-4 mb-3">
+              <div className="w-12 h-12 rounded-full bg-green-500/15 flex items-center justify-center flex-shrink-0">
+                <Radio className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-clip-muted text-xs uppercase tracking-wider font-medium">Trending Now</p>
+                <p className="font-display font-bold text-3xl text-clip-text tabular-nums leading-tight mt-0.5">Live</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-clip-muted group-hover:text-clip-cyan group-hover:translate-x-1 transition-all flex-shrink-0" />
+            </div>
+            <div className="flex items-center justify-between gap-2 mt-2">
+              <p className="text-green-600 text-xs flex items-center gap-1 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                5 platforms live
+              </p>
+              <span className="text-[10px] text-clip-muted/70 uppercase tracking-wider">Open Trend Radar</span>
+            </div>
+          </button>
+        </div>
+
+        {/* ── Trending Gaming Videos (replaces Clips This Month row) ── */}
+        <div className="mb-10">
+          <TrendingVideosSection />
         </div>
 
         {/* ── Feature Grid ── */}
