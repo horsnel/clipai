@@ -20,12 +20,15 @@ import type {
   AnalyseYouTubeResponse,
   AnalysisSummary,
   AudioTrendResponse,
+  AuditChannelResponse,
+  ChannelAuditsResponse,
   CommentsResponse,
   CompareResponse,
   DetectedClip,
   ExportOptions,
   PlaylistResponse,
   RenderJob,
+  SaveOnboardingResponse,
   ShadowResponse,
   TopicStealEntry,
   TrendingVideosResponse,
@@ -154,6 +157,10 @@ class ApiClient {
     return this.request<T>(path, {
       method: 'PATCH', body: body ? JSON.stringify(body) : undefined,
     });
+  }
+
+  delete<T>(path: string): Promise<T> {
+    return this.request<T>(path, { method: 'DELETE' });
   }
 
   // Helper to upload with progress + auth header
@@ -330,6 +337,35 @@ export async function updateNotifications(prefs: {
   clip_ready?: boolean; weekly_digest?: boolean;
 }) {
   return apiClient.patch<{ success: boolean; prefs: any }>('/settings/notifications', prefs);
+}
+
+// ─── Onboarding persistence ──────────────────────────────────────────────────
+// POST /api/settings/onboarding — persists the 4-step onboarding selections
+// (primaryGame, platforms, goal, experience) to settings.prefs.onboarding.
+// Fire-and-forget from OnboardingPage.finish(); falls back to localStorage.
+export async function saveOnboarding(data: {
+  primaryGame: string;
+  platforms: string[];
+  goal: string;
+  experience: string;
+}): Promise<SaveOnboardingResponse> {
+  return apiClient.post<SaveOnboardingResponse>('/settings/onboarding', data);
+}
+
+// ─── Channel Audit (free audit flow) ─────────────────────────────────────────
+// POST   /api/audit-channel   — runs audit for one URL, saves to user's prefs
+// GET    /api/channel-audits  — returns all saved audits with full data
+// DELETE /api/channel-audits  — remove one audit by URL
+export async function auditChannel(url: string): Promise<AuditChannelResponse> {
+  return apiClient.post<AuditChannelResponse>('/audit-channel', { url });
+}
+
+export async function getChannelAudits(): Promise<ChannelAuditsResponse> {
+  return apiClient.get<ChannelAuditsResponse>('/channel-audits');
+}
+
+export async function deleteChannelAudit(url: string): Promise<{ success: boolean }> {
+  return apiClient.delete<{ success: boolean }>(`/channel-audits?url=${encodeURIComponent(url)}`);
 }
 
 // ─── Video Editor Waitlist ─────────────────────────────────────────────────

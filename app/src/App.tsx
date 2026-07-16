@@ -18,6 +18,7 @@ import { ClipBotBubble } from './components/ClipBotBubble';
 import { CreatorRankPage } from './pages/CreatorRankPage';
 import { GrowthIntelPage } from './pages/GrowthIntelPage';
 import { OnboardingPage } from './pages/OnboardingPage';
+import { ChannelAuditPage } from './pages/ChannelAuditPage';
 import { Toaster } from '@/components/ui/sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { UpgradeModalProvider, useUpgradeModal } from '@/components/UpgradeModalContext';
@@ -31,7 +32,7 @@ import './App.css';
 export type Page =
   | 'landing' | 'auth' | 'dashboard' | 'upload' | 'results'
   | 'pricing' | 'settings' | 'terms' | 'privacy' | 'leaderboard'
-  | 'trends' | 'forge' | 'clipbot' | 'rank' | 'growth' | 'onboarding';
+  | 'trends' | 'forge' | 'clipbot' | 'rank' | 'growth' | 'onboarding' | 'audit';
 
 interface AppUser {
   id: string;
@@ -140,6 +141,7 @@ function AppContentInner({
       landing: 'ClipAI',
       auth: 'ClipAI',
       onboarding: 'ClipAI',
+      audit: 'Channel Audit',
       dashboard: 'Dashboard',
       upload: 'Video Editor',
       results: 'Video Editor',
@@ -197,7 +199,7 @@ function AppContentInner({
   };
 
   // Pages that require login. 'upload' + 'results' now route to the v3 waitlist (no auth required).
-  const PROTECTED: Page[] = ['dashboard','settings','trends','forge','clipbot','rank','growth','onboarding'];
+  const PROTECTED: Page[] = ['dashboard','settings','trends','forge','clipbot','rank','growth','onboarding','audit'];
 
   const renderPage = () => {
     if (PROTECTED.includes(currentPage) && !isLoggedIn) {
@@ -206,7 +208,8 @@ function AppContentInner({
     switch (currentPage) {
       case 'landing':     return <LandingPage onNavigate={navigateTo} />;
       case 'auth':        return <AuthPage onNavigate={navigateTo} onLogin={handleLogin} />;
-      case 'onboarding':  return <OnboardingPage user={user} onNavigate={navigateTo} onComplete={() => setCurrentPage('dashboard')} />;
+      case 'onboarding':  return <OnboardingPage user={user} onNavigate={navigateTo} onComplete={() => setCurrentPage('audit')} />;
+      case 'audit':        return <ChannelAuditPage user={user} onNavigate={navigateTo} onComplete={() => setCurrentPage('dashboard')} />;
       case 'dashboard':   return <DashboardPage user={user} onNavigate={navigateTo} onLogout={handleLogout} />;
       case 'upload':      return <WaitlistPage user={user} onNavigate={navigateTo} />;
       case 'results':     return <WaitlistPage user={user} onNavigate={navigateTo} />;

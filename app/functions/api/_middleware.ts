@@ -248,6 +248,35 @@ async function updateProfile(env: Env, userId: string, fields: Record<string, un
   return r !== null || true; // sbFetch returns null both on success-no-content and on failure
 }
 
+// ─── Settings prefs helpers (jsonb merge) ────────────────────────────────────
+// The `settings` table has (user_id, prefs jsonb, updated_at). These helpers
+// read the prefs object, merge a patch into it, and upsert back — so multiple
+// features can stash state under their own key inside `prefs` without
+// overwriting each other (e.g. `prefs.onboarding`, `prefs.audits`).
+async function readSettingsPrefs(env: Env, userId: string): Promise<Record<string, any>> {
+  const rows = await sbFetch<any[]>(env, `settings?user_id=eq.${userId}&select=prefs`);
+  return (rows && rows.length > 0 && rows[0].prefs && typeof rows[0].prefs === 'object')
+    ? rows[0].prefs
+    : {};
+}
+
+async function writeSettingsPrefs(env: Env, userId: string, prefs: Record<string, any>): Promise<void> {
+  // Upsert via Supabase REST — `resolution=merge-duplicates` makes POST behave
+  // as upsert on the primary key (user_id).
+  await sbFetch(env, 'settings', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal,resolution=merge-duplicates' },
+    body: JSON.stringify({ user_id: userId, prefs, updated_at: new Date().toISOString() }),
+  });
+}
+
+async function mergeSettingsPrefs(env: Env, userId: string, patch: Record<string, any>): Promise<Record<string, any>> {
+  const existing = await readSettingsPrefs(env, userId);
+  const merged = { ...existing, ...patch };
+  await writeSettingsPrefs(env, userId, merged);
+  return merged;
+}
+
 async function awardCredits(env: Env, userId: string, delta: number, reason: string, referenceId?: string): Promise<boolean> {
   const p = await fetchProfile(env, userId);
   if (!p) return false;
@@ -1716,6 +1745,270 @@ async function serpInstagram(env: Env, game: string, limit = 4): Promise<any[]> 
   });
 }
 
+// ─── Channel Audit helpers ───────────────────────────────────────────────────
+// Powers the "Free Channel Audit" flow: user pastes a YouTube/TikTok/X/IG
+// channel URL, we fetch real analytics where available and return a rich audit
+// object. YouTube has a real Data API (subscribers, total views, recent uploads
+// with per-video view counts). TikTok/X/IG don't expose public APIs, so we fall
+// back to Serper to surface recent posts only (no follower counts).
+type AuditPlatform = 'youtube' | 'tiktok' | 'twitter' | 'instagram';
+
+function detectPlatform(url: string): AuditPlatform | null {
+  const u = (url || '').toLowerCase();
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
+  if (u.includes('tiktok.com')) return 'tiktok';
+  if (u.includes('instagram.com')) return 'instagram';
+  if (u.includes('x.com') || u.includes('twitter.com')) return 'twitter';
+  return null;
+}
+
+/** Parse any YouTube channel URL or bare handle into a resolvable identifier. */
+function parseYouTubeChannelInput(raw: string): {
+  channelId?: string; handle?: string; customName?: string;
+} {
+  const s = raw.trim();
+  let m = s.match(/youtube\.com\/channel\/(UC[A-Za-z0-9_-]{22})/);
+  if (m) return { channelId: m[1] };
+  m = s.match(/youtube\.com\/@([A-Za-z0-9_.\-]+)/);
+  if (m) return { handle: '@' + m[1] };
+  m = s.match(/youtube\.com\/(?:c|user)\/([A-Za-z0-9_.\-]+)/);
+  if (m) return { customName: m[1] };
+  if (/^@[A-Za-z0-9_.\-]+$/.test(s)) return { handle: s };
+  if (/^UC[A-Za-z0-9_-]{22}$/.test(s)) return { channelId: s };
+  return {};
+}
+
+async function auditYouTubeChannel(env: Env, raw: string): Promise<any> {
+  if (!env.YOUTUBE_API_KEY) return { error: 'YouTube API key not configured', platform: 'youtube' };
+  const parsed = parseYouTubeChannelInput(raw);
+  if (!parsed.channelId && !parsed.handle && !parsed.customName) {
+    return { error: 'Could not parse YouTube channel URL', platform: 'youtube' };
+  }
+
+  // Step 1: resolve handle/custom name → channel ID
+  let channelId = parsed.channelId;
+  if (!channelId && parsed.handle) {
+    try {
+      const r = await fetch(
+        `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(parsed.handle)}&key=${env.YOUTUBE_API_KEY}`,
+        { cf: { cacheTtl: 3600, cacheEverything: true } },
+      );
+      if (r.ok) {
+        const d = await r.json() as any;
+        channelId = d.items?.[0]?.id;
+      }
+    } catch {}
+  }
+  if (!channelId && parsed.customName) {
+    // No direct API for /c/ custom names — fall back to search
+    try {
+      const r = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(parsed.customName)}&type=channel&maxResults=1&key=${env.YOUTUBE_API_KEY}`,
+        { cf: { cacheTtl: 3600, cacheEverything: true } },
+      );
+      if (r.ok) {
+        const d = await r.json() as any;
+        channelId = d.items?.[0]?.id?.channelId;
+      }
+    } catch {}
+  }
+  if (!channelId) return { error: 'Channel not found', platform: 'youtube' };
+
+  // Step 2: fetch channel snippet + statistics + branding
+  let channelData: any = null;
+  try {
+    const r = await fetch(
+      `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,brandingSettings&id=${channelId}&key=${env.YOUTUBE_API_KEY}`,
+      { cf: { cacheTtl: 3600, cacheEverything: true } },
+    );
+    if (r.ok) {
+      const d = await r.json() as any;
+      channelData = d.items?.[0];
+    }
+  } catch {}
+  if (!channelData) return { error: 'Could not fetch channel data', platform: 'youtube' };
+
+  const stats = channelData.statistics || {};
+  const snippet = channelData.snippet || {};
+  const branding = channelData.brandingSettings || {};
+
+  // Step 3: fetch recent uploads via the uploads playlist (UCxxxx → UUxxxx)
+  const uploadsPlaylistId = 'UU' + channelId.slice(2);
+  const recentVideos: any[] = [];
+  try {
+    const r = await fetch(
+      `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${uploadsPlaylistId}&maxResults=10&key=${env.YOUTUBE_API_KEY}`,
+      { cf: { cacheTtl: 1800, cacheEverything: true } },
+    );
+    if (r.ok) {
+      const d = await r.json() as any;
+      const items = d.items || [];
+      const videoIds = items.map((it: any) => it.contentDetails?.videoId).filter(Boolean);
+      if (videoIds.length) {
+        const vr = await fetch(
+          `https://www.googleapis.com/youtube/v3/videos?part=statistics,snippet,contentDetails&id=${videoIds.join(',')}&key=${env.YOUTUBE_API_KEY}`,
+          { cf: { cacheTtl: 1800, cacheEverything: true } },
+        );
+        if (vr.ok) {
+          const vd = await vr.json() as any;
+          const vmap: Record<string, any> = {};
+          for (const v of (vd.items || [])) vmap[v.id] = v;
+          for (const it of items) {
+            const vid = it.contentDetails?.videoId;
+            const v = vmap[vid];
+            if (!v) continue;
+            recentVideos.push({
+              id: vid,
+              title: v.snippet?.title || 'Untitled',
+              thumbnail: v.snippet?.thumbnails?.medium?.url || `https://i.ytimg.com/vi/${vid}/mqdefault.jpg`,
+              url: `https://www.youtube.com/watch?v=${vid}`,
+              publishedAt: v.snippet?.publishedAt || it.contentDetails?.videoPublishedAt || '',
+              viewCount: parseInt(v.statistics?.viewCount || '0', 10) || 0,
+              likeCount: parseInt(v.statistics?.likeCount || '0', 10) || 0,
+              commentCount: parseInt(v.statistics?.commentCount || '0', 10) || 0,
+              duration: v.contentDetails?.duration || '',
+            });
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // Compute engagement metrics from recent videos
+  const totalRecentViews = recentVideos.reduce((s, v) => s + (v.viewCount || 0), 0);
+  const avgRecentViews = recentVideos.length ? Math.round(totalRecentViews / recentVideos.length) : 0;
+  const totalRecentLikes = recentVideos.reduce((s, v) => s + (v.likeCount || 0), 0);
+  const avgEngagementRate = totalRecentViews > 0
+    ? parseFloat(((totalRecentLikes / totalRecentViews) * 100).toFixed(2))
+    : 0;
+
+  return {
+    platform: 'youtube',
+    channelId,
+    channelName: snippet.title || 'Unknown',
+    channelHandle: parsed.handle || '',
+    description: snippet.description || '',
+    avatar: snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || '',
+    banner: branding.image?.bannerExternalUrl || '',
+    country: snippet.country || '',
+    publishedAt: snippet.publishedAt || '',
+    statistics: {
+      subscribers: parseInt(stats.subscriberCount || '0', 10) || 0,
+      totalViews: parseInt(stats.viewCount || '0', 10) || 0,
+      videoCount: parseInt(stats.videoCount || '0', 10) || 0,
+      hiddenSubscriberCount: !!stats.hiddenSubscriberCount,
+    },
+    recentVideos,
+    metrics: {
+      avgRecentViews,
+      totalRecentViews,
+      avgEngagementRate,
+      recentVideoCount: recentVideos.length,
+    },
+    auditedAt: new Date().toISOString(),
+  };
+}
+
+/** Lite audit for TikTok — Serper surfaces recent posts but no follower count. */
+async function auditTikTokProfile(env: Env, url: string): Promise<any> {
+  if (!env.SERPER_API_KEY) return { error: 'Serper API key not configured', platform: 'tiktok' };
+  const m = url.match(/tiktok\.com\/@([A-Za-z0-9_.]+)/);
+  const username = m ? '@' + m[1] : '';
+  const q = username ? `site:tiktok.com ${username}` : `site:tiktok.com ${url.split('/').pop() || ''}`;
+  const raw = await serperSearch(env, q, 8);
+  const recentVideos = raw.slice(0, 6).map((v: any, i: number) => ({
+    id: `tt_audit_${i}`,
+    title: v.title || 'TikTok post',
+    thumbnail: '',
+    url: v.link || '',
+    publishedAt: '',
+    viewCount: 0, likeCount: 0, commentCount: 0,
+  }));
+  return {
+    platform: 'tiktok',
+    channelId: '',
+    channelName: username || 'TikTok creator',
+    channelHandle: username,
+    description: '',
+    avatar: '', banner: '', country: '', publishedAt: '',
+    statistics: { subscribers: 0, totalViews: 0, videoCount: recentVideos.length, hiddenSubscriberCount: true },
+    recentVideos,
+    metrics: { avgRecentViews: 0, totalRecentViews: 0, avgEngagementRate: 0, recentVideoCount: recentVideos.length },
+    auditedAt: new Date().toISOString(),
+    note: 'TikTok does not expose public follower counts. Showing recent posts from search.',
+  };
+}
+
+async function auditInstagramProfile(env: Env, url: string): Promise<any> {
+  if (!env.SERPER_API_KEY) return { error: 'Serper API key not configured', platform: 'instagram' };
+  const m = url.match(/instagram\.com\/([A-Za-z0-9_.]+)/);
+  const username = m ? m[1] : '';
+  const q = username ? `site:instagram.com ${username}` : 'site:instagram.com';
+  const raw = await serperSearch(env, q, 8);
+  const recentVideos = raw.slice(0, 6).map((v: any, i: number) => ({
+    id: `ig_audit_${i}`,
+    title: v.title || 'Instagram post',
+    thumbnail: '',
+    url: v.link || '',
+    publishedAt: '',
+    viewCount: 0, likeCount: 0, commentCount: 0,
+  }));
+  return {
+    platform: 'instagram',
+    channelId: '',
+    channelName: username || 'Instagram creator',
+    channelHandle: username ? '@' + username : '',
+    description: '',
+    avatar: '', banner: '', country: '', publishedAt: '',
+    statistics: { subscribers: 0, totalViews: 0, videoCount: recentVideos.length, hiddenSubscriberCount: true },
+    recentVideos,
+    metrics: { avgRecentViews: 0, totalRecentViews: 0, avgEngagementRate: 0, recentVideoCount: recentVideos.length },
+    auditedAt: new Date().toISOString(),
+    note: 'Instagram does not expose public follower counts. Showing recent posts from search.',
+  };
+}
+
+async function auditXProfile(env: Env, url: string): Promise<any> {
+  if (!env.SERPER_API_KEY) return { error: 'Serper API key not configured', platform: 'twitter' };
+  const m = url.match(/(?:x\.com|twitter\.com)\/([A-Za-z0-9_]+)/);
+  const username = m ? m[1] : '';
+  const q = username ? `site:x.com ${username}` : 'site:x.com';
+  const raw = await serperSearch(env, q, 8);
+  const recentVideos = raw.slice(0, 6).map((v: any, i: number) => ({
+    id: `x_audit_${i}`,
+    title: v.title || 'X post',
+    thumbnail: '',
+    url: v.link || '',
+    publishedAt: '',
+    viewCount: 0, likeCount: 0, commentCount: 0,
+  }));
+  return {
+    platform: 'twitter',
+    channelId: '',
+    channelName: username ? '@' + username : 'X creator',
+    channelHandle: username ? '@' + username : '',
+    description: '',
+    avatar: '', banner: '', country: '', publishedAt: '',
+    statistics: { subscribers: 0, totalViews: 0, videoCount: recentVideos.length, hiddenSubscriberCount: true },
+    recentVideos,
+    metrics: { avgRecentViews: 0, totalRecentViews: 0, avgEngagementRate: 0, recentVideoCount: recentVideos.length },
+    auditedAt: new Date().toISOString(),
+    note: 'X does not expose public follower counts. Showing recent posts from search.',
+  };
+}
+
+async function auditChannel(env: Env, url: string): Promise<any> {
+  const platform = detectPlatform(url);
+  if (!platform) return { error: 'Unsupported URL. Please paste a YouTube, TikTok, X, or Instagram link.' };
+  switch (platform) {
+    case 'youtube':   return auditYouTubeChannel(env, url);
+    case 'tiktok':    return auditTikTokProfile(env, url);
+    case 'instagram': return auditInstagramProfile(env, url);
+    case 'twitter':   return auditXProfile(env, url);
+  }
+  return { error: 'Unsupported platform' };
+}
+
 app.get('/trends/_diag', async (c) => {
   // Diagnostic endpoint — pings each keyless platform directly and reports
   // raw HTTP status + first 200 chars of body. Helps isolate which layer
@@ -2148,6 +2441,106 @@ Rules:
   });
 
   return json(data);
+});
+
+// ─── Channel Audit (free, auth required) ─────────────────────────────────────
+// POST /api/audit-channel — runs a fresh audit for a single URL, caches the
+// result (1h), and persists a lightweight entry to settings.prefs.audits for
+// the user (max 8 channels, deduped by URL).
+app.post('/audit-channel', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const body = await c.req.json().catch(() => ({}));
+  const url = (body.url || '').toString().trim();
+  if (!url) return json({ error: 'url is required' }, 400);
+
+  // Cache the audit itself (1h) — same URL → same audit, no need to re-fetch.
+  const auditCacheKey = await hashKey('channel_audit_v1', url);
+  let audit: any;
+  try {
+    audit = await withCache(env, auditCacheKey, 60 * 60, async () => {
+      return await auditChannel(env, url);
+    });
+  } catch {
+    audit = await auditChannel(env, url);
+  }
+  if (audit.error) return json({ error: audit.error }, 400);
+
+  // Persist a lightweight entry to settings.prefs.audits (max 8, dedupe by URL)
+  const prefs = await readSettingsPrefs(env, userId);
+  const audits = Array.isArray(prefs.audits) ? prefs.audits : [];
+  const auditEntry = {
+    url,
+    platform: audit.platform,
+    channelName: audit.channelName,
+    channelHandle: audit.channelHandle,
+    avatar: audit.avatar,
+    auditedAt: audit.auditedAt,
+  };
+  const filtered = audits.filter((a: any) => a.url !== url);
+  filtered.unshift(auditEntry);
+  prefs.audits = filtered.slice(0, 8);
+  await writeSettingsPrefs(env, userId, prefs);
+
+  return json({ audit, saved: auditEntry });
+});
+
+// GET /api/channel-audits — returns the user's saved audits WITH the full audit
+// data (re-read from the 1h cache so it stays fresh without bloating the DB).
+app.get('/channel-audits', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const prefs = await readSettingsPrefs(env, userId);
+  const audits = Array.isArray(prefs.audits) ? prefs.audits : [];
+  const fullAudits = await Promise.all(
+    audits.map(async (entry: any) => {
+      try {
+        const key = await hashKey('channel_audit_v1', entry.url);
+        const cached = await cacheRead<any>(env, key);
+        if (cached?.data) {
+          return { ...cached.data, url: entry.url };
+        }
+      } catch {}
+      // Fallback to entry metadata only
+      return {
+        ...entry,
+        recentVideos: [],
+        metrics: { avgRecentViews: 0, totalRecentViews: 0, avgEngagementRate: 0, recentVideoCount: 0 },
+        statistics: { subscribers: 0, totalViews: 0, videoCount: 0, hiddenSubscriberCount: true },
+      };
+    }),
+  );
+  return json({ audits: fullAudits });
+});
+
+// DELETE /api/channel-audits?url=... — remove an audit from user's saved list.
+app.delete('/channel-audits', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const url = (c.req.query('url') || '').trim();
+  if (!url) return json({ error: 'url query param is required' }, 400);
+  const prefs = await readSettingsPrefs(env, userId);
+  const audits = Array.isArray(prefs.audits) ? prefs.audits : [];
+  prefs.audits = audits.filter((a: any) => a.url !== url);
+  await writeSettingsPrefs(env, userId, prefs);
+  return json({ success: true });
+});
+
+// POST /api/settings/onboarding — persist onboarding selections to settings.prefs.
+// Called by the OnboardingPage on Finish. Falls back to localStorage on error.
+app.post('/settings/onboarding', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const body = await c.req.json().catch(() => ({}));
+  const onboarding = {
+    primaryGame: typeof body.primaryGame === 'string' ? body.primaryGame.slice(0, 60) : '',
+    platforms: Array.isArray(body.platforms) ? body.platforms.slice(0, 6) : [],
+    goal: typeof body.goal === 'string' ? body.goal.slice(0, 30) : '',
+    experience: typeof body.experience === 'string' ? body.experience.slice(0, 30) : '',
+    completedAt: new Date().toISOString(),
+  };
+  await mergeSettingsPrefs(env, userId, { onboarding });
+  return json({ success: true, onboarding });
 });
 
 // ─── Trend Assets (per-trend copyable content) ──────────────────────────────

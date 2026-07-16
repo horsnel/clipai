@@ -1,17 +1,29 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import {
   Sparkles, Lock, Mail, Gamepad2, ChevronRight,
   Check, Loader2, Gift, Bell, Trophy, Zap, Scissors,
+  Clock, Play, ExternalLink, Link2,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { joinWaitlist } from '@/services/api';
+import { joinWaitlist, listClips } from '@/services/api';
 
 interface WaitlistPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number; clipsUsed?: number } | null;
   onNavigate: (page: Page, clips?: unknown[]) => void;
 }
+
+interface Clip {
+  id: string; thumbnail: string; title: string; game: string;
+  hypeScore: number; duration: string; createdAt: string; status: 'ready' | 'processing';
+}
+
+const FALLBACK_CLIPS: Clip[] = [
+  { id:'1', thumbnail:'/gameplay-thumb-1.jpg', title:'Epic Multi-Kill',          game:'Call of Duty',   hypeScore:96, duration:'0:32', createdAt:'2 hours ago',  status:'ready' },
+  { id:'2', thumbnail:'/gameplay-thumb-2.jpg', title:'Clutch Victory',           game:'Bloodstrike',    hypeScore:88, duration:'0:45', createdAt:'5 hours ago',  status:'ready' },
+  { id:'3', thumbnail:'/gameplay-thumb-3.jpg', title:'Team Fight Domination',    game:'Mobile Legends', hypeScore:92, duration:'0:28', createdAt:'1 day ago',    status:'ready' },
+];
 
 const GAMES = [
   { id: 'valorant',   label: 'Valorant'    , emoji: '🎯' },
@@ -36,6 +48,33 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
   const [game, setGame]         = useState<string>('valorant');
   const [isSubmitting, setSubmitting] = useState(false);
   const [joined, setJoined]     = useState<{ position: number; credits: number } | null>(null);
+  const [clips, setClips]       = useState<Clip[]>(FALLBACK_CLIPS);
+
+  // ─── Fetch real clips from worker ────────────────────────────────────────
+  useEffect(() => {
+    let mounted = true;
+    listClips().then((data) => {
+      if (!mounted || !data.clips?.length) return;
+      const mapped: Clip[] = data.clips.slice(0, 3).map(c => ({
+        id: c.id,
+        thumbnail: '/gameplay-thumb-' + (((parseInt(c.id.slice(0, 2), 16) || 0) % 3) + 1) + '.jpg',
+        title: c.title || 'Untitled clip',
+        game: c.game || 'Gaming',
+        hypeScore: c.hype_score || 80,
+        duration: c.duration_seconds ? `${Math.floor(c.duration_seconds / 60)}:${String(c.duration_seconds % 60).padStart(2, '0')}` : '0:30',
+        createdAt: new Date(c.created_at).toLocaleDateString(),
+        status: c.status === 'ready' ? 'ready' : 'processing',
+      }));
+      setClips(mapped);
+    }).catch(() => {/* fallback stays */});
+    return () => { mounted = false; };
+  }, []);
+
+  const getHypeBadge = (score: number) => {
+    if (score >= 90) return <span className="hype-badge-gold">{score} HYPE</span>;
+    if (score >= 70) return <span className="hype-badge-blue">{score} HYPE</span>;
+    return <span className="hype-badge-gray">{score} HYPE</span>;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +151,61 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
           <div className="absolute top-3 right-3 sm:top-4 sm:right-4 opacity-30 pointer-events-none">
             <Lock className="w-5 h-5 text-clip-amber" />
           </div>
+        </div>
+
+        {/* Recent Clips — moved here from the Dashboard */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6 gap-4">
+            <h2 className="font-display font-semibold text-xl text-clip-text">Recent Clips</h2>
+            <button onClick={() => onNavigate('forge')}
+              className="text-clip-cyan text-sm hover:underline flex items-center gap-1 flex-shrink-0">
+              View All <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
+
+          {clips.length === 0 ? (
+            <div className="card-glass p-12 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-clip-cyan/6 flex items-center justify-center mx-auto mb-4">
+                <Zap className="w-8 h-8 text-clip-cyan" />
+              </div>
+              <h3 className="font-display font-semibold text-xl text-clip-text mb-2">No clips yet</h3>
+              <p className="text-clip-muted mb-6">Paste a video URL and let AI find your highlights!</p>
+              <Button onClick={() => onNavigate('forge')} className="btn-primary">
+                <Link2 className="w-5 h-5 mr-2" /> Paste Video URL
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {clips.map(clip => (
+                <div key={clip.id} onClick={() => onNavigate('forge')}
+                  className="card-glass overflow-hidden cursor-pointer group hover:-translate-y-1 hover:border-white/[0.025] transition-all duration-300">
+                  <div className="relative aspect-video overflow-hidden">
+                    <img src={clip.thumbnail} alt={clip.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/80 via-transparent to-transparent" />
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="w-14 h-14 rounded-full bg-clip-cyan/90 flex items-center justify-center backdrop-blur-sm">
+                        <Play className="w-6 h-6 text-black ml-1" />
+                      </div>
+                    </div>
+                    <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium">
+                      {clip.duration}
+                    </div>
+                    <div className="absolute top-3 left-3">{getHypeBadge(clip.hypeScore)}</div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-display font-medium text-clip-text mb-1 truncate">{clip.title}</h3>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-clip-muted text-sm truncate">{clip.game}</span>
+                      <span className="text-clip-muted text-xs flex items-center gap-1 flex-shrink-0">
+                        <Clock className="w-3 h-3" /> {clip.createdAt}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Coming Soon badge */}

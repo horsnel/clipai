@@ -10,7 +10,7 @@
 import { useState, useEffect } from 'react';
 import {
   Youtube, Copy, Check, ExternalLink, Loader2, Flame,
-  Play, AlertTriangle, Music2, Twitter, Instagram,
+  Play, AlertTriangle, Music2, Twitter, Instagram, Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTrendingVideos } from '@/services/api';
@@ -72,6 +72,12 @@ function timeAgo(iso: string): string {
   const mins = Math.floor(diff / 60000);
   if (mins >= 1) return `${mins}m ago`;
   return 'just now';
+}
+
+function formatViews(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return String(n);
 }
 
 function buildCopyPack(v: TrendingVideo): string {
@@ -291,7 +297,15 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                       {v.copyPack?.title || v.title}
                     </p>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-clip-muted truncate">{v.channel}</span>
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <span className="text-xs text-clip-muted truncate">{v.channel}</span>
+                        {v.viewCount && v.viewCount > 0 && (
+                          <span className="inline-flex items-center gap-0.5 text-[10px] text-clip-muted/80 tabular-nums flex-shrink-0">
+                            <Eye className="w-2.5 h-2.5" />
+                            {formatViews(v.viewCount)}
+                          </span>
+                        )}
+                      </div>
                       <a
                         href={v.url}
                         target="_blank"

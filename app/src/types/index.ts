@@ -282,6 +282,77 @@ export interface TrendingVideosResponse {
   game: string;
 }
 
+// ─── Channel Audit (free audit flow + dashboard squares) ─────────────────────
+export type AuditPlatform = 'youtube' | 'tiktok' | 'twitter' | 'instagram';
+
+export interface ChannelAuditVideo {
+  id: string;
+  title: string;
+  thumbnail: string;
+  url: string;
+  publishedAt: string;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  duration?: string;
+}
+
+export interface ChannelAudit {
+  platform: AuditPlatform;
+  channelId?: string;
+  channelName: string;
+  channelHandle: string;
+  description: string;
+  avatar: string;
+  banner: string;
+  country: string;
+  publishedAt: string;
+  statistics: {
+    subscribers: number;
+    totalViews: number;
+    videoCount: number;
+    hiddenSubscriberCount: boolean;
+  };
+  recentVideos: ChannelAuditVideo[];
+  metrics: {
+    avgRecentViews: number;
+    totalRecentViews: number;
+    avgEngagementRate: number;
+    recentVideoCount: number;
+  };
+  auditedAt: string;
+  url: string;
+  note?: string;
+  error?: string;
+}
+
+export interface AuditChannelResponse {
+  audit: ChannelAudit;
+  saved: {
+    url: string;
+    platform: AuditPlatform;
+    channelName: string;
+    channelHandle: string;
+    avatar: string;
+    auditedAt: string;
+  };
+}
+
+export interface ChannelAuditsResponse {
+  audits: ChannelAudit[];
+}
+
+export interface SaveOnboardingResponse {
+  success: boolean;
+  onboarding: {
+    primaryGame: string;
+    platforms: string[];
+    goal: string;
+    experience: string;
+    completedAt: string;
+  };
+}
+
 // ─── Phase 2: Competitor Lab comparison types ─────────────────────────────────
 export interface ComparisonResult {
   winner: 'A' | 'B' | 'tie';

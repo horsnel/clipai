@@ -28,6 +28,7 @@ import {
   Sparkles, Zap, Bot, Flame,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { saveOnboarding } from '@/services/api';
 
 interface OnboardingPageProps {
   user: { name: string; email: string } | null;
@@ -99,6 +100,12 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
     try {
       if (!skipped) {
         localStorage.setItem(storageKey, JSON.stringify(data));
+        // Fire-and-forget backend persistence — falls back to localStorage on error.
+        // We don't await this; the user shouldn't wait on a network call to land
+        // on their dashboard. Errors are silently ignored (localStorage is the
+        // source of truth for the client, the DB copy is for server-side
+        // personalisation later).
+        saveOnboarding(data).catch(() => {/* localStorage fallback already wrote */});
       }
       localStorage.setItem(flagKey, '1');
     } catch {}

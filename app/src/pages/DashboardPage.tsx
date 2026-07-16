@@ -1,16 +1,14 @@
-import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import {
-  Zap, Link2, Clock, Play,
-  ExternalLink, Sparkles, Radio, Flame,
-  Trophy, BarChart2, Scissors, ChevronRight, Coins, ArrowRight,
+  Link2, Flame, Radio, BarChart2,
+  Trophy, Scissors, ChevronRight, Coins, ArrowRight, Sparkles,
 } from 'lucide-react';
-import { listClips } from '@/services/api';
 import { TopicStealWidget } from '@/components/TopicStealWidget';
 import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
 import { TrendingVideosSection } from '@/components/TrendingVideosSection';
 import { TrendingViewsChart } from '@/components/TrendingViewsChart';
+import { ChannelAuditsGrid } from '@/components/ChannelAuditsGrid';
 import { setPendingAnalysisId } from '@/lib/navState';
 import type { AnalysisSummary } from '../types';
 
@@ -19,17 +17,6 @@ interface DashboardPageProps {
   onNavigate: (page: Page, clips?: unknown[]) => void;
   onLogout?: () => void;
 }
-
-interface Clip {
-  id: string; thumbnail: string; title: string; game: string;
-  hypeScore: number; duration: string; createdAt: string; status: 'ready' | 'processing';
-}
-
-const FALLBACK_CLIPS: Clip[] = [
-  { id:'1', thumbnail:'/gameplay-thumb-1.jpg', title:'Epic Multi-Kill',          game:'Call of Duty',   hypeScore:96, duration:'0:32', createdAt:'2 hours ago',  status:'ready' },
-  { id:'2', thumbnail:'/gameplay-thumb-2.jpg', title:'Clutch Victory',           game:'Bloodstrike',    hypeScore:88, duration:'0:45', createdAt:'5 hours ago',  status:'ready' },
-  { id:'3', thumbnail:'/gameplay-thumb-3.jpg', title:'Team Fight Domination',    game:'Mobile Legends', hypeScore:92, duration:'0:28', createdAt:'1 day ago',    status:'ready' },
-];
 
 interface FeatureCard {
   page: Page;
@@ -96,34 +83,6 @@ const FEATURE_CARDS: FeatureCard[] = [
 ];
 
 export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: DashboardPageProps) {
-  const [clips, setClips] = useState<Clip[]>(FALLBACK_CLIPS);
-
-  // ─── Fetch real clips from worker ────────────────────────────────────────
-  useEffect(() => {
-    let mounted = true;
-    listClips().then((data) => {
-      if (!mounted || !data.clips?.length) return;
-      const mapped: Clip[] = data.clips.slice(0, 3).map(c => ({
-        id: c.id,
-        thumbnail: '/gameplay-thumb-' + (((parseInt(c.id.slice(0, 2), 16) || 0) % 3) + 1) + '.jpg',
-        title: c.title || 'Untitled clip',
-        game: c.game || 'Gaming',
-        hypeScore: c.hype_score || 80,
-        duration: c.duration_seconds ? `${Math.floor(c.duration_seconds / 60)}:${String(c.duration_seconds % 60).padStart(2, '0')}` : '0:30',
-        createdAt: new Date(c.created_at).toLocaleDateString(),
-        status: c.status === 'ready' ? 'ready' : 'processing',
-      }));
-      setClips(mapped);
-    }).catch(() => {/* fallback stays */});
-    return () => { mounted = false; };
-  }, []);
-
-  const getHypeBadge = (score: number) => {
-    if (score >= 90) return <span className="hype-badge-gold">{score} HYPE</span>;
-    if (score >= 70) return <span className="hype-badge-blue">{score} HYPE</span>;
-    return <span className="hype-badge-gray">{score} HYPE</span>;
-  };
-
   return (
     <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
       <div className="max-w-7xl mx-auto">
@@ -141,85 +100,66 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
           </Button>
         </div>
 
-        {/* Stats — 2 redesigned cards: Credits Balance + Trending Snapshot */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6">
-          {/* Credits Balance — redesigned with colored icon circle */}
+        {/* Credits Balance — full-width stat card (Trending Now card removed) */}
+        <div className="mb-6">
           <div className={`card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all ${
             (user?.credits ?? 0) <= 5
               ? 'border-clip-amber/30 bg-clip-amber/3'
               : 'border-clip-cyan/20 bg-clip-cyan/3'
           }`}>
-            <div className="flex items-center gap-4 mb-3">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                (user?.credits ?? 0) <= 5 ? 'bg-clip-amber/15' : 'bg-clip-cyan/15'
-              }`}>
-                <Coins className={`w-6 h-6 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-clip-muted text-xs uppercase tracking-wider font-medium">Credits Balance</p>
-                <p className={`font-display font-bold text-3xl tabular-nums leading-tight mt-0.5 ${
-                  (user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-text'
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  (user?.credits ?? 0) <= 5 ? 'bg-clip-amber/15' : 'bg-clip-cyan/15'
                 }`}>
-                  {user?.credits ?? 0}
-                </p>
+                  <Coins className={`w-6 h-6 ${(user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-cyan'}`} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-clip-muted text-xs uppercase tracking-wider font-medium">Credits Balance</p>
+                  <p className={`font-display font-bold text-3xl tabular-nums leading-tight mt-0.5 ${
+                    (user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-text'
+                  }`}>
+                    {user?.credits ?? 0}
+                  </p>
+                </div>
               </div>
-            </div>
-            {(user?.credits ?? 0) <= 5 ? (
-              <button onClick={() => onNavigate('pricing')}
-                className="w-full px-3 py-2 rounded-lg bg-clip-amber text-black text-xs font-semibold hover:brightness-110 flex items-center justify-center gap-2 transition-all">
-                <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
-                Get more credits
-                <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
-              </button>
-            ) : (
-              <div className="flex items-center justify-between gap-2 mt-2">
-                <p className="text-clip-muted text-xs flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3 text-clip-cyan flex-shrink-0" />
-                  1 credit = 1 trend pack
-                </p>
-                <span className={`text-[10px] uppercase tracking-wider font-medium ${
-                  user?.plan === 'creator' ? 'text-clip-amber' :
-                  user?.plan === 'pro'     ? 'text-clip-cyan' :
-                  user?.plan === 'starter' ? 'text-blue-500' :
-                  'text-clip-muted'
-                }`}>
-                  {user?.plan ?? 'free'} plan
-                </span>
-              </div>
-            )}
-          </div>
 
-          {/* Trending Snapshot — deep-links to Trend Radar */}
-          <button
-            onClick={() => onNavigate('trends')}
-            className="card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-4 mb-3">
-              <div className="w-12 h-12 rounded-full bg-green-500/15 flex items-center justify-center flex-shrink-0">
-                <Radio className="w-6 h-6 text-green-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-clip-muted text-xs uppercase tracking-wider font-medium">Trending Now</p>
-                <p className="font-display font-bold text-3xl text-clip-text tabular-nums leading-tight mt-0.5">Live</p>
-              </div>
-              <ChevronRight className="w-5 h-5 text-clip-muted group-hover:text-clip-cyan group-hover:translate-x-1 transition-all flex-shrink-0" />
+              {(user?.credits ?? 0) <= 5 ? (
+                <button onClick={() => onNavigate('pricing')}
+                  className="px-4 py-2 rounded-lg bg-clip-amber text-black text-xs font-semibold hover:brightness-110 flex items-center justify-center gap-2 transition-all">
+                  <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+                  Get more credits
+                  <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-3 flex-wrap">
+                  <p className="text-clip-muted text-xs flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3 text-clip-cyan flex-shrink-0" />
+                    1 credit = 1 trend pack
+                  </p>
+                  <span className={`text-[10px] uppercase tracking-wider font-medium px-2 py-1 rounded ${
+                    user?.plan === 'creator' ? 'bg-clip-amber/10 text-clip-amber' :
+                    user?.plan === 'pro'     ? 'bg-clip-cyan/10 text-clip-cyan' :
+                    user?.plan === 'starter' ? 'bg-blue-500/10 text-blue-500' :
+                    'bg-clip-surface text-clip-muted'
+                  }`}>
+                    {user?.plan ?? 'free'} plan
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="flex items-center justify-between gap-2 mt-2">
-              <p className="text-green-600 text-xs flex items-center gap-1 font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                4 platforms live
-              </p>
-              <span className="text-[10px] text-clip-muted/70 uppercase tracking-wider">Open Trend Radar</span>
-            </div>
-          </button>
+          </div>
         </div>
 
-        {/* ── Trending Views chart (replaces old "Total Views" stat card) ── */}
+        {/* ── Channel Audits Grid (HERO — audited channels as avatar squares) ── */}
+        <ChannelAuditsGrid onNavigate={onNavigate} />
+
+        {/* ── Trending Views chart ── */}
         <div className="mb-10">
           <TrendingViewsChart />
         </div>
 
-        {/* ── Trending Gaming Videos (replaces Clips This Month row) ── */}
+        {/* ── Trending Gaming Videos ── */}
         <div className="mb-10">
           <TrendingVideosSection />
         </div>
@@ -281,61 +221,6 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
               onNavigate('forge');
             }}
           />
-        </div>
-
-        {/* Recent Clips */}
-        <div>
-          <div className="flex items-center justify-between mb-6 gap-4">
-            <h2 className="font-display font-semibold text-xl text-clip-text">Recent Clips</h2>
-            <button onClick={() => onNavigate('results')}
-              className="text-clip-cyan text-sm hover:underline flex items-center gap-1 flex-shrink-0">
-              View All <ExternalLink className="w-4 h-4" />
-            </button>
-          </div>
-
-          {clips.length === 0 ? (
-            <div className="card-glass p-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-clip-cyan/6 flex items-center justify-center mx-auto mb-4">
-                <Zap className="w-8 h-8 text-clip-cyan" />
-              </div>
-              <h3 className="font-display font-semibold text-xl text-clip-text mb-2">No clips yet</h3>
-              <p className="text-clip-muted mb-6">Paste a video URL and let AI find your highlights!</p>
-              <Button onClick={() => onNavigate('forge')} className="btn-primary">
-                <Link2 className="w-5 h-5 mr-2" /> Paste Video URL
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {clips.map(clip => (
-                <div key={clip.id} onClick={() => onNavigate('results')}
-                  className="card-glass overflow-hidden cursor-pointer group hover:-translate-y-1 hover:border-white/[0.025] transition-all duration-300">
-                  <div className="relative aspect-video overflow-hidden">
-                    <img src={clip.thumbnail} alt={clip.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/80 via-transparent to-transparent" />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-14 h-14 rounded-full bg-clip-cyan/90 flex items-center justify-center backdrop-blur-sm">
-                        <Play className="w-6 h-6 text-black ml-1" />
-                      </div>
-                    </div>
-                    <div className="absolute bottom-3 right-3 bg-black/80 backdrop-blur-sm px-2 py-1 rounded text-xs font-medium">
-                      {clip.duration}
-                    </div>
-                    <div className="absolute top-3 left-3">{getHypeBadge(clip.hypeScore)}</div>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-display font-medium text-clip-text mb-1 truncate">{clip.title}</h3>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-clip-muted text-sm truncate">{clip.game}</span>
-                      <span className="text-clip-muted text-xs flex items-center gap-1 flex-shrink-0">
-                        <Clock className="w-3 h-3" /> {clip.createdAt}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     </div>
