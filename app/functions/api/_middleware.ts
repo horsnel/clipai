@@ -2268,10 +2268,37 @@ function parseYouTubeId(url: string): string | null {
   return null;
 }
 
-/** Fetch video title/author/thumbnail via YouTube oEmbed (no API key needed). */
-async function fetchYouTubeMeta(videoId: string): Promise<{
+/** Fetch video title/author/thumbnail/description.
+ * Primary: YouTube Data API v3 (reliable, official, returns description too)
+ * Fallback: oEmbed (no description, but always works without a key)
+ */
+async function fetchYouTubeMeta(videoId: string, env?: Env): Promise<{
   title: string; author: string; thumbnail_url: string;
+  description?: string;
 } | null> {
+  // Primary: YouTube Data API v3 (reliable, official, returns description too)
+  const apiKey = env?.YOUTUBE_API_KEY;
+  if (apiKey) {
+    try {
+      const r = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`,
+        { cf: { cacheTtl: 3600, cacheEverything: true } },
+      );
+      if (r.ok) {
+        const data = await r.json() as any;
+        const item = data?.items?.[0];
+        if (item) {
+          return {
+            title: item.snippet?.title || 'Untitled',
+            author: item.snippet?.channelTitle || 'Unknown',
+            thumbnail_url: item.snippet?.thumbnails?.high?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+            description: item.snippet?.description || '',
+          };
+        }
+      }
+    } catch { /* fall through to oEmbed */ }
+  }
+  // Fallback: oEmbed (no description, but no API key needed)
   try {
     const r = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
@@ -2481,7 +2508,8 @@ function buildSyntheticTranscript(title: string, description: string | null): {
  */
 async function getTranscriptOrFallback(
   videoId: string,
-  meta: { title: string; author: string },
+  meta: { title: string; author: string; description?: string },
+  env?: Env,
 ): Promise<{
   segments: { t: number; text: string }[];
   wordCount: number;
@@ -2495,7 +2523,12 @@ async function getTranscriptOrFallback(
       source: real.source === 'asr' ? 'asr' : 'manual',
     };
   }
-  const description = await fetchYouTubeDescription(videoId);
+  // Fallback: prefer meta.description (already fetched via Data API) over
+  // a separate watch-page scrape (which is more fragile + bot-detected).
+  let description = meta.description || null;
+  if (!description && env) {
+    description = await fetchYouTubeDescription(videoId);
+  }
   const synth = buildSyntheticTranscript(meta.title, description);
   return synth;
 }
@@ -2659,8 +2692,8 @@ app.post('/analyse/youtube', requireAuth, requireCredits(5), async (c) => {
     }
   }
 
-  // 1. Fetch video metadata
-  const meta = await fetchYouTubeMeta(videoId);
+  // 1. Fetch video metadata (uses YOUTUBE_API_KEY if set, falls back to oEmbed)
+  const meta = await fetchYouTubeMeta(videoId, env);
   if (!meta) {
     return json({ error: 'Could not fetch video metadata. The video may be private or age-restricted.' }, 422);
   }
@@ -2673,9 +2706,10 @@ app.post('/analyse/youtube', requireAuth, requireCredits(5), async (c) => {
     transcriptSource = transcript.source === 'asr' ? 'asr' : 'manual';
   } else {
     // Fallback: use title + description as a synthetic 1-segment transcript.
-    // The LLM is told the source so it knows to be more conservative with
-    // pacing/sentiment claims that require timestamps.
-    const description = await fetchYouTubeDescription(videoId);
+    // Prefer meta.description (already fetched via Data API) over a separate
+    // watch-page scrape.
+    let description = meta.description || null;
+    if (!description) description = await fetchYouTubeDescription(videoId);
     const synth = buildSyntheticTranscript(meta.title, description);
     transcript = { segments: synth.segments, wordCount: synth.wordCount, source: 'description' };
   }
@@ -2975,9 +3009,9 @@ app.post('/analyse/compare', requireAuth, requirePlan('pro', 'creator'), require
       }
     }
     // Fetch fresh
-    const meta = await fetchYouTubeMeta(id);
+    const meta = await fetchYouTubeMeta(id, env);
     if (!meta) throw new Error(`Could not fetch metadata for video ${id}`);
-    const tr = await getTranscriptOrFallback(id, meta);
+    const tr = await getTranscriptOrFallback(id, meta, env);
     const analysisJson = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     return {
       cached: false,
@@ -3107,9 +3141,9 @@ app.post('/playlist/sequence', requireAuth, requirePlan('pro', 'creator'), requi
       };
     }
     // Fresh
-    const meta = await fetchYouTubeMeta(id);
+    const meta = await fetchYouTubeMeta(id, env);
     if (!meta) throw new Error(`Could not fetch metadata for ${id}`);
-    const tr = await getTranscriptOrFallback(id, meta);
+    const tr = await getTranscriptOrFallback(id, meta, env);
     const analysisJson = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     return { title: meta.title, author: meta.author, analysis: analysisJson };
   };
@@ -3240,9 +3274,9 @@ app.post('/analyse/audio-trend', requireAuth, requireCredits(3), async (c) => {
     transcriptText = transcript.map((s: any) => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
   } else {
     // Fetch fresh
-    const meta = await fetchYouTubeMeta(videoId);
+    const meta = await fetchYouTubeMeta(videoId, env);
     if (!meta) return json({ error: 'Could not fetch video metadata' }, 422);
-    const tr = await getTranscriptOrFallback(videoId, meta);
+    const tr = await getTranscriptOrFallback(videoId, meta, env);
     analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     title = meta.title;
     author = meta.author;
@@ -3359,9 +3393,9 @@ app.post('/analyse/comments', requireAuth, requireCredits(2), async (c) => {
     try { transcript = typeof row.transcript === 'string' ? JSON.parse(row.transcript) : (row.transcript || []); } catch { /* ignore */ }
     transcriptText = transcript.map((s: any) => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
   } else {
-    const meta = await fetchYouTubeMeta(videoId);
+    const meta = await fetchYouTubeMeta(videoId, env);
     if (!meta) return json({ error: 'Could not fetch video metadata' }, 422);
-    const tr = await getTranscriptOrFallback(videoId, meta);
+    const tr = await getTranscriptOrFallback(videoId, meta, env);
     analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     title = meta.title;
     author = meta.author;
@@ -3482,9 +3516,9 @@ app.post('/analyse/shadow', requireAuth, requireCredits(4), async (c) => {
     try { transcript = typeof row.transcript === 'string' ? JSON.parse(row.transcript) : (row.transcript || []); } catch { /* ignore */ }
     transcriptText = transcript.map((s: any) => `[${Math.floor(s.t / 60)}:${String(Math.floor(s.t % 60)).padStart(2, '0')}] ${s.text}`).join('\n');
   } else {
-    const meta = await fetchYouTubeMeta(videoId);
+    const meta = await fetchYouTubeMeta(videoId, env);
     if (!meta) return json({ error: 'Could not fetch video metadata' }, 422);
-    const tr = await getTranscriptOrFallback(videoId, meta);
+    const tr = await getTranscriptOrFallback(videoId, meta, env);
     analysis = await llmJson(env, buildAnalysisPrompt(meta, tr.segments, undefined, tr.source), ANALYSIS_SYSTEM_PROMPT, 8000);
     title = meta.title;
     author = meta.author;
