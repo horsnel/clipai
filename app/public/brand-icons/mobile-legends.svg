@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" fill="currentColor">
+  <!-- ML monogram with sword -->
+  <g fill="currentColor">
+    <path d="M50 50 L50 150 L70 150 L70 80 L100 130 L130 80 L130 150 L150 150 L150 50 L130 50 L100 100 L70 50 Z"/>
+  </g>
+  <!-- Gold sword accent -->
+  <g fill="currentColor">
+    <rect x="96" y="30" width="8" height="50"/>
+    <rect x="86" y="30" width="28" height="6"/>
+    <polygon points="100,80 105,90 100,100 95,90"/>
+  </g>
+  <text x="100" y="178" font-family="Arial Black, Helvetica, sans-serif" font-size="11" font-weight="900" fill="currentColor" text-anchor="middle" letter-spacing="2">MOBILE LEGENDS</text>
+
+</svg>

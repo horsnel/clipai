@@ -9,6 +9,7 @@ import {
 import { toast } from 'sonner';
 import { joinWaitlist, listClips } from '@/services/api';
 import { InfoIconPopup } from '@/components/InfoIconPopup';
+import { GameIcon } from '@/components/BrandIcons';
 
 interface WaitlistPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number; clipsUsed?: number } | null;
@@ -26,15 +27,18 @@ const FALLBACK_CLIPS: Clip[] = [
   { id:'3', thumbnail:'/gameplay-thumb-3.jpg', title:'Team Fight Domination',    game:'Mobile Legends', hypeScore:92, duration:'0:28', createdAt:'1 day ago',    status:'ready' },
 ];
 
+// Game pick list for the waitlist form. `id` is what we send to the backend,
+// `label` is what the user sees, and `icon` is the game name passed to GameIcon
+// (which resolves it to the real brand logo via the BrandIcons registry).
 const GAMES = [
-  { id: 'valorant',   label: 'Valorant'    , emoji: '🎯' },
-  { id: 'apex',       label: 'Apex Legends', emoji: '🪂' },
-  { id: 'fortnite',   label: 'Fortnite'    , emoji: '🏗️' },
-  { id: 'minecraft',  label: 'Minecraft'   , emoji: '⛏️' },
-  { id: 'roblox',     label: 'Roblox'      , emoji: '🟥' },
-  { id: 'cod',        label: 'Call of Duty', emoji: '🎮' },
-  { id: 'warzone',    label: 'Warzone'     , emoji: '💀' },
-  { id: 'mobile',     label: 'Mobile (PUBG/FF/ML)', emoji: '📱' },
+  { id: 'valorant',   label: 'Valorant',           icon: 'Valorant' },
+  { id: 'apex',       label: 'Apex Legends',       icon: 'Apex Legends' },
+  { id: 'fortnite',   label: 'Fortnite',           icon: 'Fortnite' },
+  { id: 'minecraft',  label: 'Minecraft',          icon: 'Minecraft' },
+  { id: 'roblox',     label: 'Roblox',             icon: 'Roblox' },
+  { id: 'cod',        label: 'Call of Duty',       icon: 'Call of Duty' },
+  { id: 'warzone',    label: 'Warzone',            icon: 'Warzone' },
+  { id: 'mobile',     label: 'Mobile (PUBG/FF/ML)', icon: 'Mobile (PUBG/FF/ML)' },
 ];
 
 const PLAN_LIMITS = {
@@ -324,7 +328,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
                       : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.025]'
                   }`}
                 >
-                  <span>{g.emoji}</span>
+                  <GameIcon game={g.icon} className="w-4 h-4 flex-shrink-0" />
                   <span className="truncate">{g.label}</span>
                 </button>
               ))}

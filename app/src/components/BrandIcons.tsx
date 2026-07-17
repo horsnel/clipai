@@ -31,7 +31,6 @@ import {
   SiPubg,
   SiFifa,
   SiEa,          // EA Sports (FIFA publisher)
-  SiCounterstrike,
 } from 'react-icons/si';
 
 // ─── Social media / content platforms ─────────────────────────────────────────
@@ -116,32 +115,60 @@ export function PlatformIcon({ platform, className = 'w-4 h-4', brandColor = fal
 }
 
 // ─── Games ────────────────────────────────────────────────────────────────────
-// Most AAA games don't have Simple Icons entries (publisher brand-use policy).
-// We use the brand icon where available and fall back to emoji otherwise.
+// Brand icon strategy for games:
+//   1. If react-icons/si has an official brand SVG → use it as an inline <Icon>.
+//   2. Otherwise, if /public/brand-icons/<slug>.svg exists (downloaded from
+//      Wikimedia Commons or generated locally) → render via <img>.
+//   3. Otherwise, fall back to a generic gamepad emoji.
+//
+// Most AAA games don't have Simple Icons entries due to publisher brand-use
+// policy, so we host the brand SVGs we need in /public/brand-icons/.
 
 type GameEntry = {
-  Icon: ComponentType<SVGProps<SVGSVGElement>> | null;
-  emoji: string;
+  /** Inline react-icons component, if available. */
+  Icon?: ComponentType<SVGProps<SVGSVGElement>> | null;
+  /** Path under /public to a hosted SVG (used when Icon is null). */
+  src?: string;
+  /** Emoji fallback (used if both Icon and src are absent). */
+  emoji?: string;
 };
 
-// Lookup by case-insensitive game name.
+// Lookup by case-insensitive game name. Keys are normalized (lowercase, trimmed).
+// Aliases map multiple spellings to the same brand icon.
 const GAME_ICONS: Record<string, GameEntry> = {
-  // Games with brand icons in react-icons/si
-  'fortnite':        { Icon: SiFortnite,       emoji: '🏗️' },
-  'valorant':        { Icon: SiValorant,       emoji: '🎯' },
-  'roblox':          { Icon: SiRoblox,         emoji: '🧱' },
-  'pubg':            { Icon: SiPubg,           emoji: '🪖' },
-  'fifa':            { Icon: SiFifa,           emoji: '⚽' },
-  'ea sports fc':    { Icon: SiEa,             emoji: '⚽' },
-  'call of duty':    { Icon: SiCounterstrike,  emoji: '🎯' },  // closest available
-  // Games without brand icons — fall back to emoji
-  'free fire':       { Icon: null,             emoji: '🔥' },
-  'bloodstrike':     { Icon: null,             emoji: '🩸' },
-  'apex legends':    { Icon: null,             emoji: '⚡' },
-  'mobile legends':  { Icon: null,             emoji: '🛡️' },
-  'minecraft':       { Icon: null,             emoji: '⛏️' },
-  'gta v':           { Icon: null,             emoji: '🚗' },
-  'gta':             { Icon: null,             emoji: '🚗' },
+  // ── Games with react-icons brand SVGs ──────────────────────────────────
+  'fortnite':       { Icon: SiFortnite,      emoji: '🏗️' },
+  'valorant':       { Icon: SiValorant,      emoji: '🎯' },
+  'roblox':         { Icon: SiRoblox,        emoji: '🧱' },
+  'pubg':           { Icon: SiPubg,          emoji: '🪖' },
+  'fifa':           { Icon: SiFifa,          emoji: '⚽' },
+  'ea sports fc':   { Icon: SiEa,            emoji: '⚽' },
+
+  // ── Games with hosted SVGs in /public/brand-icons/ ─────────────────────
+  // Official logos from Wikimedia Commons / Simple Icons CDN where available,
+  // custom-generated lettermark SVGs where not (see /scripts/make_game_svgs.py).
+  'call of duty':   { src: '/brand-icons/call-of-duty.svg' },
+  'cod':            { src: '/brand-icons/call-of-duty.svg' },
+  'warzone':        { src: '/brand-icons/warzone.svg' },
+  'apex legends':   { src: '/brand-icons/apex-legends.svg' },
+  'apex':           { src: '/brand-icons/apex-legends.svg' },
+  'minecraft':      { src: '/brand-icons/minecraft.svg' },
+  'free fire':      { src: '/brand-icons/free-fire.svg' },
+  'garena free fire': { src: '/brand-icons/free-fire.svg' },
+  'bloodstrike':    { src: '/brand-icons/bloodstrike.svg' },
+  'blood strike':   { src: '/brand-icons/bloodstrike.svg' },
+  'mobile legends': { src: '/brand-icons/mobile-legends.svg' },
+  'mobile legends: bang bang': { src: '/brand-icons/mobile-legends.svg' },
+  'mlbb':           { src: '/brand-icons/mobile-legends.svg' },
+  'gta v':          { src: '/brand-icons/grand-theft-auto.svg' },
+  'gta':            { src: '/brand-icons/grand-theft-auto.svg' },
+  'grand theft auto': { src: '/brand-icons/grand-theft-auto.svg' },
+  'grand theft auto v': { src: '/brand-icons/grand-theft-auto.svg' },
+
+  // ── "Mobile (PUBG/FF/ML)" composite entry from the waitlist page ──────
+  // Renders the PUBG icon since PUBG is listed first in the composite label.
+  'mobile':         { Icon: SiPubg,          emoji: '📱' },
+  'mobile (pubg/ff/ml)': { Icon: SiPubg,     emoji: '📱' },
 };
 
 type GameIconProps = {
@@ -150,20 +177,52 @@ type GameIconProps = {
 };
 
 /**
- * Renders the brand icon for a game. Case-insensitive match. Falls back to
- * emoji if no brand icon is available for the game.
+ * Renders the brand icon for a game. Case-insensitive match. Resolution order:
+ *   1. Inline react-icons brand SVG (cleanest, scales perfectly)
+ *   2. Hosted SVG file in /public/brand-icons/ (next-best — real brand logo)
+ *   3. Emoji fallback
+ *   4. Generic gamepad emoji (unknown game)
  */
 export function GameIcon({ game, className = 'w-5 h-5' }: GameIconProps) {
   const key = (game || '').toLowerCase().trim();
   const entry = GAME_ICONS[key];
+
+  // 1. Inline react-icons component
   if (entry?.Icon) {
     const Comp = entry.Icon;
     return <Comp className={className} aria-hidden="true" />;
   }
+
+  // 2. Hosted SVG file — rendered as a CSS mask so it inherits the parent's
+  //    text color (currentColor). All hosted SVGs in /public/brand-icons/
+  //    are patched to single-color `fill="currentColor"` (see
+  //    /scripts/patch_brand_svgs.py), so the mask paints the silhouette in
+  //    whatever color the surrounding button/text uses.
+  if (entry?.src) {
+    return (
+      <span
+        aria-hidden="true"
+        className={`${className} inline-block bg-current`}
+        style={{
+          maskImage: `url(${entry.src})`,
+          maskRepeat: 'no-repeat',
+          maskPosition: 'center',
+          maskSize: 'contain',
+          WebkitMaskImage: `url(${entry.src})`,
+          WebkitMaskRepeat: 'no-repeat',
+          WebkitMaskPosition: 'center',
+          WebkitMaskSize: 'contain',
+        }}
+      />
+    );
+  }
+
+  // 3. Emoji fallback
   if (entry?.emoji) {
     return <span className={className} aria-hidden="true" style={{ fontSize: '1em' }}>{entry.emoji}</span>;
   }
-  // Unknown game — generic gamepad emoji
+
+  // 4. Unknown game — generic gamepad emoji
   return <span className={className} aria-hidden="true" style={{ fontSize: '1em' }}>🎮</span>;
 }
 

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" fill="currentColor">
+  <!-- Stencil "B" mark -->
+  <g fill="currentColor">
+    <path d="M60 50 L60 150 L100 150 L100 130 L80 130 L80 110 L100 110 L100 90 L80 90 L80 70 L100 70 L100 50 Z"/>
+    <path d="M110 50 L110 70 L130 70 L130 90 L110 90 L110 110 L130 110 L130 130 L110 130 L110 150 L140 150 L140 50 Z"/>
+  </g>
+  <!-- Crosshair accent -->
+  <circle cx="100" cy="100" r="68" fill="none" stroke="currentColor" stroke-width="2" opacity="0.4"/>
+  <text x="100" y="180" font-family="Arial Black, Helvetica, sans-serif" font-size="14" font-weight="900" fill="currentColor" text-anchor="middle" letter-spacing="3">BLOODSTRIKE</text>
+
+</svg>

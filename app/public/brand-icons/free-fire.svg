@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" fill="currentColor">
+  <!-- Flame shape behind letters -->
+  <path d="M100 28 C 110 50 130 60 124 86 C 140 76 142 60 142 60 C 152 90 130 110 110 116 C 124 100 116 86 100 80 C 84 86 76 100 90 116 C 70 110 48 90 58 60 C 58 60 60 76 76 86 C 70 60 90 50 100 28 Z" fill="currentColor" opacity="0.85"/>
+  <!-- Wordmark -->
+  <text x="100" y="135" font-family="Arial Black, Helvetica, sans-serif" font-size="30" font-weight="900" fill="currentColor" text-anchor="middle" letter-spacing="1">FREE</text>
+  <text x="100" y="170" font-family="Arial Black, Helvetica, sans-serif" font-size="30" font-weight="900" fill="currentColor" text-anchor="middle" letter-spacing="1">FIRE</text>
+
+</svg>
