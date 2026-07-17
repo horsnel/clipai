@@ -65,8 +65,13 @@ interface Env {
   // Channel audit — platform scrapers (all optional, all free-tier)
   // Primary chain: Sociavault → ScrapeCreators → SocialData → Serper (lite)
   SOCIAVAULT_API_KEY?: string;      // api.sociavault.com — TikTok + Instagram + Twitter (free: 50 credits/key)
+  SOCIAVAULT_API_KEY_2?: string;    // backup Sociavault key (rotated when primary runs out)
+  SOCIAVAULT_API_KEY_3?: string;    // backup Sociavault key (rotated when primary runs out)
   SCRAPECREATORS_API_KEY?: string;  // api.scrapecreators.com — TikTok + Instagram backup (free: 100 credits)
   SOCIALDATA_API_KEY?: string;      // api.socialdata.tools — X/Twitter primary (key format: "9846|xxx")
+  SOCIALDATA_API_KEY_2?: string;    // backup SocialData key (the KHT2LXKT2mSi key currently 401s — kept for reference)
+  REDDIT_CLIENT_ID?: string;        // Reddit OAuth app creds — bypass 403 rate limit on www.reddit.com (register at reddit.com/prefs/apps → "script" type)
+  REDDIT_CLIENT_SECRET?: string;    // paired with REDDIT_CLIENT_ID. App-only OAuth → oauth.reddit.com (60 req/min)
   LAMATOK_API_KEY?: string;         // (deprecated) LamaTok RapidAPI — kept for backward compat
   KONBINI_API_KEY?: string;         // (deprecated) KonbiniAPI RapidAPI — kept for backward compat
   // Paystack
@@ -689,6 +694,115 @@ async function hashKey(...parts: (string | number | undefined)[]): Promise<strin
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// AUDIT CREDIT TRACKING — last-seen balances, updated as audits run
+// ════════════════════════════════════════════════════════════════════════════
+// Each audit scraper exposes its remaining credits differently:
+//   - Sociavault: GET /v1/credits returns {credits, subscriptionStatus} (free call)
+//   - ScrapeCreators: every API response body includes credits_remaining (passive)
+//   - SocialData: x-ratelimit-remaining / x-ratelimit-limit headers on every call (per-minute, NOT balance)
+// We record the last-seen values in L1 cache so /audit-credits can return them
+// without making extra probe calls. KV-backed so values survive isolate restarts.
+type CreditSnapshot = {
+  credits?: number;          // ScrapeCreators: credits_remaining · Sociavault: credits
+  subscription?: string;     // Sociavault: "free" | "paid"
+  rate_limit_remaining?: number;  // SocialData: per-minute remaining
+  rate_limit_limit?: number;      // SocialData: per-minute limit
+  last_updated: string;       // ISO timestamp
+  last_source?: string;       // which audit call last wrote this (e.g. "audit:tiktok:khaby.lame")
+};
+
+const CREDIT_KV_TTL = 7 * 24 * 60 * 60;  // 7 days — keep history even if no audits run
+
+async function recordCreditSnapshot(
+  env: Env,
+  provider: 'sociavault' | 'scrapecreators' | 'socialdata',
+  keyLabel: string,  // e.g. "primary", "backup_2", "backup_3" — for Sociavault multi-key
+  snap: Omit<CreditSnapshot, 'last_updated'>,
+): Promise<void> {
+  const full: CreditSnapshot = { ...snap, last_updated: new Date().toISOString() };
+  const kvKey = `audit_credits:${provider}:${keyLabel}`;
+  l1Cache.set(`credit:${kvKey}`, { data: full, expires: Date.now() + CREDIT_KV_TTL * 1000 });
+  if (env.CACHE_KV) {
+    try {
+      await env.CACHE_KV.put(kvKey, JSON.stringify(full), { expirationTtl: CREDIT_KV_TTL });
+    } catch (e) {
+      console.warn('[credits] KV write failed:', (e as Error).message);
+    }
+  }
+}
+
+async function readCreditSnapshot(
+  env: Env,
+  provider: 'sociavault' | 'scrapecreators' | 'socialdata',
+  keyLabel: string,
+): Promise<CreditSnapshot | null> {
+  const kvKey = `audit_credits:${provider}:${keyLabel}`;
+  const l1 = l1Cache.get(`credit:${kvKey}`);
+  if (l1) return l1.data as CreditSnapshot;
+  if (env.CACHE_KV) {
+    try {
+      const raw = await env.CACHE_KV.get<CreditSnapshot>(kvKey, 'json');
+      if (raw) {
+        l1Cache.set(`credit:${kvKey}`, { data: raw, expires: Date.now() + CREDIT_KV_TTL * 1000 });
+        return raw;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+/** Live-probe Sociavault credits. GET /v1/credits is free (no quota impact). */
+async function probeSociavaultCredits(apiKey: string): Promise<{ credits: number; subscription: string } | null> {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const r = await fetch('https://api.sociavault.com/v1/credits', {
+      headers: { 'x-api-key': apiKey },
+      signal: ctrl.signal,
+    });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const j = await r.json() as any;
+    if (typeof j?.credits === 'number') {
+      return { credits: j.credits, subscription: String(j.subscriptionStatus || j.subscription || 'unknown') };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const SOCIAVAULT_PROBE_INTERVAL_MS = 5 * 60 * 1000;  // probe at most every 5 min per key
+
+/**
+ * Throttled Sociavault credit probe — if we've probed this key in the last
+ * 5 minutes, skip. Otherwise fire-and-forget a probe and record the result.
+ * Designed to be called inside an audit flow without blocking the response
+ * (caller should wrap in executionCtx.waitUntil if available).
+ */
+async function maybeProbeAndRecordSociavaultCredits(
+  env: Env,
+  apiKey: string,
+  keyLabel: 'primary' | 'backup_2' | 'backup_3',
+  lastSource: string,
+): Promise<void> {
+  // Check L1 cache age — skip if probed recently
+  const cached = await readCreditSnapshot(env, 'sociavault', keyLabel);
+  if (cached?.last_updated) {
+    const age = Date.now() - new Date(cached.last_updated).getTime();
+    if (age < SOCIAVAULT_PROBE_INTERVAL_MS) return;
+  }
+  const probe = await probeSociavaultCredits(apiKey);
+  if (probe) {
+    await recordCreditSnapshot(env, 'sociavault', keyLabel, {
+      credits: probe.credits,
+      subscription: probe.subscription,
+      last_source: lastSource,
+    });
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // RATE LIMITING (token bucket via Cloudflare KV)
 // ════════════════════════════════════════════════════════════════════════════
 // Default: 30 requests per minute per user (or per IP if not authed).
@@ -752,9 +866,27 @@ app.get('/health', async (c) => {
   checks.serper = { status: env.SERPER_API_KEY ? 'ok' : 'unbound' };
 
   // Channel audit scrapers (all optional)
-  checks.sociavault = { status: env.SOCIAVAULT_API_KEY ? 'ok' : 'unbound', detail: env.SOCIAVAULT_API_KEY ? 'TikTok + IG + X audits enabled' : 'Audits fall back to ScrapeCreators/SocialData/Serper' };
+  const sociavaultKeysCount = [env.SOCIAVAULT_API_KEY, env.SOCIAVAULT_API_KEY_2, env.SOCIAVAULT_API_KEY_3].filter(Boolean).length;
+  checks.sociavault = {
+    status: env.SOCIAVAULT_API_KEY ? 'ok' : 'unbound',
+    detail: env.SOCIAVAULT_API_KEY
+      ? `TikTok + IG + X audits enabled (${sociavaultKeysCount} key${sociavaultKeysCount === 1 ? '' : 's'} configured)`
+      : 'Audits fall back to ScrapeCreators/SocialData/Serper',
+  };
   checks.scrapecreators = { status: env.SCRAPECREATORS_API_KEY ? 'ok' : 'unbound', detail: env.SCRAPECREATORS_API_KEY ? 'TikTok + IG backup enabled' : 'TikTok/IG fall back to Serper (lite)' };
-  checks.socialdata = { status: env.SOCIALDATA_API_KEY ? 'ok' : 'unbound', detail: env.SOCIALDATA_API_KEY ? 'X/Twitter audits enabled' : 'X audits fall back to Sociavault or Serper (lite)' };
+  const socialdataKeysCount = [env.SOCIALDATA_API_KEY, env.SOCIALDATA_API_KEY_2].filter(Boolean).length;
+  checks.socialdata = {
+    status: env.SOCIALDATA_API_KEY ? 'ok' : 'unbound',
+    detail: env.SOCIALDATA_API_KEY
+      ? `X/Twitter audits enabled (${socialdataKeysCount} key${socialdataKeysCount === 1 ? '' : 's'} configured)`
+      : 'X audits fall back to Sociavault or Serper (lite)',
+  };
+  checks.reddit_oauth = {
+    status: (env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET) ? 'ok' : 'unbound',
+    detail: (env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET)
+      ? 'Reddit audits via oauth.reddit.com (60 req/min)'
+      : 'Reddit audits fall back to www.reddit.com (rate-limited) → Pullpush → RSS',
+  };
 
   // Paystack
   checks.paystack = { status: env.PAYSTACK_SECRET_KEY ? 'ok' : 'unbound' };
@@ -1940,6 +2072,10 @@ async function auditTikTokProfile(env: Env, url: string): Promise<any> {
       const profileRes = await fetch(`https://api.sociavault.com/v1/scrape/tiktok/profile?handle=${encodeURIComponent(username)}`, {
         headers: { 'x-api-key': env.SOCIAVAULT_API_KEY },
       });
+      // Record Sociavault credit snapshot (throttled — only probes if >5min since last probe)
+      try {
+        await maybeProbeAndRecordSociavaultCredits(env, env.SOCIAVAULT_API_KEY, 'primary', `audit:tiktok:${username}`);
+      } catch {}
       if (profileRes.ok) {
         const profileJson = await profileRes.json() as any;
         const wrapper = profileJson?.data?.user ? profileJson.data : (profileJson?.user ? profileJson : {});
@@ -2019,6 +2155,15 @@ async function auditTikTokProfile(env: Env, url: string): Promise<any> {
       });
       if (profileRes.ok) {
         const profileJson = await profileRes.json() as any;
+        // Record ScrapeCreators credit snapshot (passive — every response includes credits_remaining)
+        if (typeof profileJson?.credits_remaining === 'number') {
+          try {
+            await recordCreditSnapshot(env, 'scrapecreators', 'primary', {
+              credits: profileJson.credits_remaining,
+              last_source: `audit:tiktok:${username}`,
+            });
+          } catch {}
+        }
         if (profileJson?.success && profileJson?.user) {
           const u = profileJson.user;
           const stats = profileJson.stats || u.statsV2 || {};
@@ -2130,6 +2275,10 @@ async function auditInstagramProfile(env: Env, url: string): Promise<any> {
       const profileRes = await fetch(`https://api.sociavault.com/v1/scrape/instagram/profile?handle=${encodeURIComponent(username)}`, {
         headers: { 'x-api-key': env.SOCIAVAULT_API_KEY },
       });
+      // Throttled Sociavault credit probe (same key as TikTok — only records if >5min since last probe)
+      try {
+        await maybeProbeAndRecordSociavaultCredits(env, env.SOCIAVAULT_API_KEY, 'primary', `audit:instagram:${username}`);
+      } catch {}
       if (profileRes.ok) {
         const profileJson = await profileRes.json() as any;
         const wrapper = profileJson?.data?.user ? profileJson.data : (profileJson?.data?.data?.user ? profileJson.data.data : {});
@@ -2210,6 +2359,15 @@ async function auditInstagramProfile(env: Env, url: string): Promise<any> {
       });
       if (profileRes.ok) {
         const profileJson = await profileRes.json() as any;
+        // Record ScrapeCreators credit snapshot (passive — every response includes credits_remaining)
+        if (typeof profileJson?.credits_remaining === 'number') {
+          try {
+            await recordCreditSnapshot(env, 'scrapecreators', 'primary', {
+              credits: profileJson.credits_remaining,
+              last_source: `audit:instagram:${username}`,
+            });
+          } catch {}
+        }
         if (profileJson?.success) {
           const u = profileJson?.data?.user || profileJson?.user || {};
           if (u.username || u.id) {
@@ -2325,6 +2483,18 @@ async function auditXProfile(env: Env, url: string): Promise<any> {
       const profileRes = await fetch(`https://api.socialdata.tools/twitter/user/${encodeURIComponent(username)}`, {
         headers: { 'Authorization': `Bearer ${env.SOCIALDATA_API_KEY}` },
       });
+      // Record SocialData rate-limit snapshot (per-minute rate, NOT dollar balance — socialdata.tools doesn't expose $ balance via API)
+      try {
+        const rlRemaining = Number(profileRes.headers.get('x-ratelimit-remaining') || '');
+        const rlLimit = Number(profileRes.headers.get('x-ratelimit-limit') || '');
+        if (!Number.isNaN(rlRemaining) || !Number.isNaN(rlLimit)) {
+          await recordCreditSnapshot(env, 'socialdata', 'primary', {
+            rate_limit_remaining: Number.isNaN(rlRemaining) ? undefined : rlRemaining,
+            rate_limit_limit: Number.isNaN(rlLimit) ? undefined : rlLimit,
+            last_source: `audit:twitter:${username}`,
+          });
+        }
+      } catch {}
       if (profileRes.ok) {
         const profile = await profileRes.json() as any;
         if (profile && (profile.screen_name || profile.id)) {
@@ -2396,6 +2566,10 @@ async function auditXProfile(env: Env, url: string): Promise<any> {
       const profileRes = await fetch(`https://api.sociavault.com/v1/scrape/twitter/profile?handle=${encodeURIComponent(username)}`, {
         headers: { 'x-api-key': env.SOCIAVAULT_API_KEY },
       });
+      // Throttled Sociavault credit probe
+      try {
+        await maybeProbeAndRecordSociavaultCredits(env, env.SOCIAVAULT_API_KEY, 'primary', `audit:twitter:${username}`);
+      } catch {}
       if (profileRes.ok) {
         const profileJson = await profileRes.json() as any;
         const wrapper = profileJson?.data?.data || profileJson?.data || {};
@@ -2498,9 +2672,17 @@ async function auditXProfile(env: Env, url: string): Promise<any> {
   };
 }
 
-/** Reddit audit — uses Reddit's public JSON endpoints (no API key needed, no signup).
- *  Returns: karma breakdown, account age, recent posts with scores.
- *  Just needs a descriptive User-Agent (REDDIT_USER_AGENT env var). */
+/** Reddit audit — primary chain:
+ *   Layer 0: Reddit OAuth app-only flow (oauth.reddit.com — 60 req/min, works from CF egress)
+ *            Requires REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET env vars. Register an app at
+ *            https://www.reddit.com/prefs/apps (script type, redirect URI = http://localhost).
+ *   Layer 1: Reddit public JSON (www.reddit.com — works for non-CF-egress IPs)
+ *   Layer 2: Pullpush archive mirror (api.pullpush.io) — submissions + comments with scores
+ *   Layer 3: Reddit RSS feed (www.reddit.com/user/NAME/.rss) — titles + URLs only, no scores
+ *
+ *  Reddit aggressively rate-limits anonymous server-side requests, so Layer 0 (OAuth)
+ *  is the only reliable path from Cloudflare's egress IP. Without OAuth creds, the
+ *  audit will degrade through Layers 1-3 and may return limited data via RSS. */
 async function auditRedditProfile(env: Env, url: string): Promise<any> {
   const m = url.match(/reddit\.com\/(?:user|u)\/([A-Za-z0-9_-]+)/);
   const username = m ? m[1] : '';
@@ -2509,12 +2691,173 @@ async function auditRedditProfile(env: Env, url: string): Promise<any> {
   const userAgent = env.REDDIT_USER_AGENT || 'ClipAI/1.0 (channel audit; +https://clipai-bqo.pages.dev)';
   const headers = { 'User-Agent': userAgent };
 
+  // ── Layer 0: Reddit OAuth (app-only flow → oauth.reddit.com) ─────────────────
+  if (env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET) {
+    const oauthAudit = await redditOAuthAudit(env, username, userAgent);
+    if (oauthAudit) return oauthAudit;
+    // If OAuth fails (e.g. user not found), fall through to other layers
+  }
+
+  // ── Layer 1: Reddit public JSON (works for non-CF-egress IPs) ────────────────
   try {
-    // Fetch user profile
-    const aboutRes = await fetch(`https://www.reddit.com/user/${encodeURIComponent(username)}/about.json`, { headers });
+    const aboutCtrl = new AbortController();
+    const aboutT = setTimeout(() => aboutCtrl.abort(), 10000);
+    const aboutRes = await fetch(`https://www.reddit.com/user/${encodeURIComponent(username)}/about.json`, { headers, signal: aboutCtrl.signal });
+    clearTimeout(aboutT);
+    if (aboutRes.ok) {
+      const aboutJson = await aboutRes.json() as any;
+      const data = aboutJson?.data || {};
+      const subreddit = data?.subreddit || {};
+      const channelName = subreddit.title || data.name || username;
+      const avatar = subreddit.icon_img || subreddit.icon_url || '';
+      const description = subreddit.public_description || subreddit.description || '';
+      const subscribers = Number(subreddit.subscribers || 0);
+      const totalKarma = Number(data.total_karma || 0);
+      const commentKarma = Number(data.comment_karma || 0);
+      const linkKarma = Number(data.link_karma || 0);
+      const accountAge = data.created_utc ? new Date(data.created_utc * 1000).toISOString() : '';
+      const isVerified = data.verified || data.is_employee || false;
+
+      // Fetch recent posts
+      let recentVideos: any[] = [];
+      try {
+        const postsCtrl = new AbortController();
+        const postsT = setTimeout(() => postsCtrl.abort(), 10000);
+        const postsRes = await fetch(`https://www.reddit.com/user/${encodeURIComponent(username)}/.json?limit=10`, { headers, signal: postsCtrl.signal });
+        clearTimeout(postsT);
+        if (postsRes.ok) {
+          const postsJson = await postsRes.json() as any;
+          const children = postsJson?.data?.children || [];
+          recentVideos = children.map((c: any, i: number) => {
+            const p = c?.data || {};
+            return {
+              id: p.id || `rd_audit_${i}`,
+              title: p.title || p.body?.slice(0, 100) || 'Reddit post',
+              thumbnail: (p.thumbnail && p.thumbnail.startsWith('http')) ? p.thumbnail : '',
+              url: p.permalink ? `https://www.reddit.com${p.permalink}` : '',
+              publishedAt: p.created_utc ? new Date(p.created_utc * 1000).toISOString() : '',
+              viewCount: Number(p.view_count || 0),
+              likeCount: Number(p.score || 0),
+              commentCount: Number(p.num_comments || 0),
+            };
+          }).slice(0, 10);
+        }
+      } catch {}
+
+      const totalRecentLikes = recentVideos.reduce((s: number, v: any) => s + (v.likeCount || 0), 0);
+      const avgRecentLikes = recentVideos.length ? Math.round(totalRecentLikes / recentVideos.length) : 0;
+      const avgEngagementRate = recentVideos.length > 0 ? (recentVideos.reduce((s: number, v: any) => s + (v.commentCount || 0), 0) / recentVideos.length) : 0;
+
+      return {
+        platform: 'reddit',
+        channelId: data.id || '',
+        channelName,
+        channelHandle: 'u/' + username,
+        description,
+        avatar,
+        banner: subreddit.banner_img || subreddit.banner_background_image || '',
+        country: '',
+        publishedAt: accountAge,
+        statistics: { subscribers, totalViews: totalKarma, videoCount: recentVideos.length, hiddenSubscriberCount: false },
+        recentVideos,
+        metrics: { avgRecentViews: avgRecentLikes, totalRecentViews: totalKarma, avgEngagementRate, recentVideoCount: recentVideos.length },
+        auditedAt: new Date().toISOString(),
+        note: isVerified ? 'Verified Reddit account.' : '',
+        _source: 'reddit_json',
+      };
+    }
+    // If 404, the user truly doesn't exist — fall through to error
+    if (aboutRes.status === 404) {
+      // Try Pullpush to confirm — sometimes Reddit returns 404 for rate-limited users that actually exist
+      const pp = await pullpushRedditAudit(username);
+      if (pp) return pp;
+      return { error: `Reddit user "${username}" not found (404). Check the username and try again.`, platform: 'reddit' };
+    }
+    // 403/429 → fall through to Pullpush
+  } catch {
+    // network error → fall through to Pullpush
+  }
+
+  // ── Layer 2: Pullpush archive mirror (api.pullpush.io) ──────────────────────
+  // Reddit blocks Cloudflare's egress IP with 403/429 for anonymous server-side
+  // requests. Pullpush is a third-party archive mirror that proxies Reddit data
+  // — it returns submissions + comments with scores + permalinks. Profile
+  // metadata (karma, avatar, account age) is not available via Pullpush.
+  const pullpush = await pullpushRedditAudit(username);
+  if (pullpush) return pullpush;
+
+  // ── Layer 3: Reddit RSS feed (last resort) ─────────────────────────────────
+  // RSS works from CF egress when JSON doesn't (different rate limit policy).
+  // Returns recent posts with titles, permalinks, and pubDates — but no scores,
+  // no comment counts, no profile metadata. Useful as a final fallback so the
+  // audit at least shows *something* for valid users.
+  const rssAudit = await redditRssAudit(username, headers);
+  if (rssAudit) return rssAudit;
+
+  return {
+    error: `Reddit audit failed: Reddit is rate-limiting our server IP (403/429), the Pullpush archive mirror is rate-limited (429), and the RSS feed is also unavailable. For reliable Reddit audits, set REDDIT_CLIENT_ID + REDDIT_CLIENT_SECRET (register an app at https://www.reddit.com/prefs/apps — script type, free).`,
+    platform: 'reddit',
+  };
+}
+
+/** Reddit OAuth app-only flow. Returns null if creds aren't set, OAuth fails,
+ *  or the user doesn't exist. Uses oauth.reddit.com which has a separate
+ *  (much higher) rate limit policy than www.reddit.com anonymous access. */
+async function redditOAuthAudit(env: Env, username: string, userAgent: string): Promise<any | null> {
+  if (!env.REDDIT_CLIENT_ID || !env.REDDIT_CLIENT_SECRET) return null;
+
+  // Step 1: Get app-only bearer token (cached for 50min in L1+KV)
+  const tokenKey = 'reddit_oauth_token';
+  let token: string | null = null;
+  const cached = await cacheRead<{ token: string }>(env, tokenKey);
+  if (cached?.fresh && cached.data?.token) {
+    token = cached.data.token;
+  } else {
+    try {
+      const basicAuth = btoa(`${env.REDDIT_CLIENT_ID}:${env.REDDIT_CLIENT_SECRET}`);
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 10000);
+      const r = await fetch('https://www.reddit.com/api/v1/access_token', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${basicAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': userAgent,
+        },
+        body: 'grant_type=client_credentials',
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      if (!r.ok) return null;
+      const j = await r.json() as any;
+      if (!j?.access_token) return null;
+      token = j.access_token as string;
+      // expires_in is typically 86400 (24h); cache for 50min to be safe
+      await cacheWrite(env, tokenKey, { token }, 50 * 60);
+    } catch {
+      return null;
+    }
+  }
+
+  if (!token) return null;
+
+  // Step 2: Use the token to fetch the user's profile + recent posts
+  const authHeaders = {
+    'Authorization': `Bearer ${token}`,
+    'User-Agent': userAgent,
+  };
+
+  try {
+    const aboutCtrl = new AbortController();
+    const aboutT = setTimeout(() => aboutCtrl.abort(), 10000);
+    const aboutRes = await fetch(`https://oauth.reddit.com/user/${encodeURIComponent(username)}/about`, {
+      headers: authHeaders,
+      signal: aboutCtrl.signal,
+    });
+    clearTimeout(aboutT);
     if (!aboutRes.ok) {
-      if (aboutRes.status === 404) return { error: `Reddit user "${username}" not found (404). Check the username and try again.`, platform: 'reddit' };
-      return { error: `Reddit lookup failed (HTTP ${aboutRes.status}). Reddit may be rate-limiting our server IP — try again in a minute.`, platform: 'reddit' };
+      if (aboutRes.status === 404) return null;  // user truly doesn't exist
+      return null;  // OAuth issue or rate limit — fall through
     }
     const aboutJson = await aboutRes.json() as any;
     const data = aboutJson?.data || {};
@@ -2532,7 +2875,13 @@ async function auditRedditProfile(env: Env, url: string): Promise<any> {
     // Fetch recent posts
     let recentVideos: any[] = [];
     try {
-      const postsRes = await fetch(`https://www.reddit.com/user/${encodeURIComponent(username)}/.json?limit=10`, { headers });
+      const postsCtrl = new AbortController();
+      const postsT = setTimeout(() => postsCtrl.abort(), 10000);
+      const postsRes = await fetch(`https://oauth.reddit.com/user/${encodeURIComponent(username)}/overview?limit=10`, {
+        headers: authHeaders,
+        signal: postsCtrl.signal,
+      });
+      clearTimeout(postsT);
       if (postsRes.ok) {
         const postsJson = await postsRes.json() as any;
         const children = postsJson?.data?.children || [];
@@ -2571,10 +2920,198 @@ async function auditRedditProfile(env: Env, url: string): Promise<any> {
       metrics: { avgRecentViews: avgRecentLikes, totalRecentViews: totalKarma, avgEngagementRate, recentVideoCount: recentVideos.length },
       auditedAt: new Date().toISOString(),
       note: isVerified ? 'Verified Reddit account.' : '',
+      _source: 'reddit_oauth',
     };
-  } catch (e: any) {
-    return { error: `Reddit audit failed: ${e?.message || 'network error'}`, platform: 'reddit' };
+  } catch {
+    return null;
   }
+}
+
+/** Reddit RSS feed fallback. Returns recent post titles + URLs + dates only
+ *  (no scores, no comment counts — RSS doesn't expose those). Returns null
+ *  if the feed is empty or unavailable. */
+async function redditRssAudit(username: string, headers: Record<string, string>): Promise<any | null> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const r = await fetch(`https://www.reddit.com/user/${encodeURIComponent(username)}/.rss?limit=25`, { headers, signal: ctrl.signal });
+    if (!r.ok) return null;
+    const xml = await r.text();
+    if (!xml || !xml.includes('<entry>')) return null;
+
+    // Extract <entry> blocks
+    const entryRegex = /<entry>[\s\S]*?<\/entry>/g;
+    const entries: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = entryRegex.exec(xml)) !== null && entries.length < 10) {
+      entries.push(m[0]);
+    }
+    if (entries.length === 0) return null;
+
+    const recentVideos = entries.map((xmlEntry, i) => {
+      const title = (xmlEntry.match(/<title[^>]*>([\s\S]*?)<\/title>/)?.[1] || `Reddit post ${i + 1}`).replace(/&[^;]+;/g, ' ').trim();
+      const link = xmlEntry.match(/<link[^>]+href="([^"]+)"/)?.[1] || '';
+      const published = xmlEntry.match(/<published[^>]*>([^<]+)<\/published>/)?.[1] || '';
+      const author = xmlEntry.match(/<name>([^<]+)<\/name>/)?.[1] || '';
+      // Try to extract content snippet
+      const contentMatch = xmlEntry.match(/<content[^>]*>([\s\S]*?)<\/content>/)?.[1] || '';
+      const contentText = contentMatch.replace(/<[^>]+>/g, '').replace(/&[^;]+;/g, ' ').trim().slice(0, 200);
+      return {
+        id: `rd_rss_${i}`,
+        title: title.slice(0, 100),
+        thumbnail: '',
+        url: link,
+        publishedAt: published,
+        viewCount: 0,
+        likeCount: 0,  // RSS doesn't expose scores
+        commentCount: 0,
+        author: author.replace('/u/', ''),
+      };
+    });
+
+    // Try to extract profile metadata from the feed header
+    const channelName = (xml.match(/<title[^>]*>([\s\S]*?)<\/title>/)?.[1] || username).replace(/&[^;]+;/g, ' ').trim();
+    const description = (xml.match(/<subtitle[^>]*>([\s\S]*?)<\/subtitle>/)?.[1] || '').replace(/&[^;]+;/g, ' ').trim();
+
+    return {
+      platform: 'reddit',
+      channelId: '',
+      channelName,
+      channelHandle: 'u/' + username,
+      description,
+      avatar: '',
+      banner: '',
+      country: '',
+      publishedAt: '',
+      statistics: {
+        subscribers: 0,
+        totalViews: 0,
+        videoCount: recentVideos.length,
+        hiddenSubscriberCount: true,
+      },
+      recentVideos,
+      metrics: {
+        avgRecentViews: 0,
+        totalRecentViews: 0,
+        avgEngagementRate: 0,
+        recentVideoCount: recentVideos.length,
+      },
+      auditedAt: new Date().toISOString(),
+      note: 'Reddit is rate-limiting our server IP (403/429) and the Pullpush archive mirror is also rate-limited (429). Recent post titles + URLs are shown via the public RSS feed. Scores and profile metadata (karma, avatar, account age) are not available via RSS — try again later for full data.',
+      _source: 'reddit_rss',
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Pullpush-based Reddit audit fallback. Returns null if Pullpush has no data
+ *  for the user (i.e. they've never posted). Aggregates submissions + comments
+ *  into a single recent-activity feed with engagement metrics. */
+async function pullpushRedditAudit(username: string): Promise<any | null> {
+  const ua = 'ClipAI/1.0 (channel audit; +https://clipai-bqo.pages.dev)';
+  const author = encodeURIComponent(username);
+
+  // Helper: fetch with manual AbortController (AbortSignal.timeout() is not
+  // reliably supported in the Cloudflare Workers runtime).
+  const pullpushFetch = async (path: string): Promise<any | null> => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    try {
+      const r = await fetch(`https://api.pullpush.io/reddit/${path}`, {
+        headers: { 'User-Agent': ua },
+        signal: ctrl.signal,
+      });
+      if (!r.ok) return null;
+      return await r.json().catch(() => null);
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(t);
+    }
+  };
+
+  // Parallel: fetch submissions + comments
+  const [subs, comments] = await Promise.all([
+    pullpushFetch(`search/submission/?author=${author}&size=25&sort=desc`),
+    pullpushFetch(`search/comment/?author=${author}&size=25&sort=desc`),
+  ]);
+  const subsList = Array.isArray(subs?.data) ? subs.data : [];
+  const commentsList = Array.isArray(comments?.data) ? comments.data : [];
+
+  if (subsList.length === 0 && commentsList.length === 0) return null;
+
+  // Merge into a single feed sorted by created_utc desc
+  const feed: any[] = [];
+  for (const s of subsList) {
+    feed.push({
+      kind: 'submission',
+      id: s.id || s.name || '',
+      title: s.title || '(untitled submission)',
+      thumbnail: (s.thumbnail && typeof s.thumbnail === 'string' && s.thumbnail.startsWith('http')) ? s.thumbnail : '',
+      url: s.permalink ? `https://www.reddit.com${s.permalink}` : '',
+      publishedAt: s.created_utc ? new Date(s.created_utc * 1000).toISOString() : '',
+      viewCount: 0,  // Pullpush doesn't expose view_count for submissions
+      likeCount: Number(s.score || 0),
+      commentCount: Number(s.num_comments || 0),
+      subreddit: s.subreddit || '',
+    });
+  }
+  for (const c of commentsList) {
+    feed.push({
+      kind: 'comment',
+      id: c.id || '',
+      title: (c.body || '').slice(0, 100) || '(comment)',
+      thumbnail: '',
+      url: c.permalink ? `https://www.reddit.com${c.permalink}` : '',
+      publishedAt: c.created_utc ? new Date(c.created_utc * 1000).toISOString() : '',
+      viewCount: 0,
+      likeCount: Number(c.score || 0),
+      commentCount: 0,
+      subreddit: c.subreddit || '',
+    });
+  }
+  feed.sort((a, b) => (b.publishedAt || '').localeCompare(a.publishedAt || ''));
+  const recentVideos = feed.slice(0, 10);
+
+  const totalRecentLikes = recentVideos.reduce((s: number, v: any) => s + (v.likeCount || 0), 0);
+  const avgRecentLikes = recentVideos.length ? Math.round(totalRecentLikes / recentVideos.length) : 0;
+  const avgEngagementRate = recentVideos.length > 0
+    ? (recentVideos.reduce((s: number, v: any) => s + (v.commentCount || 0), 0) / recentVideos.length)
+    : 0;
+
+  // Subreddits the user has posted in (deduped, top 5)
+  const subreddits = Array.from(new Set(feed.map((p: any) => p.subreddit).filter(Boolean))).slice(0, 5);
+
+  return {
+    platform: 'reddit',
+    channelId: '',
+    channelName: username,
+    channelHandle: 'u/' + username,
+    description: subreddits.length > 0 ? `Active in: ${subreddits.join(', ')}` : '',
+    avatar: '',
+    banner: '',
+    country: '',
+    publishedAt: '',
+    statistics: {
+      subscribers: 0,
+      totalViews: 0,
+      videoCount: feed.length,
+      hiddenSubscriberCount: true,
+    },
+    recentVideos,
+    metrics: {
+      avgRecentViews: avgRecentLikes,
+      totalRecentViews: totalRecentLikes,
+      avgEngagementRate,
+      recentVideoCount: recentVideos.length,
+    },
+    auditedAt: new Date().toISOString(),
+    note: 'Reddit limits profile metadata (karma, avatar, account age) for anonymous server-side requests. Recent activity is shown via the Pullpush public archive mirror. Scores are point-in-time snapshots, not live.',
+    _source: 'pullpush',
+  };
 }
 
 async function auditChannel(env: Env, url: string): Promise<any> {
@@ -2624,6 +3161,72 @@ app.get('/trends/_diag', async (c) => {
     out.redditTop_count = out.redditTop_output.length;
   } catch (e: any) {
     out.redditTop_output = { error: e.message };
+  }
+
+  // Pullpush — diagnostic probe to verify the Reddit fallback works from CF egress.
+  try {
+    const r = await fetch('https://api.pullpush.io/reddit/search/submission/?author=spez&size=1', {
+      headers: { 'User-Agent': 'ClipAI/1.0 (channel audit; +https://clipai-bqo.pages.dev)' },
+    });
+    const body = await r.text();
+    out.layers.pullpush_submissions = {
+      status: r.status,
+      body_len: body.length,
+      body_preview: body.slice(0, 300),
+      items_found: (body.match(/"id":"/g) || []).length,
+    };
+  } catch (e: any) {
+    out.layers.pullpush_submissions = { error: e.message };
+  }
+
+  // Reddit direct JSON — diagnostic probe to confirm 403/429 status from CF egress.
+  try {
+    const r = await fetch('https://www.reddit.com/user/spez/about.json', {
+      headers: { 'User-Agent': env.REDDIT_USER_AGENT || 'ClipAI/1.0 (channel audit; +https://clipai-bqo.pages.dev)' },
+    });
+    const body = await r.text();
+    out.layers.reddit_direct_json = {
+      status: r.status,
+      body_len: body.length,
+      body_preview: body.slice(0, 200),
+    };
+  } catch (e: any) {
+    out.layers.reddit_direct_json = { error: e.message };
+  }
+
+  // Reddit RSS feed — diagnostic probe to verify the Layer 3 fallback works from CF egress.
+  try {
+    const r = await fetch('https://www.reddit.com/user/spez/.rss?limit=5', {
+      headers: { 'User-Agent': env.REDDIT_USER_AGENT || 'ClipAI/1.0 (channel audit; +https://clipai-bqo.pages.dev)' },
+    });
+    const body = await r.text();
+    out.layers.reddit_rss_feed = {
+      status: r.status,
+      body_len: body.length,
+      items_found: (body.match(/<entry>/g) || []).length,
+      body_preview: body.slice(0, 300),
+    };
+  } catch (e: any) {
+    out.layers.reddit_rss_feed = { error: e.message };
+  }
+
+  // SocialData — diagnostic probe to verify x-ratelimit-* headers are visible from CF egress.
+  if (env.SOCIALDATA_API_KEY) {
+    try {
+      const r = await fetch('https://api.socialdata.tools/twitter/user/elonmusk', {
+        headers: { 'Authorization': `Bearer ${env.SOCIALDATA_API_KEY}` },
+      });
+      const allHeaders: Record<string, string> = {};
+      r.headers.forEach((v: string, k: string) => { allHeaders[k] = v; });
+      out.layers.socialdata_headers = {
+        status: r.status,
+        x_ratelimit_limit: r.headers.get('x-ratelimit-limit'),
+        x_ratelimit_remaining: r.headers.get('x-ratelimit-remaining'),
+        all_headers: allHeaders,
+      };
+    } catch (e: any) {
+      out.layers.socialdata_headers = { error: e.message };
+    }
   }
 
   // Google Trends — explore
@@ -3026,8 +3629,10 @@ Rules:
 
 // ─── Channel Audit (free, auth required) ─────────────────────────────────────
 // POST /api/audit-channel — runs a fresh audit for a single URL, caches the
-// result (1h), and persists a lightweight entry to settings.prefs.audits for
-// the user (max 8 channels, deduped by URL).
+// result with adaptive TTL (1h default; 6h for accounts with >1M followers —
+// big accounts don't change stats hourly, and this conserves scraper credits),
+// and persists a lightweight entry to settings.prefs.audits for the user
+// (max 8 channels, deduped by URL).
 app.post('/audit-channel', requireAuth, async (c) => {
   const env = c.env as Env;
   const userId = c.get('userId') as string;
@@ -3035,13 +3640,43 @@ app.post('/audit-channel', requireAuth, async (c) => {
   const url = (body.url || '').toString().trim();
   if (!url) return json({ error: 'url is required' }, 400);
 
-  // Cache the audit itself (1h) — same URL → same audit, no need to re-fetch.
+  // Adaptive cache TTL: peek the existing cached value first. If we already
+  // know the subscriber count from a previous audit, use the appropriate TTL.
+  // Default for first-time audits is 1h; if the fresh audit comes back with
+  // >1M subs, we re-write with 6h TTL (handled below after auditChannel runs).
   const auditCacheKey = await hashKey('channel_audit_v1', url);
+  const BIG_ACCOUNT_TTL = 6 * 60 * 60;   // 6h for accounts with >1M followers
+  const DEFAULT_TTL = 60 * 60;            // 1h for everyone else
+  const BIG_ACCOUNT_THRESHOLD = 1_000_000;
+
+  // Peek cached value to decide TTL before we even fetch.
+  const peeked = await cacheRead<any>(env, auditCacheKey);
+  let inferredTtl = DEFAULT_TTL;
+  if (peeked?.data?.statistics?.subscribers !== undefined) {
+    inferredTtl = peeked.data.statistics.subscribers >= BIG_ACCOUNT_THRESHOLD
+      ? BIG_ACCOUNT_TTL
+      : DEFAULT_TTL;
+  }
+
   let audit: any;
+  let refreshTtl = inferredTtl;
   try {
-    audit = await withCache(env, auditCacheKey, 60 * 60, async () => {
-      return await auditChannel(env, url);
+    audit = await withCache(env, auditCacheKey, inferredTtl, async () => {
+      const fresh = await auditChannel(env, url);
+      // Compute the appropriate TTL from the FRESH result (in case the cached
+      // value was missing or stale). If the fresh audit shows a big account,
+      // bump the TTL up so we conserve scraper credits on subsequent calls.
+      const subs = Number(fresh?.statistics?.subscribers || 0);
+      refreshTtl = subs >= BIG_ACCOUNT_THRESHOLD ? BIG_ACCOUNT_TTL : DEFAULT_TTL;
+      return fresh;
     });
+    // If withCache wrote with the inferred TTL but the fresh result is a big
+    // account, re-write with the longer TTL so the next call benefits.
+    if (refreshTtl > inferredTtl) {
+      try {
+        await cacheWrite(env, auditCacheKey, audit, refreshTtl);
+      } catch {}
+    }
   } catch {
     audit = await auditChannel(env, url);
   }
@@ -3105,6 +3740,158 @@ app.delete('/channel-audits', requireAuth, async (c) => {
   prefs.audits = audits.filter((a: any) => a.url !== url);
   await writeSettingsPrefs(env, userId, prefs);
   return json({ success: true });
+});
+
+// GET /api/audit-credits?secret=... — returns live credit balances for all
+// configured audit scrapers. Operator-only (requires WORKER_SECRET, same as
+// /trends/_diag). Useful as a health indicator in the admin UI.
+//
+// Returns:
+//   {
+//     "sociavault": {
+//       "configured": true,
+//       "total_credits": 141,
+//       "keys": [
+//         {"label": "primary", "credits": 29, "subscription": "free", "last_updated": "...", "last_source": "audit:tiktok:khaby.lame"},
+//         {"label": "backup_2", "credits": 50, ...},
+//         {"label": "backup_3", "credits": 50, ...}
+//       ]
+//     },
+//     "scrapecreators": {
+//       "configured": true,
+//       "credits_remaining": 95,
+//       "last_updated": "...",
+//       "last_source": "audit:tiktok:khaby.lame",
+//       "note": "Updated passively after each ScrapeCreators API call"
+//     },
+//     "socialdata": {
+//       "configured": true,
+//       "rate_limit_per_min": 120,
+//       "rate_limit_remaining": 119,
+//       "last_updated": "...",
+//       "note": "Dollar balance not exposed by API; per-minute rate limit shown"
+//     },
+//     "total_audit_capacity_estimate": "about 120 audits"
+//   }
+//
+// Query params:
+//   ?refresh=1 — forces a fresh probe of Sociavault (ScrapeCreators/SocialData are
+//                passive-only). Costs 0 credits (Sociavault's /v1/credits is free).
+app.get('/audit-credits', async (c) => {
+  const env = c.env as Env;
+  const secret = c.req.query('secret');
+  if (!env.WORKER_SECRET || secret !== env.WORKER_SECRET) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const refresh = c.req.query('refresh') === '1';
+
+  // ── Sociavault (probe live for fresh values) ────────────────────────────────
+  const sociavaultKeys: Array<{ label: 'primary' | 'backup_2' | 'backup_3'; key?: string }> = [
+    { label: 'primary',  key: env.SOCIAVAULT_API_KEY },
+    { label: 'backup_2', key: env.SOCIAVAULT_API_KEY_2 },
+    { label: 'backup_3', key: env.SOCIAVAULT_API_KEY_3 },
+  ];
+  const sociavaultKeys_out = await Promise.all(
+    sociavaultKeys.map(async (k) => {
+      if (!k.key) {
+        return { label: k.label, configured: false };
+      }
+      // If refresh=1, force a live probe. Otherwise use the cached snapshot.
+      if (refresh) {
+        const live = await probeSociavaultCredits(k.key);
+        if (live) {
+          await recordCreditSnapshot(env, 'sociavault', k.label, {
+            credits: live.credits,
+            subscription: live.subscription,
+            last_source: 'audit-credits:refresh',
+          });
+          return { label: k.label, configured: true, credits: live.credits, subscription: live.subscription, last_updated: new Date().toISOString(), last_source: 'audit-credits:refresh' };
+        }
+      }
+      const snap = await readCreditSnapshot(env, 'sociavault', k.label);
+      return {
+        label: k.label,
+        configured: true,
+        credits: snap?.credits ?? null,
+        subscription: snap?.subscription ?? null,
+        last_updated: snap?.last_updated ?? null,
+        last_source: snap?.last_source ?? null,
+      };
+    }),
+  );
+  const sociavaultTotal = sociavaultKeys_out
+    .map((k: any) => (typeof k.credits === 'number' ? k.credits : 0))
+    .reduce((s: number, n: number) => s + n, 0);
+
+  // ── ScrapeCreators (passive — read last-seen value) ─────────────────────────
+  let scrapecreators_out: any = { configured: !!env.SCRAPECREATORS_API_KEY };
+  if (env.SCRAPECREATORS_API_KEY) {
+    const snap = await readCreditSnapshot(env, 'scrapecreators', 'primary');
+    scrapecreators_out = {
+      configured: true,
+      credits_remaining: snap?.credits ?? null,
+      last_updated: snap?.last_updated ?? null,
+      last_source: snap?.last_source ?? null,
+      note: 'Updated passively after each ScrapeCreators API call. Pass ?refresh=1 to make a probe call (costs 1 credit).',
+    };
+    // Optional probe — only if ?refresh=1 AND we have no recent snapshot
+    if (refresh && (!snap || !snap.last_updated || Date.now() - new Date(snap.last_updated).getTime() > 5 * 60 * 1000)) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 12000);
+        const r = await fetch('https://api.scrapecreators.com/v1/tiktok/profile?handle=khaby.lame', {
+          headers: { 'x-api-key': env.SCRAPECREATORS_API_KEY },
+          signal: ctrl.signal,
+        });
+        clearTimeout(t);
+        if (r.ok) {
+          const j = await r.json() as any;
+          if (typeof j?.credits_remaining === 'number') {
+            await recordCreditSnapshot(env, 'scrapecreators', 'primary', {
+              credits: j.credits_remaining,
+              last_source: 'audit-credits:refresh',
+            });
+            scrapecreators_out.credits_remaining = j.credits_remaining;
+            scrapecreators_out.last_updated = new Date().toISOString();
+            scrapecreators_out.last_source = 'audit-credits:refresh';
+          }
+        }
+      } catch {}
+    }
+  }
+
+  // ── SocialData (passive — per-minute rate, NOT dollar balance) ──────────────
+  let socialdata_out: any = { configured: !!env.SOCIALDATA_API_KEY };
+  if (env.SOCIALDATA_API_KEY) {
+    const snap = await readCreditSnapshot(env, 'socialdata', 'primary');
+    socialdata_out = {
+      configured: true,
+      rate_limit_per_min: snap?.rate_limit_limit ?? null,
+      rate_limit_remaining: snap?.rate_limit_remaining ?? null,
+      last_updated: snap?.last_updated ?? null,
+      last_source: snap?.last_source ?? null,
+      note: 'Dollar balance is not exposed by the SocialData API. Per-minute rate limit (x-ratelimit-* headers) is shown instead, updated passively after each X audit.',
+    };
+  }
+
+  // ── Capacity estimate ───────────────────────────────────────────────────────
+  // Each full audit costs ~2 credits (1 profile + 1 videos/posts fetch).
+  // Sociavault credits + ScrapeCreators credits ÷ 2 = approx audit count.
+  const scrapecreatorsCredits = typeof scrapecreators_out.credits_remaining === 'number' ? scrapecreators_out.credits_remaining : 0;
+  const totalAudits = Math.floor((sociavaultTotal + scrapecreatorsCredits) / 2);
+  const capacity_estimate = `about ${totalAudits} full audits remaining (Sociavault ${sociavaultTotal} + ScrapeCreators ${scrapecreatorsCredits} credits, ~2 per audit)`;
+
+  return json({
+    generatedAt: new Date().toISOString(),
+    sociavault: {
+      configured: !!env.SOCIAVAULT_API_KEY,
+      total_credits: sociavaultTotal,
+      keys: sociavaultKeys_out,
+    },
+    scrapecreators: scrapecreators_out,
+    socialdata: socialdata_out,
+    total_audit_capacity_estimate: capacity_estimate,
+  });
 });
 
 // POST /api/settings/onboarding — persist onboarding selections to settings.prefs.
