@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
 import {
-  Plus, Loader2, AlertTriangle, RefreshCw, Sparkles,
+  Plus, Loader2, AlertTriangle, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getChannelAudits, deleteChannelAudit } from '@/services/api';
@@ -77,15 +77,6 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={fetchAudits}
-            disabled={loading}
-            className="text-clip-muted hover:text-clip-text text-xs flex items-center gap-1 transition-colors disabled:opacity-40"
-            title="Refresh audits"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </button>
           <button
             onClick={() => onNavigate('audit')}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-clip-cyan/10 text-clip-cyan border border-clip-cyan/30 hover:bg-clip-cyan/20 transition-colors"

@@ -310,7 +310,12 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
           {/* Window controls */}
           <div className="flex items-center gap-1">
             {isFull ? (
-              // Shrink to semi-page
+              // In FULL-PAGE mode, show two controls:
+              //   1. (optional) Minimize to semi-page — only if not forced
+              //   2. EXIT button — always shown in full mode. When forced
+              //      (user is on /clipbot route), exit navigates back to the
+              //      dashboard via onNavigate. When not forced, exit just
+              //      collapses the bubble.
               !hideBubble && forcedMode !== 'full' && (
                 <button
                   onClick={() => setMode('semi')}
@@ -336,8 +341,28 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
                 <Maximize2 className="w-4 h-4" />
               </button>
             )}
-            {/* Close → back to bubble (only if not forced full) */}
-            {forcedMode !== 'full' && (
+            {/* EXIT button — always visible in full-page mode.
+                When forced full (user on /clipbot route), navigate to dashboard.
+                Otherwise, collapse to bubble. */}
+            {isFull && (
+              <button
+                onClick={() => {
+                  if (forcedMode === 'full') {
+                    // User is on the /clipbot route — navigate away
+                    onNavigate?.('dashboard');
+                  } else {
+                    setMode('bubble');
+                  }
+                }}
+                title={forcedMode === 'full' ? 'Exit to dashboard' : 'Close'}
+                aria-label={forcedMode === 'full' ? 'Exit to dashboard' : 'Close chat'}
+                className="w-9 h-9 rounded-lg hover:bg-white/[0.02] flex items-center justify-center text-clip-muted hover:text-clip-text transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+            {/* Close → back to bubble (only when not in full-page mode) */}
+            {!isFull && forcedMode !== 'full' && (
               <button
                 onClick={() => setMode('bubble')}
                 title="Close"

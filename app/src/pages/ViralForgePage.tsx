@@ -16,6 +16,7 @@ import { CommentsPanel } from '../components/CommentsPanel';
 import { ShadowPanel } from '../components/ShadowPanel';
 import { consumePendingAnalysisId } from '@/lib/navState';
 import type { UnifiedAnalysis } from '../types';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface ViralForgePageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -293,10 +294,14 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text mb-2">
-            Viral <span className="gradient-text">Forge</span>
-          </h1>
-          <p className="text-clip-muted">AI-powered titles, captions, hooks & hashtags — built to go viral</p>
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
+              Viral <span className="gradient-text">Forge</span>
+            </h1>
+            <InfoIconPopup label="What is Viral Forge?" size="md" className="ml-1">
+              AI-powered titles, captions, hooks &amp; hashtags — built to go viral
+            </InfoIconPopup>
+          </div>
         </div>
 
         {/* Tool tabs */}
@@ -309,8 +314,12 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                   : 'border-white/[0.025] bg-clip-surface hover:border-white/[0.025]'
               }`}>
               <t.icon className={`w-5 h-5 mb-2 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-muted'}`} />
-              <p className={`text-sm font-medium ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
-              <p className="text-xs text-clip-muted mt-0.5 hidden sm:block leading-tight">{t.desc}</p>
+              <div className="flex items-center gap-1">
+                <p className={`text-sm font-medium ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
+                <InfoIconPopup label={`What is ${t.label}?`} size="sm">
+                  {t.desc}
+                </InfoIconPopup>
+              </div>
             </button>
           ))}
         </div>
@@ -326,6 +335,9 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                     <label className="text-sm font-medium text-clip-text block mb-2 flex items-center gap-2">
                       <Youtube className="w-4 h-4 text-clip-cyan" />
                       YouTube URL
+                      <InfoIconPopup label="How it works" size="sm" className="ml-1">
+                        Paste any YouTube video URL with English captions. We analyze the transcript and return 14 viral strategy outputs in one shot — costs 5 credits.
+                      </InfoIconPopup>
                     </label>
                     <input
                       type="url"
@@ -335,9 +347,6 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                       placeholder="https://youtube.com/watch?v=…  or  https://youtu.be/…"
                       className="input-dark w-full text-sm"
                     />
-                    <p className="text-xs text-clip-muted mt-2">
-                      Paste any YouTube video URL with English captions. We analyze the transcript and return 14 viral strategy outputs in one shot — costs 5 credits.
-                    </p>
                   </div>
 
                   <div>
@@ -744,9 +753,11 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
           <div className="mt-8 card-glass p-5 border-clip-cyan/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Sparkles className="w-5 h-5 text-clip-cyan flex-shrink-0" />
-              <div>
+              <div className="flex items-center gap-2">
                 <p className="text-clip-text font-medium text-sm">Unlimited generations + priority AI</p>
-                <p className="text-clip-muted text-xs">Free plan: 5 generations/day. Pro: unlimited ViralForge + ClipBot access.</p>
+                <InfoIconPopup label="Why upgrade?" size="sm" className="ml-1">
+                  Free plan: 5 generations/day. Pro: unlimited ViralForge + ClipBot access.
+                </InfoIconPopup>
               </div>
             </div>
             <button onClick={() => onNavigate('pricing')} className="btn-primary text-sm px-5 py-2 whitespace-nowrap">

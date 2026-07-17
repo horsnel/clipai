@@ -11,6 +11,7 @@ import {
   updateNotifications as apiUpdateNotifications,
   getReferralStats,
 } from '@/services/api';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface SettingsPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; referralCode?: string; credits?: number } | null;
@@ -100,12 +101,14 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="font-display font-bold text-2xl sm:text-3xl text-clip-text">
-            Settings
-          </h1>
-          <p className="text-clip-muted text-sm">
-            Manage your account and preferences
-          </p>
+          <div className="flex items-center gap-1.5">
+            <h1 className="font-display font-bold text-2xl sm:text-3xl text-clip-text">
+              Settings
+            </h1>
+            <InfoIconPopup label="Settings overview" size="md">
+              Manage your account and preferences
+            </InfoIconPopup>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -277,12 +280,14 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
 
                 {user?.plan !== 'creator' && (
                   <div className="card-glass p-6 border-clip-cyan/30">
-                    <h3 className="font-display font-semibold text-lg text-clip-text mb-2">
-                      Upgrade Your Plan
-                    </h3>
-                    <p className="text-clip-muted text-sm mb-4">
-                      Get more clips and advanced features
-                    </p>
+                    <div className="flex items-center gap-1.5 mb-4">
+                      <h3 className="font-display font-semibold text-lg text-clip-text">
+                        Upgrade Your Plan
+                      </h3>
+                      <InfoIconPopup label="Why upgrade?" size="sm">
+                        Get more clips and advanced features
+                      </InfoIconPopup>
+                    </div>
                     <Button onClick={() => onNavigate('pricing')} className="btn-primary">
                       <Sparkles className="w-4 h-4 mr-2" />
                       View Plans
@@ -296,12 +301,14 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
             {activeTab === 'referrals' && (
               <div className="space-y-6">
                 <div className="card-glass p-6">
-                  <h3 className="font-display font-semibold text-lg text-clip-text mb-2">
-                    Your Referral Code
-                  </h3>
-                  <p className="text-clip-muted text-sm mb-4">
-                    Share this code with friends and earn 5 free clips for each signup!
-                  </p>
+                  <div className="flex items-center gap-1.5 mb-4">
+                    <h3 className="font-display font-semibold text-lg text-clip-text">
+                      Your Referral Code
+                    </h3>
+                    <InfoIconPopup label="How referrals work" size="sm">
+                      Share this code with friends and earn 5 free clips for each signup!
+                    </InfoIconPopup>
+                  </div>
                   <div className="flex gap-3">
                     <div className="flex-1 bg-clip-surface border border-white/[0.02] rounded-xl px-4 py-3 font-mono text-clip-text">
                       {referralCode}
@@ -349,8 +356,12 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                   ].map((item) => (
                     <label key={item.key} className="flex items-center justify-between p-3 bg-clip-surface rounded-xl cursor-pointer gap-3">
                       <div className="min-w-0">
-                        <p className="text-clip-text font-medium">{item.label}</p>
-                        <p className="text-clip-muted text-xs">{item.desc}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-clip-text font-medium">{item.label}</p>
+                          <InfoIconPopup label={`What is ${item.label}?`} size="sm">
+                            {item.desc}
+                          </InfoIconPopup>
+                        </div>
                       </div>
                       <button
                         onClick={() => setNotifications(prev => ({ ...prev, [item.key]: !prev[item.key as keyof typeof notifications] }))}

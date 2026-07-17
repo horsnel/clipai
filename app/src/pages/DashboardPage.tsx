@@ -9,6 +9,7 @@ import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
 import { TrendingVideosSection } from '@/components/TrendingVideosSection';
 import { TrendingViewsChart } from '@/components/TrendingViewsChart';
 import { ChannelAuditsGrid } from '@/components/ChannelAuditsGrid';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 import { setPendingAnalysisId } from '@/lib/navState';
 import type { AnalysisSummary } from '../types';
 
@@ -190,10 +191,14 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.iconBg}`}>
                   <card.icon className={`w-5 h-5 ${card.iconColor}`} />
                 </div>
-                <p className="font-display font-semibold text-clip-text mb-1 group-hover:text-clip-cyan transition-colors pr-10">
-                  {card.label}
-                </p>
-                <p className="text-clip-muted text-sm leading-snug">{card.desc}</p>
+                <div className="flex items-center mb-1 pr-10">
+                  <span className="font-display font-semibold text-clip-text group-hover:text-clip-cyan transition-colors">
+                    {card.label}
+                  </span>
+                  <InfoIconPopup label={`What is ${card.label}?`} size="sm" className="ml-1">
+                    {card.desc}
+                  </InfoIconPopup>
+                </div>
 
                 {!card.locked && (
                   <div className="flex items-center gap-1 mt-3 text-clip-cyan text-xs opacity-0 group-hover:opacity-100 transition-opacity">

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getMyRank } from '@/services/api';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface CreatorRankPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -202,10 +203,14 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
-              Creator <span className="gradient-text">Rank</span>
-            </h1>
-            <p className="text-clip-muted mt-1">Level up. Earn XP. Become a GOD TIER creator.</p>
+            <div className="flex items-center gap-1.5">
+              <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
+                Creator <span className="gradient-text">Rank</span>
+              </h1>
+              <InfoIconPopup label="What is Creator Rank?" size="md">
+                Level up. Earn XP. Become a GOD TIER creator.
+              </InfoIconPopup>
+            </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <button
@@ -438,7 +443,12 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
           <div className="space-y-4">
             <div className="card-glass p-4 border-clip-cyan/20 bg-clip-cyan/3 flex items-center gap-3">
               <TrendingUp className="w-5 h-5 text-clip-cyan flex-shrink-0" />
-              <p className="text-clip-text text-sm">Every action on ClipAI earns you XP. The more you create, the higher you rank.</p>
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <h3 className="font-display font-semibold text-clip-text text-sm">Earn XP</h3>
+                <InfoIconPopup label="How XP works" size="sm">
+                  Every action on ClipAI earns you XP. The more you create, the higher you rank.
+                </InfoIconPopup>
+              </div>
             </div>
             {XP_ACTIONS.map((action, i) => (
               <div key={i} className="card-glass p-4 flex items-center gap-4 hover:border-white/[0.025] transition-all group">
@@ -451,8 +461,12 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
               </div>
             ))}
             <div className="card-glass p-5 border-clip-amber/20 bg-clip-amber/3 text-center">
-              <p className="text-clip-amber text-sm font-medium mb-1">🔥 Streak Bonus</p>
-              <p className="text-clip-muted text-xs">Log in 7 days in a row and get a 2× XP multiplier for 24 hours</p>
+              <div className="flex items-center justify-center gap-1.5">
+                <p className="text-clip-amber text-sm font-medium">🔥 Streak Bonus</p>
+                <InfoIconPopup label="Streak bonus" size="sm">
+                  Log in 7 days in a row and get a 2× XP multiplier for 24 hours
+                </InfoIconPopup>
+              </div>
             </div>
             {user?.plan === 'free' && (
               <div className="card-glass p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">

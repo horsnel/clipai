@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { saveOnboarding } from '@/services/api';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface OnboardingPageProps {
   user: { name: string; email: string } | null;
@@ -195,17 +196,17 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
           {/* Step 0: Game */}
           {step === 0 && (
             <div>
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-xl bg-clip-cyan/15 flex items-center justify-center">
                   <Gamepad2 className="w-5 h-5 text-clip-cyan" />
                 </div>
                 <h2 className="font-display font-bold text-xl text-clip-text">
                   What do you play?
                 </h2>
+                <InfoIconPopup label="Why we ask" size="sm" className="ml-1">
+                  Pick your primary game — we'll tailor trends, hashtags & titles to it.
+                </InfoIconPopup>
               </div>
-              <p className="text-clip-muted text-sm mb-5 ml-13">
-                Pick your primary game — we'll tailor trends, hashtags & titles to it.
-              </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {POPULAR_GAMES.map(g => (
                   <button
@@ -244,17 +245,17 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
           {/* Step 1: Platforms */}
           {step === 1 && (
             <div>
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-xl bg-clip-cyan/15 flex items-center justify-center">
                   <Youtube className="w-5 h-5 text-clip-cyan" />
                 </div>
                 <h2 className="font-display font-bold text-xl text-clip-text">
                   Where do you post?
                 </h2>
+                <InfoIconPopup label="Why we ask" size="sm" className="ml-1">
+                  Pick all the platforms you create content for. We'll tune caption length & hashtags per platform.
+                </InfoIconPopup>
               </div>
-              <p className="text-clip-muted text-sm mb-5 ml-13">
-                Pick all the platforms you create content for. We'll tune caption length & hashtags per platform.
-              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {PLATFORMS.map(p => {
                   const selected = data.platforms.includes(p.id);
@@ -286,17 +287,17 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
           {/* Step 2: Goal */}
           {step === 2 && (
             <div>
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-xl bg-clip-cyan/15 flex items-center justify-center">
                   <Trophy className="w-5 h-5 text-clip-cyan" />
                 </div>
                 <h2 className="font-display font-bold text-xl text-clip-text">
                   What's your main goal?
                 </h2>
+                <InfoIconPopup label="Why we ask" size="sm" className="ml-1">
+                  We'll prioritise features & suggestions based on what you're trying to achieve.
+                </InfoIconPopup>
               </div>
-              <p className="text-clip-muted text-sm mb-5 ml-13">
-                We'll prioritise features & suggestions based on what you're trying to achieve.
-              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {GOALS.map(g => {
                   const selected = data.goal === g.id;
@@ -329,17 +330,17 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
           {/* Step 3: Experience */}
           {step === 3 && (
             <div>
-              <div className="flex items-center gap-3 mb-2">
+              <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-xl bg-clip-cyan/15 flex items-center justify-center">
                   <Sparkles className="w-5 h-5 text-clip-cyan" />
                 </div>
                 <h2 className="font-display font-bold text-xl text-clip-text">
                   How experienced are you?
                 </h2>
+                <InfoIconPopup label="Why we ask" size="sm" className="ml-1">
+                  This helps us calibrate the complexity of suggestions we give you.
+                </InfoIconPopup>
               </div>
-              <p className="text-clip-muted text-sm mb-5 ml-13">
-                This helps us calibrate the complexity of suggestions we give you.
-              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {EXPERIENCE.map(e => {
                   const selected = data.experience === e.id;

@@ -7,6 +7,7 @@ import {
 import { toast } from 'sonner';
 import { apiClient } from '@/services/api';
 import { ParticleLoader } from '../components/Loading';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface GrowthIntelPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -126,10 +127,14 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
       <div className="max-w-5xl mx-auto">
 
         <div className="mb-8">
-          <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text mb-2">
-            Growth <span className="gradient-text">Intel</span>
-          </h1>
-          <p className="text-clip-muted">Data-driven tools to grow faster than everyone else</p>
+          <div className="flex items-center gap-2 mb-2">
+            <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
+              Growth <span className="gradient-text">Intel</span>
+            </h1>
+            <InfoIconPopup label="What is Growth Intel?" size="md" className="ml-1">
+              Data-driven tools to grow faster than everyone else
+            </InfoIconPopup>
+          </div>
         </div>
 
         {/* Tool tabs */}
@@ -160,8 +165,10 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <div className="card-glass p-5 space-y-4">
               <h3 className="font-display font-semibold text-clip-text flex items-center gap-2">
                 <Eye className="w-4 h-4 text-clip-cyan" /> Competitor Spy
+                <InfoIconPopup label="How Competitor Spy works" size="sm" className="ml-1">
+                  Enter any gaming creator's YouTube channel. AI analyses their top videos and tells you exactly what's working.
+                </InfoIconPopup>
               </h3>
-              <p className="text-clip-muted text-sm">Enter any gaming creator's YouTube channel. AI analyses their top videos and tells you exactly what's working.</p>
               <div>
                 <label className="text-xs text-clip-muted uppercase tracking-wider block mb-2">YouTube Channel URL</label>
                 <input type="url" value={channelUrl} onChange={e => setChannelUrl(e.target.value)}
@@ -251,8 +258,10 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <div className="card-glass p-5 space-y-4">
               <h3 className="font-display font-semibold text-clip-text flex items-center gap-2">
                 <Clock className="w-4 h-4 text-clip-cyan" /> Best Time to Post
+                <InfoIconPopup label="How Best Time to Post works" size="sm" className="ml-1">
+                  Get the optimal posting schedule for your game and platform in Nigeria (WAT).
+                </InfoIconPopup>
               </h3>
-              <p className="text-clip-muted text-sm">Get the optimal posting schedule for your game and platform in Nigeria (WAT).</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-clip-muted uppercase tracking-wider block mb-2">Platform</label>
@@ -328,8 +337,10 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <div className="card-glass p-5 space-y-4">
               <h3 className="font-display font-semibold text-clip-text flex items-center gap-2">
                 <BarChart2 className="w-4 h-4 text-clip-cyan" /> A/B Title Predictor
+                <InfoIconPopup label="How A/B Title Predictor works" size="sm" className="ml-1">
+                  Enter 2 title options — AI predicts which will perform better based on live search data and CTR patterns.
+                </InfoIconPopup>
               </h3>
-              <p className="text-clip-muted text-sm">Enter 2 title options — AI predicts which will perform better based on live search data and CTR patterns.</p>
               <div className="space-y-3">
                 {[
                   { label: 'Title A', value: titleA, set: setTitleA, placeholder: 'e.g. I got a 1v4 clutch in Bloodstrike 😤' },

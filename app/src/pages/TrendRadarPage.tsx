@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { TrendCardModal } from '../components/TrendCardModal';
 import { ParticleLoader } from '../components/Loading';
 import { TopicStealWidget } from '../components/TopicStealWidget';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface TrendRadarPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -132,12 +133,14 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
               <span className="text-green-600 text-xs font-medium uppercase tracking-wider">Live</span>
             </div>
-            <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
-              Trend <span className="gradient-text">Radar</span>
-            </h1>
-            <p className="text-clip-muted mt-1">
-              What's blowing up across YouTube, Reddit, Google, TikTok & X — RIGHT NOW
-            </p>
+            <div className="flex items-center gap-2">
+              <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
+                Trend <span className="gradient-text">Radar</span>
+              </h1>
+              <InfoIconPopup label="What is Trend Radar?" size="md" className="ml-1">
+                What's blowing up across YouTube, Reddit, Google, TikTok &amp; X — RIGHT NOW
+              </InfoIconPopup>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {lastRefresh && (
@@ -233,6 +236,9 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <span className="text-sm font-medium text-clip-text">
                 {filtered.length} trends tracked
               </span>
+              <InfoIconPopup label="How to use" size="sm" className="ml-1">
+                Tap any trend to get keywords, titles, captions &amp; hashtags
+              </InfoIconPopup>
             </div>
             {isLoading && (
               <div className="flex items-center gap-2 text-clip-muted text-xs">
@@ -344,13 +350,6 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
             ))}
           </div>
 
-          {/* Hint below table */}
-          {filtered.length > 0 && (
-            <div className="px-4 py-3 border-t border-white/[0.02] flex items-center gap-2 text-clip-muted text-xs">
-              <Sparkles className="w-3.5 h-3.5 text-clip-cyan flex-shrink-0" />
-              <span>Tap any trend to get keywords, titles, captions & hashtags</span>
-            </div>
-          )}
         </div>
 
         {/* Upgrade CTA for free users */}
@@ -358,9 +357,11 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
           <div className="mt-6 card-glass p-5 border-clip-amber/20 bg-clip-amber/3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Zap className="w-5 h-5 text-clip-amber flex-shrink-0" />
-              <div>
+              <div className="flex items-center gap-2">
                 <p className="text-clip-text font-medium text-sm">Unlock hourly trend updates + sound tracker</p>
-                <p className="text-clip-muted text-xs">Free plan refreshes every 24h. Pro refreshes every hour.</p>
+                <InfoIconPopup label="Why upgrade?" size="sm" className="ml-1">
+                  Free plan refreshes every 24h. Pro refreshes every hour.
+                </InfoIconPopup>
               </div>
             </div>
             <button onClick={() => onNavigate('pricing')}

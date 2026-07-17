@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { joinWaitlist, listClips } from '@/services/api';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface WaitlistPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; credits?: number; clipsUsed?: number } | null;
@@ -220,14 +221,16 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
 
         {/* Headline */}
         <div className="text-center mb-10">
-          <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-clip-text mb-4">
-            The <span className="gradient-text">AI Video Editor</span><br />
-            is reloading.
-          </h1>
-          <p className="text-clip-muted text-lg max-w-2xl mx-auto">
-            We're rebuilding the ClipAI editor with auto-cut, beat-sync, vertical reframing, and one-tap TikTok export.
-            Join the waitlist — get early access, <span className="text-clip-cyan font-semibold">+25 bonus credits</span> when it ships, and lock in launch pricing.
-          </p>
+          <div className="flex items-center justify-center gap-1.5 mb-4">
+            <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-clip-text">
+              The <span className="gradient-text">AI Video Editor</span><br />
+              is reloading.
+            </h1>
+            <InfoIconPopup label="What is the ClipAI Editor?" size="md">
+              We're rebuilding the ClipAI editor with auto-cut, beat-sync, vertical reframing, and one-tap TikTok export.
+              Join the waitlist — get early access, <span className="text-clip-cyan font-semibold">+25 bonus credits</span> when it ships, and lock in launch pricing.
+            </InfoIconPopup>
+          </div>
         </div>
 
         {/* What's coming grid */}
@@ -241,8 +244,12 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
               <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center mb-3">
                 <f.icon className="w-5 h-5 text-clip-cyan" />
               </div>
-              <h3 className="font-display font-semibold text-clip-text mb-1">{f.title}</h3>
-              <p className="text-clip-muted text-sm leading-relaxed">{f.desc}</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <h3 className="font-display font-semibold text-clip-text">{f.title}</h3>
+                <InfoIconPopup label={`How ${f.title} works`} size="sm">
+                  {f.desc}
+                </InfoIconPopup>
+              </div>
             </div>
           ))}
         </div>
@@ -281,9 +288,11 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
               <div className="w-10 h-10 rounded-xl bg-clip-amber/10 flex items-center justify-center">
                 <Gift className="w-5 h-5 text-clip-amber" />
               </div>
-              <div>
+              <div className="flex items-center gap-1.5">
                 <h3 className="font-display font-semibold text-clip-text">Join the Waitlist</h3>
-                <p className="text-clip-muted text-sm">+25 credits when the editor launches.</p>
+                <InfoIconPopup label="Waitlist perks" size="sm">
+                  +25 credits when the editor launches.
+                </InfoIconPopup>
               </div>
             </div>
 
@@ -332,22 +341,28 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
                 <>Reserve My Spot <ChevronRight className="w-5 h-5" /></>
               )}
             </Button>
-            <p className="text-clip-muted text-xs text-center mt-3">
-              No spam. We email you once when the editor launches.
-            </p>
+            <div className="flex items-center justify-center gap-1.5 mt-3">
+              <span className="text-clip-muted text-xs">Reserve your spot</span>
+              <InfoIconPopup label="Email policy" size="sm">
+                No spam. We email you once when the editor launches.
+              </InfoIconPopup>
+            </div>
           </form>
         )}
 
         {/* Perks row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-10 max-w-3xl mx-auto">
           {[
-            { icon: Trophy, label: 'Climb the leaderboard while you wait' },
-            { icon: Sparkles, label: 'Free ViralForge + ClipBot access today' },
-            { icon: Lock, label: 'Lock in launch pricing before it goes up' },
+            { icon: Trophy,   label: 'Climb the leaderboard while you wait',      detail: 'Earn XP from any ClipAI activity — your rank updates in real time on the public Leaderboard.' },
+            { icon: Sparkles, label: 'Free ViralForge + ClipBot access today',    detail: 'Full access to all 14 ViralForge outputs and unlimited ClipBot chat on paid plans, starting today.' },
+            { icon: Lock,     label: 'Lock in launch pricing before it goes up', detail: 'Founding members keep their plan price forever — even after we raise public rates at editor launch.' },
           ].map((p) => (
             <div key={p.label} className="flex items-center gap-2 text-clip-muted text-xs text-center justify-center">
               <p.icon className="w-4 h-4 text-clip-cyan flex-shrink-0" />
               <span>{p.label}</span>
+              <InfoIconPopup label="Perk details" size="sm">
+                {p.detail}
+              </InfoIconPopup>
             </div>
           ))}
         </div>

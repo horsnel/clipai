@@ -317,7 +317,7 @@ function AppContentInner({
       {/* Floating ClipBot chat widget — persistent across all logged-in pages.
           State (messages, mode) is preserved during navigation. When the user
           navigates to /clipbot, it forces full-page mode and covers the viewport. */}
-      {isLoggedIn && (
+      {isLoggedIn && currentPage !== 'onboarding' && (
         <ClipBotBubble
           user={user}
           onNavigate={navigateTo}

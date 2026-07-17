@@ -356,8 +356,8 @@ export async function saveOnboarding(data: {
 // POST   /api/audit-channel   — runs audit for one URL, saves to user's prefs
 // GET    /api/channel-audits  — returns all saved audits with full data
 // DELETE /api/channel-audits  — remove one audit by URL
-export async function auditChannel(url: string): Promise<AuditChannelResponse> {
-  return apiClient.post<AuditChannelResponse>('/audit-channel', { url });
+export async function auditChannel(url: string, platform?: string): Promise<AuditChannelResponse> {
+  return apiClient.post<AuditChannelResponse>('/audit-channel', platform ? { url, platform } : { url });
 }
 
 export async function getChannelAudits(): Promise<ChannelAuditsResponse> {

@@ -70,6 +70,8 @@ interface Env {
   SCRAPECREATORS_API_KEY?: string;  // api.scrapecreators.com — TikTok + Instagram backup (free: 100 credits)
   SOCIALDATA_API_KEY?: string;      // api.socialdata.tools — X/Twitter primary (key format: "9846|xxx")
   SOCIALDATA_API_KEY_2?: string;    // backup SocialData key (the KHT2LXKT2mSi key currently 401s — kept for reference)
+  SOCIALDATA_API_KEY_3?: string;    // 3rd SocialData key (9860|Z0t4fuql...) — rotated when primary 401s or rate-limits
+  SOCIALDATA_API_KEY_4?: string;    // 4th SocialData key (9859|xZm6kpcB...) — last-resort rotation before Sociavault fallback
   REDDIT_CLIENT_ID?: string;        // Reddit OAuth app creds — bypass 403 rate limit on www.reddit.com (register at reddit.com/prefs/apps → "script" type)
   REDDIT_CLIENT_SECRET?: string;    // paired with REDDIT_CLIENT_ID. App-only OAuth → oauth.reddit.com (60 req/min)
   LAMATOK_API_KEY?: string;         // (deprecated) LamaTok RapidAPI — kept for backward compat
@@ -874,7 +876,7 @@ app.get('/health', async (c) => {
       : 'Audits fall back to ScrapeCreators/SocialData/Serper',
   };
   checks.scrapecreators = { status: env.SCRAPECREATORS_API_KEY ? 'ok' : 'unbound', detail: env.SCRAPECREATORS_API_KEY ? 'TikTok + IG backup enabled' : 'TikTok/IG fall back to Serper (lite)' };
-  const socialdataKeysCount = [env.SOCIALDATA_API_KEY, env.SOCIALDATA_API_KEY_2].filter(Boolean).length;
+  const socialdataKeysCount = [env.SOCIALDATA_API_KEY, env.SOCIALDATA_API_KEY_2, env.SOCIALDATA_API_KEY_3, env.SOCIALDATA_API_KEY_4].filter(Boolean).length;
   checks.socialdata = {
     status: env.SOCIALDATA_API_KEY ? 'ok' : 'unbound',
     detail: env.SOCIALDATA_API_KEY
@@ -1897,6 +1899,11 @@ async function serpInstagram(env: Env, game: string, limit = 4): Promise<any[]> 
 // back to Serper to surface recent posts only (no follower counts).
 type AuditPlatform = 'youtube' | 'tiktok' | 'twitter' | 'instagram' | 'reddit';
 
+/** Detect the audit platform from a URL or bare username.
+ *  Accepts full URLs (youtube.com/@MrBeast) or bare usernames with optional
+ *  platform prefix: "@MrBeast", "tt:khaby.lame", "ig:keke", "x:elonmusk",
+ *  "reddit:spez", "youtube.com/@MrBeast", etc. Returns the platform + the
+ *  normalised URL (constructed from username if input was bare). */
 function detectPlatform(url: string): AuditPlatform | null {
   const u = (url || '').toLowerCase();
   if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
@@ -1904,6 +1911,63 @@ function detectPlatform(url: string): AuditPlatform | null {
   if (u.includes('instagram.com')) return 'instagram';
   if (u.includes('x.com') || u.includes('twitter.com')) return 'twitter';
   if (u.includes('reddit.com') || u.includes('redd.it')) return 'reddit';
+  return null;
+}
+
+/** Normalises a user input into a full URL the audit functions can parse.
+ *  Supports:
+ *    - Full URLs:        "https://youtube.com/@MrBeast"      → returned as-is
+ *    - Bare usernames:   "@MrBeast"                          → requires `platformHint`
+ *    - Platform prefix:  "yt:MrBeast" / "tt:khaby.lame" / "ig:keke" /
+ *                        "x:elonmusk" / "r:spez" / "rdt:spez"  → prefix extracted
+ *    - With @:           "@MrBeast" + platformHint='youtube' → youtube.com/@MrBeast
+ *  Returns the normalised URL or null if we can't safely resolve it. */
+function normaliseAuditInput(raw: string, platformHint?: string): { url: string; platform: AuditPlatform } | null {
+  const s = (raw || '').trim();
+  if (!s) return null;
+
+  // Already a URL? Just detect platform.
+  if (/^https?:\/\//i.test(s) || /^(youtube|tiktok|instagram|x|twitter|reddit)\.com\//i.test(s)) {
+    const platform = detectPlatform(s);
+    return platform ? { url: s, platform } : null;
+  }
+
+  // Strip leading @ for bare username handling
+  let username = s.replace(/^@+/, '');
+  let platform: AuditPlatform | null = null;
+
+  // Check for platform prefix: "yt:name", "tt:name", "ig:name", "x:name", "r:name", "rdt:name"
+  const prefixMatch = username.match(/^(yt|tt|ig|tw|x|rdt|r|reddit):(.+)$/i);
+  if (prefixMatch) {
+    const prefix = prefixMatch[1].toLowerCase();
+    username = prefixMatch[2].trim().replace(/^@+/, '');
+    if (prefix === 'yt') platform = 'youtube';
+    else if (prefix === 'tt') platform = 'tiktok';
+    else if (prefix === 'ig') platform = 'instagram';
+    else if (prefix === 'tw' || prefix === 'x') platform = 'twitter';
+    else if (prefix === 'r' || prefix === 'rdt' || prefix === 'reddit') platform = 'reddit';
+  }
+
+  // If no prefix matched, use the platformHint from the request body
+  if (!platform && platformHint) {
+    const hint = platformHint.toLowerCase();
+    if (hint === 'youtube' || hint === 'yt') platform = 'youtube';
+    else if (hint === 'tiktok' || hint === 'tt') platform = 'tiktok';
+    else if (hint === 'instagram' || hint === 'ig') platform = 'instagram';
+    else if (hint === 'twitter' || hint === 'x' || hint === 'tw') platform = 'twitter';
+    else if (hint === 'reddit' || hint === 'r' || hint === 'rdt') platform = 'reddit';
+  }
+
+  if (!platform || !username) return null;
+
+  // Construct the canonical URL for the platform
+  switch (platform) {
+    case 'youtube':   return { url: `https://youtube.com/@${username}`, platform };
+    case 'tiktok':    return { url: `https://www.tiktok.com/@${username}`, platform };
+    case 'instagram': return { url: `https://www.instagram.com/${username}`, platform };
+    case 'twitter':   return { url: `https://x.com/${username}`, platform };
+    case 'reddit':    return { url: `https://www.reddit.com/user/${username}`, platform };
+  }
   return null;
 }
 
@@ -1921,6 +1985,79 @@ function parseYouTubeChannelInput(raw: string): {
   if (/^@[A-Za-z0-9_.\-]+$/.test(s)) return { handle: s };
   if (/^UC[A-Za-z0-9_-]{22}$/.test(s)) return { channelId: s };
   return {};
+}
+
+/** Pick the best TikTok thumbnail URL from an aweme's `video` object.
+ *  TikTok's CDN serves multiple cover variants with different formats:
+ *    - `cover`              : HEIC format — Safari-only, broken in Chrome/Firefox
+ *    - `origin_cover`       : HEIC format — same problem
+ *    - `dynamic_cover`      : WebP format — universally renderable (animated)
+ *    - `animated_cover`     : WebP format — universally renderable (animated)
+ *    - `ai_dynamic_cover`   : WebP format — universally renderable (AI animated)
+ *  Sociavault returns `url_list` as a JSON OBJECT {"0":"url1","1":"url2"} instead
+ *  of an array, so we use Object.values() to safely handle both shapes. */
+function pickTikTokThumb(video: any): string {
+  if (!video || typeof video !== 'object') return '';
+  // Priority: WebP variants first (universal), then HEIC as last resort
+  const fields = ['dynamic_cover', 'animated_cover', 'ai_dynamic_cover', 'cover', 'origin_cover'];
+  for (const field of fields) {
+    const node = video[field];
+    if (!node || typeof node !== 'object') continue;
+    const ul = node.url_list;
+    if (Array.isArray(ul) && ul.length > 0 && typeof ul[0] === 'string') return ul[0];
+    if (ul && typeof ul === 'object') {
+      const vals = Object.values(ul as Record<string, string>);
+      if (vals.length > 0 && typeof vals[0] === 'string') return vals[0];
+    }
+    if (typeof node.url === 'string' && node.url) return node.url;
+  }
+  // Also check top-level `cover` field on the aweme itself
+  const topCover = video.cover;
+  if (topCover && typeof topCover === 'object') {
+    const ul = topCover.url_list;
+    if (Array.isArray(ul) && ul.length > 0 && typeof ul[0] === 'string') return ul[0];
+    if (ul && typeof ul === 'object') {
+      const vals = Object.values(ul as Record<string, string>);
+      if (vals.length > 0 && typeof vals[0] === 'string') return vals[0];
+    }
+  }
+  return '';
+}
+
+/** Pick the best Instagram thumbnail URL from a media node.
+ *  Sociavault returns IG posts with `display_uri` (top-level URL string) plus
+ *  `image_versions2.candidates` as a JSON OBJECT {"0":{url,width,height},...}.
+ *  We try `display_uri` first (simplest), then fall back to the candidates. */
+function pickInstagramThumb(node: any): string {
+  if (!node || typeof node !== 'object') return '';
+  // Direct URL strings (Sociavault-specific top-level fields)
+  if (typeof node.display_uri === 'string' && node.display_uri) return node.display_uri;
+  if (typeof node.thumbnail_url === 'string' && node.thumbnail_url) return node.thumbnail_url;
+  if (typeof node.display_url === 'string' && node.display_url) return node.display_url;
+  if (typeof node.thumbnail_src === 'string' && node.thumbnail_src) return node.thumbnail_src;
+  // image_versions2.candidates (Instagram Graph API shape)
+  const iv2 = node.image_versions2;
+  if (iv2 && typeof iv2 === 'object') {
+    const cands = iv2.candidates;
+    if (Array.isArray(cands) && cands.length > 0 && cands[0]?.url) return cands[0].url;
+    if (cands && typeof cands === 'object') {
+      const vals = Object.values(cands as Record<string, any>);
+      if (vals.length > 0 && vals[0]?.url) return vals[0].url;
+    }
+  }
+  // carousel_media (for multi-image posts — use first item's thumbnail)
+  if (Array.isArray(node.carousel_media) && node.carousel_media.length > 0) {
+    const first = node.carousel_media[0];
+    if (first?.image_versions2?.candidates) {
+      const cands = first.image_versions2.candidates;
+      if (Array.isArray(cands) && cands.length > 0 && cands[0]?.url) return cands[0].url;
+      if (cands && typeof cands === 'object') {
+        const vals = Object.values(cands as Record<string, any>);
+        if (vals.length > 0 && vals[0]?.url) return vals[0].url;
+      }
+    }
+  }
+  return '';
 }
 
 async function auditYouTubeChannel(env: Env, raw: string): Promise<any> {
@@ -2109,7 +2246,10 @@ async function auditTikTokProfile(env: Env, url: string): Promise<any> {
               recentVideos = list.slice(0, 10).map((v: any, i: number) => ({
                 id: String(v.id || v.aweme_id || `tt_audit_${i}`),
                 title: v.desc || `TikTok post ${i + 1}`,
-                thumbnail: v.video?.cover?.url_list?.[0] || v.video?.origin_cover?.url_list?.[0] || v.cover?.url_list?.[0] || '',
+                // TikTok's CDN serves HEIC for `cover`/`origin_cover` (Safari-only) and
+                // WebP for `dynamic_cover`/`animated_cover`/`ai_dynamic_cover` (universal).
+                // Prefer the WebP variants so thumbnails render in Chrome + Firefox.
+                thumbnail: pickTikTokThumb(v.video || v),
                 url: v.share_url || (v.id ? `https://www.tiktok.com/@${u.uniqueId || username}/video/${v.id}` : ''),
                 publishedAt: v.create_time ? new Date(v.create_time * 1000).toISOString() : '',
                 viewCount: Number(v.stats?.play_count || v.statistics?.play_count || 0),
@@ -2192,7 +2332,7 @@ async function auditTikTokProfile(env: Env, url: string): Promise<any> {
                 recentVideos = list.slice(0, 10).map((v: any, i: number) => ({
                   id: String(v.id || v.aweme_id || `tt_audit_${i}`),
                   title: v.desc || `TikTok post ${i + 1}`,
-                  thumbnail: v.video?.cover?.url_list?.[0] || v.video?.origin_cover?.url_list?.[0] || v.cover?.url_list?.[0] || '',
+                  thumbnail: pickTikTokThumb(v.video || v),
                   url: v.share_url || (v.id ? `https://www.tiktok.com/@${u.uniqueId || username}/video/${v.id}` : ''),
                   publishedAt: v.create_time ? new Date(v.create_time * 1000).toISOString() : '',
                   viewCount: Number(v.stats?.play_count || v.statistics?.play_count || 0),
@@ -2311,7 +2451,7 @@ async function auditInstagramProfile(env: Env, url: string): Promise<any> {
                 return {
                   id: String(n.id || `ig_audit_${i}`),
                   title: typeof caption === 'string' ? caption.slice(0, 120) : `Post ${i + 1}`,
-                  thumbnail: n.thumbnail_url || n.display_url || n.thumbnail_src || n.image_versions2?.candidates?.[0]?.url || '',
+                  thumbnail: pickInstagramThumb(n),
                   url: shortcode ? `https://www.instagram.com/p/${shortcode}/` : (n.permalink || ''),
                   publishedAt: n.taken_at_timestamp ? new Date(n.taken_at_timestamp * 1000).toISOString() : (n.taken_at ? new Date(n.taken_at * 1000).toISOString() : (n.device_timestamp ? new Date(Math.floor(Number(n.device_timestamp) / (Number(n.device_timestamp) > 1e14 ? 1000 : 1))).toISOString() : (n.caption?.created_at ? new Date(n.caption.created_at * 1000).toISOString() : ''))),
                   viewCount: Number(n.video_view_count || n.video_views || n.play_count || 0),
@@ -2397,7 +2537,7 @@ async function auditInstagramProfile(env: Env, url: string): Promise<any> {
                   return {
                     id: String(n.id || `ig_audit_${i}`),
                     title: typeof caption === 'string' ? caption.slice(0, 120) : `Post ${i + 1}`,
-                    thumbnail: n.thumbnail_url || n.display_url || n.thumbnail_src || '',
+                    thumbnail: pickInstagramThumb(n),
                     url: shortcode ? `https://www.instagram.com/p/${shortcode}/` : (n.permalink || ''),
                     publishedAt: n.taken_at_timestamp ? new Date(n.taken_at_timestamp * 1000).toISOString() : '',
                     viewCount: Number(n.video_view_count || n.video_views || 0),
@@ -2477,24 +2617,38 @@ async function auditXProfile(env: Env, url: string): Promise<any> {
   const handle = username ? '@' + username : '';
   if (!username) return { error: 'Could not parse X username from URL. Use format: x.com/username', platform: 'twitter' };
 
-  // ── SocialData (primary) — X profile + recent tweets via search ──────────────
-  if (env.SOCIALDATA_API_KEY) {
+  // ── SocialData (primary chain — try all configured keys in rotation) ──────────
+  // SocialData keys are short-lived (~$1 free credit each, 120 req/min rate).
+  // We try primary → backup_2 → backup_3 → backup_4 until one succeeds.
+  // The first key that returns a valid profile wins; subsequent keys are skipped.
+  const socialdataKeys: Array<{ label: string; key?: string }> = [
+    { label: 'primary',  key: env.SOCIALDATA_API_KEY },
+    { label: 'backup_2', key: env.SOCIALDATA_API_KEY_2 },
+    { label: 'backup_3', key: env.SOCIALDATA_API_KEY_3 },
+    { label: 'backup_4', key: env.SOCIALDATA_API_KEY_4 },
+  ].filter(k => !!k.key) as Array<{ label: string; key?: string }>;
+
+  for (const { label, key } of socialdataKeys) {
+    if (!key) continue;
     try {
       const profileRes = await fetch(`https://api.socialdata.tools/twitter/user/${encodeURIComponent(username)}`, {
-        headers: { 'Authorization': `Bearer ${env.SOCIALDATA_API_KEY}` },
+        headers: { 'Authorization': `Bearer ${key}` },
       });
-      // Record SocialData rate-limit snapshot (per-minute rate, NOT dollar balance — socialdata.tools doesn't expose $ balance via API)
+      // Record SocialData rate-limit snapshot for THIS key (per-minute rate).
       try {
         const rlRemaining = Number(profileRes.headers.get('x-ratelimit-remaining') || '');
         const rlLimit = Number(profileRes.headers.get('x-ratelimit-limit') || '');
         if (!Number.isNaN(rlRemaining) || !Number.isNaN(rlLimit)) {
-          await recordCreditSnapshot(env, 'socialdata', 'primary', {
+          await recordCreditSnapshot(env, 'socialdata', label as any, {
             rate_limit_remaining: Number.isNaN(rlRemaining) ? undefined : rlRemaining,
             rate_limit_limit: Number.isNaN(rlLimit) ? undefined : rlLimit,
             last_source: `audit:twitter:${username}`,
           });
         }
       } catch {}
+      // If this key 401s or 429s, fall through to the next key in the rotation
+      if (profileRes.status === 401 || profileRes.status === 403) continue;
+      if (profileRes.status === 429) continue;
       if (profileRes.ok) {
         const profile = await profileRes.json() as any;
         if (profile && (profile.screen_name || profile.id)) {
@@ -2513,7 +2667,7 @@ async function auditXProfile(env: Env, url: string): Promise<any> {
           let recentVideos: any[] = [];
           try {
             const tweetsRes = await fetch(`https://api.socialdata.tools/twitter/search?query=${encodeURIComponent('from:' + username)}&count=10`, {
-              headers: { 'Authorization': `Bearer ${env.SOCIALDATA_API_KEY}` },
+              headers: { 'Authorization': `Bearer ${key}` },
             });
             if (tweetsRes.ok) {
               const tweetsJson = await tweetsRes.json() as any;
@@ -3114,15 +3268,18 @@ async function pullpushRedditAudit(username: string): Promise<any | null> {
   };
 }
 
-async function auditChannel(env: Env, url: string): Promise<any> {
-  const platform = detectPlatform(url);
-  if (!platform) return { error: 'Unsupported URL. Please paste a YouTube, TikTok, X, Instagram, or Reddit link.' };
+async function auditChannel(env: Env, url: string, platformHint?: string): Promise<any> {
+  // Normalise the input — accept full URLs OR bare usernames (with optional
+  // platform prefix or platformHint). Returns the canonical URL + platform.
+  const normalised = normaliseAuditInput(url, platformHint);
+  if (!normalised) return { error: 'Unsupported input. Paste a full URL (youtube.com/@MrBeast) or a username with a platform prefix (yt:MrBeast, tt:khaby.lame, ig:keke, x:elonmusk, r:spez).' };
+  const { url: canonicalUrl, platform } = normalised;
   switch (platform) {
-    case 'youtube':   return auditYouTubeChannel(env, url);
-    case 'tiktok':    return auditTikTokProfile(env, url);
-    case 'instagram': return auditInstagramProfile(env, url);
-    case 'twitter':   return auditXProfile(env, url);
-    case 'reddit':    return auditRedditProfile(env, url);
+    case 'youtube':   return auditYouTubeChannel(env, canonicalUrl);
+    case 'tiktok':    return auditTikTokProfile(env, canonicalUrl);
+    case 'instagram': return auditInstagramProfile(env, canonicalUrl);
+    case 'twitter':   return auditXProfile(env, canonicalUrl);
+    case 'reddit':    return auditRedditProfile(env, canonicalUrl);
   }
   return { error: 'Unsupported platform' };
 }
@@ -3637,8 +3794,16 @@ app.post('/audit-channel', requireAuth, async (c) => {
   const env = c.env as Env;
   const userId = c.get('userId') as string;
   const body = await c.req.json().catch(() => ({}));
-  const url = (body.url || '').toString().trim();
-  if (!url) return json({ error: 'url is required' }, 400);
+  const rawUrl = (body.url || '').toString().trim();
+  const platformHint = (body.platform || '').toString().trim();
+  if (!rawUrl) return json({ error: 'url is required' }, 400);
+
+  // Normalise the input up-front so the cache key + saved audit entry use the
+  // canonical URL (not whatever the user typed). This means auditing "MrBeast"
+  // with platformHint="youtube" and "youtube.com/@MrBeast" both hit the same cache.
+  const normalised = normaliseAuditInput(rawUrl, platformHint);
+  if (!normalised) return json({ error: 'Unsupported input. Paste a full URL or a username with a platform prefix (yt:name, tt:name, ig:name, x:name, r:name).' }, 400);
+  const url = normalised.url;
 
   // Adaptive cache TTL: peek the existing cached value first. If we already
   // know the subscriber count from a previous audit, use the appropriate TTL.
@@ -3662,7 +3827,7 @@ app.post('/audit-channel', requireAuth, async (c) => {
   let refreshTtl = inferredTtl;
   try {
     audit = await withCache(env, auditCacheKey, inferredTtl, async () => {
-      const fresh = await auditChannel(env, url);
+      const fresh = await auditChannel(env, url, platformHint);
       // Compute the appropriate TTL from the FRESH result (in case the cached
       // value was missing or stale). If the fresh audit shows a big account,
       // bump the TTL up so we conserve scraper credits on subsequent calls.
@@ -3678,7 +3843,7 @@ app.post('/audit-channel', requireAuth, async (c) => {
       } catch {}
     }
   } catch {
-    audit = await auditChannel(env, url);
+    audit = await auditChannel(env, url, platformHint);
   }
   if (audit.error) return json({ error: audit.error }, 400);
 
@@ -3861,18 +4026,35 @@ app.get('/audit-credits', async (c) => {
   }
 
   // ── SocialData (passive — per-minute rate, NOT dollar balance) ──────────────
-  let socialdata_out: any = { configured: !!env.SOCIALDATA_API_KEY };
-  if (env.SOCIALDATA_API_KEY) {
-    const snap = await readCreditSnapshot(env, 'socialdata', 'primary');
-    socialdata_out = {
-      configured: true,
-      rate_limit_per_min: snap?.rate_limit_limit ?? null,
-      rate_limit_remaining: snap?.rate_limit_remaining ?? null,
-      last_updated: snap?.last_updated ?? null,
-      last_source: snap?.last_source ?? null,
-      note: 'Dollar balance is not exposed by the SocialData API. Per-minute rate limit (x-ratelimit-* headers) is shown instead, updated passively after each X audit.',
-    };
-  }
+  // Iterate over all 4 configured keys (primary + 3 backups) so the operator
+  // can see which keys are alive and which are 401/429.
+  const socialdataKeys: Array<{ label: string; key?: string }> = [
+    { label: 'primary',  key: env.SOCIALDATA_API_KEY },
+    { label: 'backup_2', key: env.SOCIALDATA_API_KEY_2 },
+    { label: 'backup_3', key: env.SOCIALDATA_API_KEY_3 },
+    { label: 'backup_4', key: env.SOCIALDATA_API_KEY_4 },
+  ];
+  const socialdataKeys_out = await Promise.all(
+    socialdataKeys.map(async (k) => {
+      if (!k.key) return { label: k.label, configured: false };
+      const snap = await readCreditSnapshot(env, 'socialdata', k.label as any);
+      return {
+        label: k.label,
+        configured: true,
+        rate_limit_per_min: snap?.rate_limit_limit ?? null,
+        rate_limit_remaining: snap?.rate_limit_remaining ?? null,
+        last_updated: snap?.last_updated ?? null,
+        last_source: snap?.last_source ?? null,
+      };
+    }),
+  );
+  const socialdataConfiguredCount = socialdataKeys_out.filter((k: any) => k.configured).length;
+  const socialdata_out: any = {
+    configured: socialdataConfiguredCount > 0,
+    keys_configured: socialdataConfiguredCount,
+    keys: socialdataKeys_out,
+    note: 'Dollar balance is not exposed by the SocialData API. Per-minute rate limit (x-ratelimit-* headers) is shown per-key, updated passively after each X audit. Keys are rotated on 401/403/429.',
+  };
 
   // ── Capacity estimate ───────────────────────────────────────────────────────
   // Each full audit costs ~2 credits (1 profile + 1 videos/posts fetch).

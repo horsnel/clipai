@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { initPayment, applyReferralCode } from '@/services/api';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface PricingPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; referralCode?: string } | null;
@@ -171,12 +172,14 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
         {/* Header */}
         <div className="text-center mb-10">
           <h1 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-4">
-            Paste a URL. Get <span className="gradient-text">14 viral strategies</span>.
+            <span className="inline-flex items-center gap-2 flex-wrap justify-center">
+              Paste a URL. Get <span className="gradient-text">14 viral strategies</span>.
+              <InfoIconPopup label="How does ClipAI work?" size="md" className="ml-1">
+                No uploads. No rendering. No storage. ClipAI streams any YouTube video to Gemini and returns
+                titles, hooks, captions, distribution packs, thumbnail concepts, and more — in seconds.
+              </InfoIconPopup>
+            </span>
           </h1>
-          <p className="text-clip-muted text-lg max-w-2xl mx-auto">
-            No uploads. No rendering. No storage. ClipAI streams any YouTube video to Gemini and returns
-            titles, hooks, captions, distribution packs, thumbnail concepts, and more — in seconds.
-          </p>
         </div>
 
         {/* Phase 1 highlight strip */}
@@ -186,9 +189,11 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
               <div className={`w-8 h-8 rounded-lg ${h.bg} flex items-center justify-center flex-shrink-0`}>
                 <h.Icon className={`w-4 h-4 ${h.color}`} />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex items-center gap-1">
                 <p className="font-display font-medium text-clip-text text-xs truncate">{h.label}</p>
-                <p className="text-clip-muted text-[10px] truncate">{h.sub}</p>
+                <InfoIconPopup label={`What is ${h.label}?`} size="sm" className="ml-1 flex-shrink-0">
+                  {h.sub}
+                </InfoIconPopup>
               </div>
             </div>
           ))}
@@ -324,13 +329,13 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
             <div className="w-10 h-10 rounded-xl bg-clip-amber/10 flex items-center justify-center">
               <Gift className="w-5 h-5 text-clip-amber" />
             </div>
-            <div>
+            <div className="flex items-center gap-1">
               <h3 className="font-display font-semibold text-clip-text">
                 Referral Program
               </h3>
-              <p className="text-clip-muted text-sm">
+              <InfoIconPopup label="How referrals work" size="sm" className="ml-1">
                 Invite a friend — they get 50 credits, you get 50 credits + 200 XP when they upgrade.
-              </p>
+              </InfoIconPopup>
             </div>
           </div>
           

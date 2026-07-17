@@ -5,6 +5,7 @@ import {
   ChevronRight, Sparkles 
 } from 'lucide-react';
 import { getLeaderboard } from '@/services/api';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface LeaderboardPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -99,12 +100,14 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
               <Trophy className="w-6 h-6 text-black" />
             </div>
           </div>
-          <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text mb-2">
-            Leaderboard
-          </h1>
-          <p className="text-clip-muted">
-            Top creators ranked by total hype score
-          </p>
+          <div className="flex items-center justify-center gap-1.5 mb-2">
+            <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
+              Leaderboard
+            </h1>
+            <InfoIconPopup label="What is the Leaderboard?" size="md">
+              Top creators ranked by total hype score
+            </InfoIconPopup>
+          </div>
         </div>
 
         {/* Tab Switcher */}
@@ -269,12 +272,14 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
                 <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-clip-amber" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-display font-semibold text-clip-text mb-1">
-                  Unlock More Clips
-                </p>
-                <p className="text-clip-muted text-sm">
-                  Upgrade to Pro or Creator to create unlimited highlights
-                </p>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <p className="font-display font-semibold text-clip-text">
+                    Unlock More Clips
+                  </p>
+                  <InfoIconPopup label="Why upgrade?" size="sm">
+                    Upgrade to Pro or Creator to create unlimited highlights
+                  </InfoIconPopup>
+                </div>
               </div>
               <button
                 onClick={() => onNavigate('pricing')}

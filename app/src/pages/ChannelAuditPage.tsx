@@ -2,18 +2,17 @@
  * ChannelAuditPage.tsx — Free channel audit flow shown after signup/onboarding.
  *
  * Flow:
- *   1. User pastes a channel URL (YouTube/TikTok/X/Instagram)
+ *   1. User enters a channel URL OR bare username (with platform selector)
  *   2. We run a live audit (POST /api/audit-channel) — shows a loading state
  *   3. Audit result appears as a square preview card inline
- *   4. User can paste another URL to audit more channels (up to 8)
- *   5. "Go to Dashboard" button → navigates to dashboard, where all audited
- *      channels show as squares in the ChannelAuditsGrid
+ *   4. User can audit more channels (up to 8)
+ *   5. "Go to Dashboard" button → navigates to dashboard
  *
- * Skippable: "Skip for now" link in the top-right navigates straight to the
- * dashboard without auditing.
- *
- * Also accessible from the dashboard's "Add channel" button — in that case the
- * user has already done onboarding, so we don't show the "first time" framing.
+ * Input formats supported (server-side normalises everything):
+ *   - Full URL:  https://youtube.com/@MrBeast
+ *   - Bare @:    @MrBeast           (requires platform selector)
+ *   - Plain:     MrBeast            (requires platform selector)
+ *   - Prefixed:  yt:MrBeast, tt:khaby.lame, ig:keke, x:elonmusk, r:spez
  */
 import { useState, useRef, useEffect } from 'react';
 import type { Page } from '../App';
@@ -25,6 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { auditChannel } from '@/services/api';
+import { InfoIconPopup } from '@/components/InfoIconPopup';
 import type { ChannelAudit, AuditPlatform } from '../types';
 
 interface ChannelAuditPageProps {
@@ -40,28 +40,34 @@ interface AuditState {
   error?: string;
 }
 
-const PLATFORM_HINTS: Array<{ platform: AuditPlatform; label: string; icon: React.ElementType; color: string; example: string }> = [
-  { platform: 'youtube',   label: 'YouTube',   icon: Youtube,       color: 'text-red-500',     example: 'youtube.com/@MrBeast' },
-  { platform: 'tiktok',    label: 'TikTok',    icon: Music2,        color: 'text-clip-cyan',   example: 'tiktok.com/@username' },
-  { platform: 'instagram', label: 'Instagram', icon: Instagram,     color: 'text-pink-400',    example: 'instagram.com/username' },
-  { platform: 'twitter',   label: 'X',         icon: Twitter,       color: 'text-slate-300',   example: 'x.com/username' },
-  { platform: 'reddit',    label: 'Reddit',    icon: MessageCircle, color: 'text-orange-500',  example: 'reddit.com/u/username' },
+const PLATFORM_OPTIONS: Array<{ value: AuditPlatform; label: string; icon: React.ElementType; color: string }> = [
+  { value: 'youtube',   label: 'YouTube',   icon: Youtube,       color: 'text-red-500' },
+  { value: 'tiktok',    label: 'TikTok',    icon: Music2,        color: 'text-clip-cyan' },
+  { value: 'instagram', label: 'Instagram', icon: Instagram,     color: 'text-pink-400' },
+  { value: 'twitter',   label: 'X',         icon: Twitter,       color: 'text-slate-300' },
+  { value: 'reddit',    label: 'Reddit',    icon: MessageCircle, color: 'text-orange-500' },
 ];
 
 const MAX_AUDITS = 8;
 
-function detectPlatformFromUrl(url: string): AuditPlatform | null {
-  const u = (url || '').toLowerCase();
-  if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
-  if (u.includes('tiktok.com')) return 'tiktok';
-  if (u.includes('instagram.com')) return 'instagram';
-  if (u.includes('x.com') || u.includes('twitter.com')) return 'twitter';
-  if (u.includes('reddit.com') || u.includes('redd.it')) return 'reddit';
-  return null;
+/** Returns true if the input looks like a full URL (has a platform domain). */
+function isFullUrl(s: string): boolean {
+  const u = s.toLowerCase();
+  return u.includes('youtube.com') || u.includes('youtu.be') ||
+         u.includes('tiktok.com') ||
+         u.includes('instagram.com') ||
+         u.includes('x.com') || u.includes('twitter.com') ||
+         u.includes('reddit.com') || u.includes('redd.it');
 }
 
-export function ChannelAuditPage({ user, onNavigate: _onNavigate, onComplete }: ChannelAuditPageProps) {
-  const [url, setUrl] = useState('');
+/** Returns true if the input has a recognised platform prefix (yt:, tt:, etc.). */
+function hasPlatformPrefix(s: string): boolean {
+  return /^(yt|tt|ig|tw|x|rdt|r|reddit):/i.test(s.trim());
+}
+
+export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onComplete }: ChannelAuditPageProps) {
+  const [input, setInput] = useState('');
+  const [selectedPlatform, setSelectedPlatform] = useState<AuditPlatform | null>(null);
   const [audits, setAudits] = useState<AuditState[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -73,43 +79,53 @@ export function ChannelAuditPage({ user, onNavigate: _onNavigate, onComplete }: 
 
   const completedAudits = audits.filter(a => a.status === 'done' && a.audit);
 
-  const runAudit = async (urlToAudit: string) => {
-    const trimmed = urlToAudit.trim();
+  const runAudit = async (rawInput: string, platform: AuditPlatform | null) => {
+    const trimmed = rawInput.trim();
     if (!trimmed) {
-      toast.error('Paste a channel URL first');
+      toast.error('Enter a channel URL or username first');
       return;
     }
-    const platform = detectPlatformFromUrl(trimmed);
-    if (!platform) {
-      toast.error('Unsupported link. Use a YouTube, TikTok, X, Instagram, or Reddit URL.');
+    // If input is a full URL OR has a platform prefix, we don't need a selected platform.
+    // Otherwise we require the user to pick a platform.
+    const needsPlatform = !isFullUrl(trimmed) && !hasPlatformPrefix(trimmed);
+    if (needsPlatform && !platform) {
+      toast.error('Pick a platform (YouTube, TikTok, etc.) for bare usernames, or paste a full URL.');
       return;
     }
     if (completedAudits.length >= MAX_AUDITS) {
       toast.error(`You've reached the ${MAX_AUDITS}-channel limit. Remove one to add another.`);
       return;
     }
-    // Dedupe — if URL already audited, don't re-run
-    if (audits.some(a => a.url === trimmed && a.status === 'done')) {
+
+    // Build the request body. Send the raw input + the selected platform as a hint.
+    // The backend normalises everything — full URL, prefixed username, or bare
+    // username + platformHint — into a canonical URL.
+    const requestBody: { url: string; platform?: string } = { url: trimmed };
+    if (needsPlatform && platform) requestBody.platform = platform;
+
+    // Use the canonical URL for dedup (so user can't double-add the same channel)
+    // We optimistically hash the input + platform for the dedup key.
+    const dedupKey = `${trimmed.toLowerCase()}::${platform || 'auto'}`;
+    if (audits.some(a => a.url === dedupKey && a.status === 'done')) {
       toast('You already audited this channel', { icon: 'ℹ️' });
       return;
     }
 
     setSubmitting(true);
-    // Optimistically add a loading entry
-    const entry: AuditState = { url: trimmed, status: 'loading' };
-    setAudits(prev => [entry, ...prev.filter(a => a.url !== trimmed)]);
-    setUrl('');
+    const entry: AuditState = { url: dedupKey, status: 'loading' };
+    setAudits(prev => [entry, ...prev.filter(a => a.url !== dedupKey)]);
+    setInput('');
 
     try {
-      const data = await auditChannel(trimmed);
+      const data = await auditChannel(requestBody.url, requestBody.platform);
       setAudits(prev => prev.map(a =>
-        a.url === trimmed ? { ...a, status: 'done', audit: data.audit } : a
+        a.url === dedupKey ? { ...a, status: 'done', audit: data.audit } : a
       ));
       toast.success(`Audit complete for ${data.audit.channelName}`);
     } catch (e: any) {
       const msg = e?.message || 'Audit failed';
       setAudits(prev => prev.map(a =>
-        a.url === trimmed ? { ...a, status: 'error', error: msg } : a
+        a.url === dedupKey ? { ...a, status: 'error', error: msg } : a
       ));
       toast.error(msg);
     } finally {
@@ -121,15 +137,20 @@ export function ChannelAuditPage({ user, onNavigate: _onNavigate, onComplete }: 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (submitting) return;
-    runAudit(url);
+    runAudit(input, selectedPlatform);
   };
 
-  const removeAudit = (urlToRemove: string) => {
-    setAudits(prev => prev.filter(a => a.url !== urlToRemove));
+  const removeAudit = (key: string) => {
+    setAudits(prev => prev.filter(a => a.url !== key));
   };
 
-  const retryAudit = (urlToRetry: string) => {
-    runAudit(urlToRetry);
+  const retryAudit = (key: string) => {
+    // Find the original input + platform from the audit entry
+    const entry = audits.find(a => a.url === key);
+    if (!entry) return;
+    // We can't perfectly reconstruct the original input, so retry with the canonical URL from the audit
+    const canonicalUrl = entry.audit?.url || entry.url;
+    runAudit(canonicalUrl, null);
   };
 
   return (
@@ -156,57 +177,73 @@ export function ChannelAuditPage({ user, onNavigate: _onNavigate, onComplete }: 
 
         {/* Card */}
         <div className="card-glass p-6 sm:p-8">
-          {/* Header */}
+          {/* Header — title + info icon (no inline explanation paragraph) */}
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-clip-cyan/15 to-purple-500/15 flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-clip-cyan" />
             </div>
-            <div>
+            <div className="flex items-center gap-1.5">
               <h2 className="font-display font-bold text-xl text-clip-text">
                 Free Channel Audit
               </h2>
-              <p className="text-clip-muted text-xs mt-0.5">
-                Get an instant analytics snapshot of your channel
-              </p>
+              <InfoIconPopup label="What is a Channel Audit?" size="md">
+                Paste a link to your YouTube, TikTok, X, Instagram, or Reddit
+                channel — or just type the username and pick a platform — and
+                we'll pull a free analytics report: subscribers, total views,
+                recent posts, and engagement rate. You can audit up to {MAX_AUDITS} channels.
+                <br /><br />
+                YouTube and Reddit audits return real follower counts and engagement data.
+                TikTok, X, and Instagram audits use third-party scrapers (Sociavault, ScrapeCreators,
+                SocialData) — without API keys they fall back to a lite mode showing recent posts only.
+              </InfoIconPopup>
             </div>
           </div>
 
-          <p className="text-clip-muted text-sm leading-relaxed mb-5">
-            Hi {user?.name ?? 'Creator'}! Paste a link to your YouTube, TikTok, X, Instagram, or Reddit
-            channel and we'll pull a free analytics report — subscribers, total views, recent
-            posts, engagement rate. You can audit up to {MAX_AUDITS} channels.
-          </p>
-
-          {/* Platform hints */}
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            {PLATFORM_HINTS.map(p => {
-              const Icon = p.icon;
-              return (
-                <div key={p.platform} className="inline-flex items-center gap-1 text-[10px] text-clip-muted">
-                  <Icon className={`w-3.5 h-3.5 ${p.color}`} />
-                  {p.label}
-                </div>
-              );
-            })}
+          {/* Platform selector — required only when input is a bare username */}
+          <div className="mb-4">
+            <p className="text-[10px] uppercase tracking-wider text-clip-muted/70 mb-2">
+              Pick a platform <span className="text-clip-muted/40">(only needed for bare usernames)</span>
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {PLATFORM_OPTIONS.map(p => {
+                const Icon = p.icon;
+                const selected = selectedPlatform === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setSelectedPlatform(selected ? null : p.value)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+                      selected
+                        ? 'bg-clip-cyan/15 border-clip-cyan/50 text-clip-cyan'
+                        : 'bg-clip-surface border-white/[0.025] text-clip-muted hover:border-white/[0.06] hover:text-clip-text'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${selected ? 'text-clip-cyan' : p.color}`} />
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* URL input form */}
+          {/* URL / username input form */}
           <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 mb-5">
             <div className="relative flex-1">
               <Link2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-clip-muted pointer-events-none" />
               <input
                 ref={inputRef}
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="Paste your channel URL (e.g. youtube.com/@yourchannel)"
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Paste URL or @username — e.g. youtube.com/@MrBeast  or  @khaby.lame"
                 disabled={submitting}
                 className="input-dark pl-10 w-full disabled:opacity-50"
               />
             </div>
             <Button
               type="submit"
-              disabled={submitting || !url.trim()}
+              disabled={submitting || !input.trim()}
               className="btn-primary py-2.5 px-5 flex items-center gap-2 text-sm justify-center"
             >
               {submitting ? (
@@ -246,13 +283,6 @@ export function ChannelAuditPage({ user, onNavigate: _onNavigate, onComplete }: 
             </Button>
           </div>
         </div>
-
-        {/* Helper text */}
-        <p className="text-center text-clip-muted text-xs mt-5">
-          YouTube & Reddit audits return real follower counts & engagement data.
-          <br />
-          TikTok, X & Instagram audits require API keys (LamaTok / KonbiniAPI / SocialData) for full stats — without keys they show recent posts only.
-        </p>
       </div>
     </div>
   );
@@ -322,7 +352,7 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
           <Check className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
         </div>
         <p className="text-xs text-clip-muted truncate">
-          {audit.channelHandle || entry.url}
+          {audit.channelHandle || audit.url}
         </p>
       </div>
 
@@ -335,7 +365,7 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
       )}
 
       <a
-        href={entry.url}
+        href={audit.url}
         target="_blank"
         rel="noopener noreferrer"
         className="text-clip-muted hover:text-clip-cyan transition-colors flex-shrink-0"
