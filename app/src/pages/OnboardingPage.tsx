@@ -23,13 +23,14 @@ import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import {
   ArrowRight, ArrowLeft, Check, X, Gamepad2, Trophy,
-  Youtube, Music2, Twitter, Instagram,
   TrendingUp, DollarSign, Heart, Building2,
   Sparkles, Zap, Bot, Flame,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { saveOnboarding } from '@/services/api';
 import { InfoIconPopup } from '@/components/InfoIconPopup';
+import { PlatformIcon, GameIcon } from '@/components/BrandIcons';
+import type { PlatformId } from '@/components/BrandIcons';
 
 interface OnboardingPageProps {
   user: { name: string; email: string } | null;
@@ -47,25 +48,25 @@ interface OnboardingData {
 }
 
 const POPULAR_GAMES = [
-  { name: 'Free Fire',     emoji: '🔥' },
-  { name: 'Bloodstrike',   emoji: '🩸' },
-  { name: 'Call of Duty',  emoji: '🎯' },
-  { name: 'Valorant',      emoji: '🎮' },
-  { name: 'Fortnite',      emoji: '🏗️' },
-  { name: 'Apex Legends',  emoji: '⚡' },
-  { name: 'Mobile Legends',emoji: '🛡️' },
-  { name: 'FIFA',          emoji: '⚽' },
-  { name: 'Minecraft',     emoji: '⛏️' },
-  { name: 'GTA V',         emoji: '🚗' },
-  { name: 'Roblox',        emoji: '🧱' },
-  { name: 'PUBG',          emoji: '🪖' },
+  { name: 'Free Fire' },
+  { name: 'Bloodstrike' },
+  { name: 'Call of Duty' },
+  { name: 'Valorant' },
+  { name: 'Fortnite' },
+  { name: 'Apex Legends' },
+  { name: 'Mobile Legends' },
+  { name: 'FIFA' },
+  { name: 'Minecraft' },
+  { name: 'GTA V' },
+  { name: 'Roblox' },
+  { name: 'PUBG' },
 ];
 
-const PLATFORMS = [
-  { id: 'youtube',   label: 'YouTube',     icon: Youtube,   color: 'text-red-500',          bg: 'hover:bg-red-500/10 hover:border-red-500/40' },
-  { id: 'tiktok',    label: 'TikTok',      icon: Music2,    color: 'text-clip-cyan',        bg: 'hover:bg-cyan-500/10 hover:border-cyan-500/40' },
-  { id: 'twitter',   label: 'X (Twitter)', icon: Twitter,   color: 'text-slate-300',        bg: 'hover:bg-slate-500/10 hover:border-slate-400/40' },
-  { id: 'instagram', label: 'Instagram',   icon: Instagram, color: 'text-pink-400',         bg: 'hover:bg-pink-500/10 hover:border-pink-500/40' },
+const PLATFORMS: Array<{ id: PlatformId; label: string; color: string; bg: string }> = [
+  { id: 'youtube',   label: 'YouTube',     color: 'text-red-500',          bg: 'hover:bg-red-500/10 hover:border-red-500/40' },
+  { id: 'tiktok',    label: 'TikTok',      color: 'text-clip-cyan',        bg: 'hover:bg-cyan-500/10 hover:border-cyan-500/40' },
+  { id: 'twitter',   label: 'X',           color: 'text-slate-300',        bg: 'hover:bg-slate-500/10 hover:border-slate-400/40' },
+  { id: 'instagram', label: 'Instagram',   color: 'text-pink-400',         bg: 'hover:bg-pink-500/10 hover:border-pink-500/40' },
 ];
 
 const GOALS = [
@@ -218,7 +219,7 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
                         : 'bg-clip-surface border-white/[0.025] text-clip-text hover:border-white/[0.06]'
                     }`}
                   >
-                    <span className="text-base">{g.emoji}</span>
+                    <GameIcon game={g.name} className="w-5 h-5 flex-shrink-0" />
                     <span className="truncate">{g.name}</span>
                   </button>
                 ))}
@@ -247,7 +248,7 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
             <div>
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-10 h-10 rounded-xl bg-clip-cyan/15 flex items-center justify-center">
-                  <Youtube className="w-5 h-5 text-clip-cyan" />
+                  <PlatformIcon platform="youtube" className="w-5 h-5 text-clip-cyan" />
                 </div>
                 <h2 className="font-display font-bold text-xl text-clip-text">
                   Where do you post?
@@ -259,7 +260,6 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {PLATFORMS.map(p => {
                   const selected = data.platforms.includes(p.id);
-                  const Icon = p.icon;
                   return (
                     <button
                       key={p.id}
@@ -270,7 +270,7 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
                           : `bg-clip-surface border-white/[0.025] ${p.bg}`
                       }`}
                     >
-                      <Icon className={`w-6 h-6 ${p.color} flex-shrink-0`} />
+                      <PlatformIcon platform={p.id} className={`w-6 h-6 ${p.color} flex-shrink-0`} />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-clip-text">{p.label}</p>
                       </div>

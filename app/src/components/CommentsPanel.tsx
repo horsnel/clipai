@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Youtube, Copy, Check, MessageSquare, AlertTriangle,
+  Copy, Check, MessageSquare, AlertTriangle,
   ThumbsUp, ThumbsDown, HelpCircle, Flame, Ban, Pin,
   Sparkles,
 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { analyseComments } from '@/services/api';
 import type { CommentsResponse, PredictedCommentsResult } from '../types';
 import { ParticleLoader } from './Loading';
+import { PlatformIcon } from './BrandIcons';
 
 interface CommentsPanelProps {
   user: { plan: string } | null;
@@ -96,7 +97,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
 
         <div>
           <label className="text-sm font-medium text-clip-text block mb-2 flex items-center gap-2">
-            <Youtube className="w-4 h-4 text-clip-cyan" />
+            <PlatformIcon platform="youtube" className="w-4 h-4 text-clip-cyan" />
             YouTube URL
           </label>
           <input

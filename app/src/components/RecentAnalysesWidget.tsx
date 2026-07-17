@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import type { Page } from '../App';
 import {
-  Clock, Play, ChevronRight, Flame, ExternalLink, Sparkles, Youtube, X,
+  Clock, Play, ChevronRight, Flame, ExternalLink, Sparkles, X,
 } from 'lucide-react';
 import { listAnalyses } from '@/services/api';
+import { PlatformIcon } from './BrandIcons';
 import type { AnalysisSummary } from '../types';
 
 interface RecentAnalysesWidgetProps {
@@ -214,7 +215,7 @@ export function RecentAnalysesWidget({
                     </div>
                     {ytId && (
                       <span className="absolute top-0.5 left-0.5 inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[8px] font-bold bg-red-500/90 text-white">
-                        <Youtube className="w-2 h-2" /> YT
+                        <PlatformIcon platform="youtube" className="w-2 h-2" /> YT
                       </span>
                     )}
                   </button>
@@ -288,7 +289,7 @@ export function RecentAnalysesWidget({
             {/* Header bar */}
             <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/[0.025]">
               <div className="flex items-center gap-2 min-w-0">
-                <Youtube className="w-4 h-4 text-red-500 flex-shrink-0" />
+                <PlatformIcon platform="youtube" className="w-4 h-4 text-red-500 flex-shrink-0" />
                 <p className="text-sm font-medium text-clip-text truncate">
                   {playingAnalysis.video_title || 'Untitled video'}
                 </p>

@@ -19,12 +19,13 @@ import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import {
   ArrowRight, ArrowLeft, Check, X, Loader2,
-  Youtube, Music2, Twitter, Instagram, AlertTriangle, Link2,
-  Sparkles, Trash2, ExternalLink, Search, MessageCircle,
+  AlertTriangle, Link2,
+  Sparkles, Trash2, ExternalLink, Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { auditChannel } from '@/services/api';
 import { InfoIconPopup } from '@/components/InfoIconPopup';
+import { PlatformIcon } from '@/components/BrandIcons';
 import type { ChannelAudit, AuditPlatform } from '../types';
 
 interface ChannelAuditPageProps {
@@ -40,12 +41,12 @@ interface AuditState {
   error?: string;
 }
 
-const PLATFORM_OPTIONS: Array<{ value: AuditPlatform; label: string; icon: React.ElementType; color: string }> = [
-  { value: 'youtube',   label: 'YouTube',   icon: Youtube,       color: 'text-red-500' },
-  { value: 'tiktok',    label: 'TikTok',    icon: Music2,        color: 'text-clip-cyan' },
-  { value: 'instagram', label: 'Instagram', icon: Instagram,     color: 'text-pink-400' },
-  { value: 'twitter',   label: 'X',         icon: Twitter,       color: 'text-slate-300' },
-  { value: 'reddit',    label: 'Reddit',    icon: MessageCircle, color: 'text-orange-500' },
+const PLATFORM_OPTIONS: Array<{ value: AuditPlatform; label: string; color: string }> = [
+  { value: 'youtube',   label: 'YouTube',   color: 'text-red-500' },
+  { value: 'tiktok',    label: 'TikTok',    color: 'text-clip-cyan' },
+  { value: 'instagram', label: 'Instagram', color: 'text-pink-400' },
+  { value: 'twitter',   label: 'X',         color: 'text-slate-300' },
+  { value: 'reddit',    label: 'Reddit',    color: 'text-orange-500' },
 ];
 
 const MAX_AUDITS = 8;
@@ -121,7 +122,19 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
       setAudits(prev => prev.map(a =>
         a.url === dedupKey ? { ...a, status: 'done', audit: data.audit } : a
       ));
-      toast.success(`Audit complete for ${data.audit.channelName}`);
+      // Surface credit charge to the user — free audits get a normal toast,
+      // charged audits get an info toast showing the deduction + new balance.
+      const charge = data.charge;
+      if (charge && !charge.free && charge.charged > 0) {
+        toast.success(`Audit complete · −${charge.charged} credit · ${charge.balance} left`);
+      } else if (charge && charge.free && charge.charged === 0) {
+        // Distinguish "first free audit used" from "cache hit (always free)"
+        // by checking balance — first-free users will have a non-zero balance
+        // typically, but we don't need to differentiate for the toast.
+        toast.success(`Audit complete for ${data.audit.channelName} · Free`);
+      } else {
+        toast.success(`Audit complete for ${data.audit.channelName}`);
+      }
     } catch (e: any) {
       const msg = e?.message || 'Audit failed';
       setAudits(prev => prev.map(a =>
@@ -171,7 +184,7 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
             <ArrowLeft className="w-3 h-3" /> Skip for now
           </button>
           <span className="text-[10px] text-clip-muted/70 uppercase tracking-wider">
-            Free · No credits used
+            1st free · then 1 credit each
           </span>
         </div>
 
@@ -206,7 +219,6 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
             </p>
             <div className="flex items-center gap-2 flex-wrap">
               {PLATFORM_OPTIONS.map(p => {
-                const Icon = p.icon;
                 const selected = selectedPlatform === p.value;
                 return (
                   <button
@@ -219,7 +231,7 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
                         : 'bg-clip-surface border-white/[0.025] text-clip-muted hover:border-white/[0.06] hover:text-clip-text'
                     }`}
                   >
-                    <Icon className={`w-3.5 h-3.5 ${selected ? 'text-clip-cyan' : p.color}`} />
+                    <PlatformIcon platform={p.value} className={`w-3.5 h-3.5 ${selected ? 'text-clip-cyan' : p.color}`} />
                     {p.label}
                   </button>
                 );
@@ -327,7 +339,6 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
   // Done — show a compact preview row
   const audit = entry.audit!;
   const platform = audit.platform;
-  const PlatformIcon = platform === 'youtube' ? Youtube : platform === 'tiktok' ? Music2 : platform === 'instagram' ? Instagram : platform === 'reddit' ? MessageCircle : Twitter;
   const platformColor = platform === 'youtube' ? 'text-red-500' : platform === 'tiktok' ? 'text-clip-cyan' : platform === 'instagram' ? 'text-pink-400' : platform === 'reddit' ? 'text-orange-500' : 'text-slate-300';
 
   return (
@@ -342,7 +353,7 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
         />
       ) : (
         <div className="w-10 h-10 rounded-full bg-clip-surface flex items-center justify-center flex-shrink-0">
-          <PlatformIcon className={`w-5 h-5 ${platformColor}`} />
+          <PlatformIcon platform={platform} className={`w-5 h-5 ${platformColor}`} />
         </div>
       )}
 

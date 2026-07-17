@@ -15,10 +15,10 @@
  */
 import { useState, useEffect } from 'react';
 import {
-  Youtube, Music2, Twitter, Instagram,
   TrendingUp, Loader2, AlertTriangle, Eye, BarChart3,
 } from 'lucide-react';
 import { getTrendingVideos } from '@/services/api';
+import { PlatformIcon } from '@/components/BrandIcons';
 import type { TrendingVideo } from '../types';
 
 interface TrendingViewsChartProps {
@@ -27,13 +27,6 @@ interface TrendingViewsChartProps {
 }
 
 type Platform = 'youtube' | 'tiktok' | 'twitter' | 'instagram';
-
-const PLATFORM_ICON: Record<Platform, React.ElementType> = {
-  youtube: Youtube,
-  tiktok: Music2,
-  twitter: Twitter,
-  instagram: Instagram,
-};
 
 const PLATFORM_BAR_COLOR: Record<Platform, string> = {
   youtube:   'from-red-500 to-red-700',
@@ -126,7 +119,6 @@ export function TrendingViewsChart({ game }: TrendingViewsChartProps) {
         <div className="space-y-2.5">
           {sortedVideos.slice(0, 8).map((v) => {
             const platform = v.platform as Platform;
-            const PlatformIcon = PLATFORM_ICON[platform] || Youtube;
             const barColor = PLATFORM_BAR_COLOR[platform] || 'from-clip-cyan to-blue-600';
             const iconColor = PLATFORM_ICON_COLOR[platform] || 'text-clip-cyan';
             const views = v.viewCount || 0;
@@ -140,7 +132,7 @@ export function TrendingViewsChart({ game }: TrendingViewsChartProps) {
             return (
               <div key={v.id} className="flex items-center gap-2.5">
                 {/* Platform icon */}
-                <PlatformIcon className={`w-3.5 h-3.5 ${iconColor} flex-shrink-0`} />
+                <PlatformIcon platform={platform} className={`w-3.5 h-3.5 ${iconColor} flex-shrink-0`} />
 
                 {/* Title */}
                 <div className="text-xs text-clip-text truncate flex-1 min-w-0" title={title}>

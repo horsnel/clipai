@@ -1,6 +1,6 @@
 /**
  * TrendingVideosSection.tsx — Dashboard widget showing trending gaming videos
- * across multiple platforms (YouTube, TikTok, X/Twitter) with a one-click
+ * across multiple platforms (YouTube, TikTok, X) with a one-click
  * "Copy Pack" button (title + caption + hashtags).
  *
  * Designed to replace the old "Clips This Month" card on the dashboard.
@@ -9,12 +9,15 @@
  */
 import { useState, useEffect } from 'react';
 import {
-  Youtube, Copy, Check, ExternalLink, Loader2, Flame,
-  Play, AlertTriangle, Music2, Twitter, Instagram, Eye,
+  Copy, Check, ExternalLink, Flame,
+  Play, AlertTriangle, Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTrendingVideos } from '@/services/api';
+import { ParticleLoader } from './Loading';
+import { PlatformIcon } from './BrandIcons';
 import type { TrendingVideo } from '../types';
+import type { PlatformId } from './BrandIcons';
 
 interface TrendingVideosSectionProps {
   /** Optional game filter. If omitted, "gaming" is used (top gaming highlights). */
@@ -27,7 +30,7 @@ interface PlatformStyle {
   label: string;
   badgeClass: string;
   iconClass: string;
-  icon: React.ElementType;
+  platformId: PlatformId;
   fallbackBg: string;
 }
 
@@ -36,28 +39,28 @@ const PLATFORM_STYLES: Record<Platform, PlatformStyle> = {
     label: 'YouTube',
     badgeClass: 'bg-red-500/90 text-white',
     iconClass: 'text-red-500',
-    icon: Youtube,
+    platformId: 'youtube',
     fallbackBg: 'bg-gradient-to-br from-red-500/20 to-red-900/20',
   },
   tiktok: {
     label: 'TikTok',
     badgeClass: 'bg-black/90 text-white border border-white/20',
     iconClass: 'text-clip-cyan',
-    icon: Music2,
+    platformId: 'tiktok',
     fallbackBg: 'bg-gradient-to-br from-cyan-500/15 to-pink-500/15',
   },
   twitter: {
     label: 'X',
     badgeClass: 'bg-black/90 text-white border border-white/20',
     iconClass: 'text-white',
-    icon: Twitter,
+    platformId: 'twitter',
     fallbackBg: 'bg-gradient-to-br from-slate-700/30 to-slate-900/30',
   },
   instagram: {
     label: 'Instagram',
     badgeClass: 'bg-gradient-to-r from-purple-600/90 to-pink-500/90 text-white',
     iconClass: 'text-pink-400',
-    icon: Instagram,
+    platformId: 'instagram',
     fallbackBg: 'bg-gradient-to-br from-purple-500/20 via-pink-500/15 to-amber-500/15',
   },
 };
@@ -142,12 +145,12 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
     instagram: videos.filter((v) => v.platform === 'instagram').length,
   };
 
-  const FILTER_TABS: Array<{ key: Platform | 'all'; label: string; icon: React.ElementType }> = [
-    { key: 'all',       label: 'All',       icon: Flame },
-    { key: 'youtube',   label: 'YouTube',   icon: Youtube },
-    { key: 'tiktok',    label: 'TikTok',    icon: Music2 },
-    { key: 'twitter',   label: 'X',         icon: Twitter },
-    { key: 'instagram', label: 'Instagram', icon: Instagram },
+  const FILTER_TABS: Array<{ key: Platform | 'all'; label: string; platformId?: PlatformId }> = [
+    { key: 'all',       label: 'All' },
+    { key: 'youtube',   label: 'YouTube',   platformId: 'youtube' },
+    { key: 'tiktok',    label: 'TikTok',    platformId: 'tiktok' },
+    { key: 'twitter',   label: 'X',         platformId: 'twitter' },
+    { key: 'instagram', label: 'Instagram', platformId: 'instagram' },
   ];
 
   return (
@@ -188,7 +191,9 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                     : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.02] border border-transparent'
                 }`}
               >
-                <tab.icon className="w-3.5 h-3.5" />
+                {tab.platformId
+                  ? <PlatformIcon platform={tab.platformId} className="w-3.5 h-3.5" />
+                  : <Flame className="w-3.5 h-3.5" />}
                 {tab.label}
                 <span className={`text-[10px] px-1 rounded ${isActive ? 'bg-clip-cyan/20' : 'bg-white/[0.02]'}`}>
                   {count}
@@ -202,10 +207,14 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
       {/* Body */}
       <div className="p-3 sm:p-4">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <Loader2 className="w-6 h-6 text-clip-cyan animate-spin" />
-            <p className="text-clip-muted text-xs">Fetching trending videos across platforms…</p>
-          </div>
+          <ParticleLoader
+            stages={[
+              'Scanning YouTube trending…',
+              'Pulling TikTok + X + Instagram…',
+              'Generating copy packs…',
+            ]}
+            stageIntervalMs={1400}
+          />
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
             <AlertTriangle className="w-8 h-8 text-clip-amber/70" />
@@ -213,7 +222,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
           </div>
         ) : filteredVideos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
-            <Youtube className="w-8 h-8 text-clip-muted opacity-50" />
+            <PlatformIcon platform="youtube" className="w-8 h-8 text-clip-muted opacity-50" />
             <p className="text-clip-muted text-sm">
               {videos.length === 0
                 ? 'No trending videos right now. Check back soon.'
@@ -225,7 +234,6 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
             {filteredVideos.map((v) => {
               const hasPack = !!(v.copyPack?.title || v.copyPack?.caption || v.copyPack?.hashtags?.length);
               const style = PLATFORM_STYLES[v.platform as Platform] || PLATFORM_STYLES.youtube;
-              const PlatformIcon = style.icon;
               const hasThumbnail = !!v.thumbnail;
               return (
                 <div
@@ -250,7 +258,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                     ) : (
                       // Platform-colored fallback for TikTok / X (no thumbnail available)
                       <div className={`absolute inset-0 ${style.fallbackBg} flex items-center justify-center`}>
-                        <PlatformIcon className={`w-12 h-12 ${style.iconClass} opacity-80`} />
+                        <PlatformIcon platform={style.platformId} className={`w-12 h-12 ${style.iconClass} opacity-80`} />
                       </div>
                     )}
                     {/* Dark gradient overlay */}
@@ -263,7 +271,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                     </div>
                     {/* Platform badge */}
                     <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${style.badgeClass}`}>
-                      <PlatformIcon className="w-3 h-3" /> {style.label}
+                      <PlatformIcon platform={style.platformId} className="w-3 h-3" /> {style.label}
                     </span>
                     {/* Copy button — top right */}
                     {hasPack && (

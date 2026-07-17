@@ -12,9 +12,9 @@
  * Used inside <ChannelAuditsGrid /> on the dashboard.
  */
 import {
-  Youtube, Music2, Twitter, Instagram, MessageCircle,
   Users, Eye, TrendingUp, Video, AlertCircle,
 } from 'lucide-react';
+import { PlatformIcon } from '@/components/BrandIcons';
 import type { ChannelAudit, AuditPlatform } from '../types';
 
 interface ChannelAuditCardProps {
@@ -24,7 +24,6 @@ interface ChannelAuditCardProps {
 
 const PLATFORM_CONFIG: Record<AuditPlatform, {
   label: string;
-  icon: React.ElementType;
   iconColor: string;
   banner: string;       // gradient behind the avatar
   ring: string;         // ring color around the avatar
@@ -32,7 +31,6 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
 }> = {
   youtube: {
     label: 'YouTube',
-    icon: Youtube,
     iconColor: 'text-red-500',
     banner: 'from-red-500/30 via-red-700/15 to-clip-surface',
     ring: 'ring-red-500/40',
@@ -40,7 +38,6 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
   },
   tiktok: {
     label: 'TikTok',
-    icon: Music2,
     iconColor: 'text-clip-cyan',
     banner: 'from-cyan-500/25 via-pink-500/15 to-clip-surface',
     ring: 'ring-cyan-400/40',
@@ -48,7 +45,6 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
   },
   twitter: {
     label: 'X',
-    icon: Twitter,
     iconColor: 'text-slate-300',
     banner: 'from-slate-500/25 via-slate-700/15 to-clip-surface',
     ring: 'ring-slate-400/40',
@@ -56,7 +52,6 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
   },
   instagram: {
     label: 'Instagram',
-    icon: Instagram,
     iconColor: 'text-pink-400',
     banner: 'from-purple-500/25 via-pink-500/15 to-amber-500/10',
     ring: 'ring-pink-400/40',
@@ -64,7 +59,6 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
   },
   reddit: {
     label: 'Reddit',
-    icon: MessageCircle,
     iconColor: 'text-orange-500',
     banner: 'from-orange-500/25 via-red-500/15 to-clip-surface',
     ring: 'ring-orange-400/40',
@@ -80,7 +74,6 @@ function formatCount(n: number): string {
 
 export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
   const config = PLATFORM_CONFIG[audit.platform] || PLATFORM_CONFIG.youtube;
-  const PlatformIcon = config.icon;
   const hasRealStats = (audit.platform === 'youtube' || audit.platform === 'reddit' || audit.platform === 'tiktok' || audit.platform === 'instagram' || audit.platform === 'twitter') && !audit.statistics.hiddenSubscriberCount;
   const avatarFallback = audit.channelHandle || audit.channelName || '?';
 
@@ -95,7 +88,7 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
         {/* Top banner (gradient) — avatar overlaps this edge */}
         <div className={`relative h-20 bg-gradient-to-br ${config.banner} overflow-hidden`}>
           {/* Faint platform icon watermark in the banner */}
-          <PlatformIcon className={`absolute -right-3 -top-3 w-20 h-20 ${config.iconColor} opacity-10`} />
+          <PlatformIcon platform={audit.platform} className={`absolute -right-3 -top-3 w-20 h-20 ${config.iconColor} opacity-10`} />
           {/* "Audited" pill */}
           <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/50 backdrop-blur-sm text-white/90 border border-white/10">
             <span className="w-1 h-1 rounded-full bg-green-400" />
@@ -126,7 +119,7 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
               {audit.channelName}
             </p>
             <div className="flex items-center justify-center gap-1 mt-0.5">
-              <PlatformIcon className={`w-3 h-3 ${config.iconColor}`} />
+              <PlatformIcon platform={audit.platform} className={`w-3 h-3 ${config.iconColor}`} />
               <span className="text-[10px] text-clip-muted truncate">{audit.channelHandle || config.label}</span>
             </div>
           </div>

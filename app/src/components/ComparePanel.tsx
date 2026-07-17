@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import {
-  Youtube, Loader2, Crown, Copy, Check, Trophy,
+  Loader2, Crown, Copy, Check, Trophy,
   TrendingUp, Minus, ArrowRight, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { compareVideos } from '@/services/api';
 import type { CompareResponse, ComparisonResult } from '../types';
 import { ParticleLoader } from './Loading';
+import { PlatformIcon } from './BrandIcons';
 
 interface ComparePanelProps {
   user: { plan: string } | null;
@@ -234,7 +235,7 @@ export function ComparePanel({ user, onNavigate }: ComparePanelProps) {
           <div>
             <label className="text-xs text-clip-muted mb-1 block">Video A</label>
             <div className="relative">
-              <Youtube className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-clip-muted" />
+              <PlatformIcon platform="youtube" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-clip-muted" />
               <input
                 type="url"
                 value={urlA}
@@ -247,7 +248,7 @@ export function ComparePanel({ user, onNavigate }: ComparePanelProps) {
           <div>
             <label className="text-xs text-clip-muted mb-1 block">Video B</label>
             <div className="relative">
-              <Youtube className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-clip-muted" />
+              <PlatformIcon platform="youtube" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-clip-muted" />
               <input
                 type="url"
                 value={urlB}

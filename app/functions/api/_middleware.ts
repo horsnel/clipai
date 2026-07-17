@@ -105,6 +105,10 @@ type Profile = {
   // The worker checks + resets this before each audit (see checkAndIncrementDailyQuota).
   audits_used_today?: number;
   audit_quota_reset_at?: string;
+  // Phase 5b — true once the user has used their one free lifetime audit.
+  // First audit (cache miss) is free; subsequent audits cost 1 credit each.
+  // Cached audits (re-audit same URL within TTL) are always free.
+  free_audit_used?: boolean;
 };
 
 type Ctx = { Bindings: Env; Variables: { userId: string; profile: Profile } };
@@ -481,6 +485,62 @@ async function checkAndIncrementDailyQuota(env: Env, userId: string): Promise<{ 
   });
 
   return { allowed: true, used: newUsed, quota, resetAt: newResetAt };
+}
+
+// ─── Phase 5b — audit credit cost ────────────────────────────────────────────
+// First audit (cache miss) per user is FREE. After that, every cache-miss
+// audit costs 1 credit. Cache HIT audits (re-auditing same URL within TTL)
+// are always free — no scraper cost is incurred, so we don't charge.
+//
+// This helper is called AFTER the audit runs but BEFORE we persist the entry,
+// so we can return a 402 to the frontend if the user is out of credits
+// (without saving a half-baked audit row).
+//
+// Returns:
+//   { charged: 0, free: true, balance } — first free audit used OR cache hit
+//   { charged: 1, free: false, balance } — credit deducted
+//   { error: 'insufficient_credits', balance } — user has 0 credits, audit refused
+const AUDIT_CREDIT_COST = 1;
+
+async function chargeAuditCredit(env: Env, userId: string, cacheHit: boolean): Promise<{ charged: number; free: boolean; balance: number; error?: string }> {
+  const profile = await fetchProfile(env, userId);
+  if (!profile) {
+    // Can't read profile — don't block the audit (best-effort).
+    return { charged: 0, free: true, balance: 0 };
+  }
+
+  // Cache hits are always free — no scraper cost.
+  if (cacheHit) {
+    return { charged: 0, free: true, balance: profile.credits || 0 };
+  }
+
+  // First cache-miss audit is free — mark the flag + return.
+  if (!profile.free_audit_used) {
+    await updateProfile(env, userId, { free_audit_used: true });
+    return { charged: 0, free: true, balance: profile.credits || 0 };
+  }
+
+  // Subsequent cache-miss audits cost 1 credit each.
+  const balance = profile.credits || 0;
+  if (balance < AUDIT_CREDIT_COST) {
+    return { charged: 0, free: false, balance, error: 'insufficient_credits' };
+  }
+
+  // Deduct + log the transaction.
+  const newBalance = balance - AUDIT_CREDIT_COST;
+  await updateProfile(env, userId, { credits: newBalance });
+  await sbFetch(env, 'credit_transactions', {
+    method: 'POST',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      user_id: userId,
+      delta: -AUDIT_CREDIT_COST,
+      reason: 'channel_audit',
+      reference_id: null,
+    }),
+  });
+
+  return { charged: AUDIT_CREDIT_COST, free: false, balance: newBalance };
 }
 
 async function awardCredits(env: Env, userId: string, delta: number, reason: string, referenceId?: string): Promise<boolean> {
@@ -4027,6 +4087,7 @@ app.post('/audit-channel', requireAuth, async (c) => {
 
   // Peek cached value to decide TTL before we even fetch.
   const peeked = await cacheRead<any>(env, auditCacheKey);
+  const cacheHit = !!(peeked?.fresh && peeked?.data);
   let inferredTtl = DEFAULT_TTL;
   if (peeked?.data?.statistics?.subscribers !== undefined) {
     inferredTtl = peeked.data.statistics.subscribers >= BIG_ACCOUNT_THRESHOLD
@@ -4058,6 +4119,19 @@ app.post('/audit-channel', requireAuth, async (c) => {
   }
   if (audit.error) return json({ error: audit.error, quota }, 400);
 
+  // ─── Phase 5b — charge 1 credit per audit (first one free, cache hits free) ──
+  // Cache hits don't spend scraper credits, so they're always free. The first
+  // cache MISS is free (the user's one lifetime free audit). Subsequent misses
+  // cost 1 credit each. If the user has 0 credits, return 402 without saving.
+  const charge = await chargeAuditCredit(env, userId, cacheHit);
+  if (charge.error === 'insufficient_credits') {
+    return json({
+      error: `Out of credits. Channel audits cost ${AUDIT_CREDIT_COST} credit each after your first free audit. Earn more credits by referring friends or upgrade to a paid plan.`,
+      charge,
+      quota,
+    }, 402);
+  }
+
   // Persist to channel_audits table (new) + mirror to settings.prefs.audits
   // (legacy jsonb fallback). The 8-channel-per-user limit is enforced by a
   // DB trigger on the table; if the user already has 8 SAVED channels and this
@@ -4073,7 +4147,7 @@ app.post('/audit-channel', requireAuth, async (c) => {
     auditedAt: audit.auditedAt,
   });
 
-  return json({ audit, saved, count, quota });
+  return json({ audit, saved, count, quota, charge });
 });
 
 // GET /api/channel-audits — returns the user's saved audits WITH the full audit

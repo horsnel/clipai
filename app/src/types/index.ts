@@ -345,6 +345,13 @@ export interface AuditChannelResponse {
     quota: number;
     resetAt: string;
   };
+  /** Phase 5b — credit charge info. `charged: 0` means free (first audit or cache hit). */
+  charge?: {
+    charged: number;
+    free: boolean;
+    balance: number;
+    error?: string;
+  };
 }
 
 export interface ChannelAuditsResponse {

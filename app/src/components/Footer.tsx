@@ -1,5 +1,5 @@
 import type { Page } from '../App';
-import { Github, Twitter, Instagram } from 'lucide-react';
+import { SiX, SiInstagram, SiGithub } from '@/components/BrandIcons';
 import { Logo } from './Logo';
 
 interface FooterProps {
@@ -31,7 +31,7 @@ export function Footer({ onNavigate }: FooterProps) {
                 rel="noopener noreferrer"
                 className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.025] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
               >
-                <Twitter className="w-4 h-4" />
+                <SiX className="w-4 h-4" />
               </a>
               <a
                 href="https://instagram.com/olhmescraxes1"
@@ -39,7 +39,7 @@ export function Footer({ onNavigate }: FooterProps) {
                 rel="noopener noreferrer"
                 className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.025] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
               >
-                <Instagram className="w-4 h-4" />
+                <SiInstagram className="w-4 h-4" />
               </a>
               <a
                 href="https://github.com/horsnel/clipai"
@@ -47,7 +47,7 @@ export function Footer({ onNavigate }: FooterProps) {
                 rel="noopener noreferrer"
                 className="w-10 h-10 rounded-lg bg-clip-surface border border-white/[0.025] flex items-center justify-center text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/30 transition-all"
               >
-                <Github className="w-4 h-4" />
+                <SiGithub className="w-4 h-4" />
               </a>
             </div>
           </div>

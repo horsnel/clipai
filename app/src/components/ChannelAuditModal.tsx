@@ -16,8 +16,9 @@
 import { useEffect } from 'react';
 import {
   X, ExternalLink, Users, Eye, Video, TrendingUp, Heart,
-  Youtube, Music2, Twitter, Instagram, AlertCircle, Trash2, MessageCircle,
+  AlertCircle, Trash2, MessageCircle,
 } from 'lucide-react';
+import { PlatformIcon } from '@/components/BrandIcons';
 import type { ChannelAudit, AuditPlatform } from '../types';
 
 interface ChannelAuditModalProps {
@@ -28,16 +29,15 @@ interface ChannelAuditModalProps {
 
 const PLATFORM_CONFIG: Record<AuditPlatform, {
   label: string;
-  icon: React.ElementType;
   iconColor: string;
   banner: string;
   accent: string;
 }> = {
-  youtube:   { label: 'YouTube',   icon: Youtube,   iconColor: 'text-red-500',   banner: 'from-red-500/30 via-red-700/15 to-clip-surface',         accent: 'text-red-500' },
-  tiktok:    { label: 'TikTok',    icon: Music2,    iconColor: 'text-clip-cyan', banner: 'from-cyan-500/25 via-pink-500/15 to-clip-surface',       accent: 'text-clip-cyan' },
-  twitter:   { label: 'X',         icon: Twitter,   iconColor: 'text-slate-300', banner: 'from-slate-500/25 via-slate-700/15 to-clip-surface',     accent: 'text-slate-300' },
-  instagram: { label: 'Instagram', icon: Instagram, iconColor: 'text-pink-400',  banner: 'from-purple-500/25 via-pink-500/15 to-amber-500/10',    accent: 'text-pink-400' },
-  reddit:    { label: 'Reddit',    icon: MessageCircle, iconColor: 'text-orange-500', banner: 'from-orange-500/25 via-red-500/15 to-clip-surface',  accent: 'text-orange-500' },
+  youtube:   { label: 'YouTube',   iconColor: 'text-red-500',   banner: 'from-red-500/30 via-red-700/15 to-clip-surface',         accent: 'text-red-500' },
+  tiktok:    { label: 'TikTok',    iconColor: 'text-clip-cyan', banner: 'from-cyan-500/25 via-pink-500/15 to-clip-surface',       accent: 'text-clip-cyan' },
+  twitter:   { label: 'X',         iconColor: 'text-slate-300', banner: 'from-slate-500/25 via-slate-700/15 to-clip-surface',     accent: 'text-slate-300' },
+  instagram: { label: 'Instagram', iconColor: 'text-pink-400',  banner: 'from-purple-500/25 via-pink-500/15 to-amber-500/10',    accent: 'text-pink-400' },
+  reddit:    { label: 'Reddit',    iconColor: 'text-orange-500', banner: 'from-orange-500/25 via-red-500/15 to-clip-surface',     accent: 'text-orange-500' },
 };
 
 function formatCount(n: number): string {
@@ -61,7 +61,6 @@ function timeAgo(iso: string): string {
 
 export function ChannelAuditModal({ audit, onClose, onDelete }: ChannelAuditModalProps) {
   const config = PLATFORM_CONFIG[audit.platform] || PLATFORM_CONFIG.youtube;
-  const PlatformIcon = config.icon;
   const hasRealStats = !audit.statistics.hiddenSubscriberCount;
 
   // Esc to close
@@ -88,7 +87,7 @@ export function ChannelAuditModal({ audit, onClose, onDelete }: ChannelAuditModa
         {/* ─── Header: banner + avatar ─── */}
         <div className={`relative h-28 bg-gradient-to-br ${config.banner} overflow-hidden`}>
           {/* Watermark icon */}
-          <PlatformIcon className={`absolute -right-6 -top-6 w-40 h-40 ${config.iconColor} opacity-10`} />
+          <PlatformIcon platform={audit.platform} className={`absolute -right-6 -top-6 w-40 h-40 ${config.iconColor} opacity-10`} />
           {/* Close button */}
           <button
             onClick={onClose}
@@ -99,7 +98,7 @@ export function ChannelAuditModal({ audit, onClose, onDelete }: ChannelAuditModa
           </button>
           {/* Platform badge */}
           <span className={`absolute top-3 left-3 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-sm text-white border border-white/10`}>
-            <PlatformIcon className={`w-3 h-3 ${config.iconColor}`} />
+            <PlatformIcon platform={audit.platform} className={`w-3 h-3 ${config.iconColor}`} />
             {config.label}
           </span>
         </div>
@@ -217,7 +216,7 @@ export function ChannelAuditModal({ audit, onClose, onDelete }: ChannelAuditModa
                       />
                     ) : (
                       <div className={`absolute inset-0 bg-gradient-to-br ${config.banner} flex items-center justify-center`}>
-                        <PlatformIcon className={`w-5 h-5 ${config.iconColor} opacity-60`} />
+                        <PlatformIcon platform={audit.platform} className={`w-5 h-5 ${config.iconColor} opacity-60`} />
                       </div>
                     )}
                   </div>

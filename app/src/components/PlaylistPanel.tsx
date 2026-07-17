@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import {
-  Youtube, Loader2, Crown, Copy, Check, ListOrdered,
+  Loader2, Crown, Copy, Check, ListOrdered,
   Calendar, Link2, TrendingUp, Sparkles, X, Plus, ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { sequencePlaylist } from '@/services/api';
 import type { PlaylistResponse, PlaylistResult } from '../types';
 import { ParticleLoader } from './Loading';
+import { PlatformIcon } from './BrandIcons';
 
 interface PlaylistPanelProps {
   user: { plan: string } | null;
@@ -134,7 +135,7 @@ export function PlaylistPanel({ user, onNavigate }: PlaylistPanelProps) {
             {(['youtube', 'tiktok', 'x', 'shorts'] as const).map(platform => {
               const rows = p.distribution_schedule[platform] || [];
               if (!rows.length) return null;
-              const platformLabel: Record<string, string> = { youtube: 'YouTube', tiktok: 'TikTok', x: 'X (Twitter)', shorts: 'YouTube Shorts' };
+              const platformLabel: Record<string, string> = { youtube: 'YouTube', tiktok: 'TikTok', x: 'X', shorts: 'YouTube Shorts' };
               const platformColor: Record<string, string> = {
                 youtube: 'text-red-600 bg-red-500/10',
                 tiktok: 'text-pink-600 bg-pink-500/10',
@@ -254,7 +255,7 @@ export function PlaylistPanel({ user, onNavigate }: PlaylistPanelProps) {
           {urls.map((u, i) => (
             <div key={i} className="flex gap-2">
               <div className="relative flex-1">
-                <Youtube className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-clip-muted" />
+                <PlatformIcon platform="youtube" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-clip-muted" />
                 <input
                   type="url"
                   value={u}

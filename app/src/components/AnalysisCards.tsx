@@ -7,9 +7,10 @@ import { useState } from 'react';
 import {
   Activity, BarChart3, Camera, CheckCircle2, Copy, Flame, Hash,
   Layers, Lightbulb, MessageSquare, Pencil, Pin, Play,
-  Sparkles, TrendingUp, Volume2, Youtube, Zap,
+  Sparkles, TrendingUp, Volume2, Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PlatformIcon } from './BrandIcons';
 import type { UnifiedAnalysis } from '../types';
 
 interface Props {
@@ -157,7 +158,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
                     </div>
                   </div>
                   <span className="absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/90 text-white">
-                    <Youtube className="w-3 h-3" /> YouTube
+                    <PlatformIcon platform="youtube" className="w-3 h-3" /> YouTube
                   </span>
                 </button>
               )}

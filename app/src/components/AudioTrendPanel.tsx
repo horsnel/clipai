@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import {
-  Youtube, Copy, Check, Music, Zap, AlertTriangle,
+  Copy, Check, Music, Zap, AlertTriangle,
   Volume2, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { analyseAudioTrend } from '@/services/api';
 import type { AudioTrendResponse, AudioTrendResult } from '../types';
 import { ParticleLoader } from './Loading';
+import { PlatformIcon } from './BrandIcons';
 
 interface AudioTrendPanelProps {
   user: { plan: string } | null;
@@ -100,7 +101,7 @@ export function AudioTrendPanel({ user: _user, onNavigate: _onNavigate }: AudioT
 
         <div>
           <label className="text-sm font-medium text-clip-text block mb-2 flex items-center gap-2">
-            <Youtube className="w-4 h-4 text-clip-cyan" />
+            <PlatformIcon platform="youtube" className="w-4 h-4 text-clip-cyan" />
             YouTube URL
           </label>
           <input

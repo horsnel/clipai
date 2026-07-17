@@ -265,11 +265,57 @@ export async function listClips(): Promise<{ clips: any[] }> {
   return apiClient.get<{ clips: any[] }>('/clips');
 }
 
-// ─── Trending Videos (Dashboard widget, public, 6h cache) ───────────────────
+// ─── Trending Videos (Dashboard widget, public, 6h backend cache + 1h client cache) ───
+// Backend caches the rendered video list for 6h globally (KV). We ALSO cache
+// on the client (localStorage) for 1h so the dashboard renders instantly on
+// repeat visits without showing a loading state every time. The cache is
+// keyed by `game` so different games don't collide.
+const TRENDING_VIDEOS_CLIENT_TTL_MS = 60 * 60 * 1000; // 1 hour
+const TRENDING_VIDEOS_CACHE_PREFIX = 'clipai:tv:';
+
 export async function getTrendingVideos(game?: string): Promise<TrendingVideosResponse> {
   const params = new URLSearchParams();
   if (game) params.set('game', game);
-  return apiClient.get<TrendingVideosResponse>(`/trending-videos?${params.toString()}`);
+  const cacheKey = `${TRENDING_VIDEOS_CACHE_PREFIX}${(game || 'gaming').toLowerCase()}`;
+
+  // 1. Try client cache first — instant render on repeat visits.
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { data: TrendingVideosResponse; expiresAt: number };
+      if (Date.now() < parsed.expiresAt) {
+        return parsed.data;
+      }
+      // Expired — clear so we don't keep stale data if the network fails.
+      localStorage.removeItem(cacheKey);
+    }
+  } catch {
+    // localStorage may be unavailable (private mode, quota) — fall through to network.
+  }
+
+  // 2. Network fetch — hits the 6h backend KV cache.
+  const data = await apiClient.get<TrendingVideosResponse>(`/trending-videos?${params.toString()}`);
+
+  // 3. Persist to client cache (best-effort).
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify({
+      data,
+      expiresAt: Date.now() + TRENDING_VIDEOS_CLIENT_TTL_MS,
+    }));
+  } catch {
+    // Quota exceeded — clear any other cached trending entries and try once more.
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith(TRENDING_VIDEOS_CACHE_PREFIX))
+        .forEach(k => localStorage.removeItem(k));
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data,
+        expiresAt: Date.now() + TRENDING_VIDEOS_CLIENT_TTL_MS,
+      }));
+    } catch {}
+  }
+
+  return data;
 }
 
 // ─── Leaderboard ────────────────────────────────────────────────────────────

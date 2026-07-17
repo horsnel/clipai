@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
 import { Zap, Copy, ThumbsUp, Loader2,
   Hash, Type, Sparkles, ChevronRight, CheckCheck,
-  TrendingUp, Flame, Trophy, Crown, Youtube, ListOrdered,
+  TrendingUp, Flame, Trophy, Crown, ListOrdered,
   Music, MessageSquare, Ghost,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import { ShadowPanel } from '../components/ShadowPanel';
 import { consumePendingAnalysisId } from '@/lib/navState';
 import type { UnifiedAnalysis } from '../types';
 import { InfoIconPopup } from '@/components/InfoIconPopup';
+import { PlatformIcon } from '@/components/BrandIcons';
 
 interface ViralForgePageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -333,7 +334,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                 <>
                   <div>
                     <label className="text-sm font-medium text-clip-text block mb-2 flex items-center gap-2">
-                      <Youtube className="w-4 h-4 text-clip-cyan" />
+                      <PlatformIcon platform="youtube" className="w-4 h-4 text-clip-cyan" />
                       YouTube URL
                       <InfoIconPopup label="How it works" size="sm" className="ml-1">
                         Paste any YouTube video URL with English captions. We analyze the transcript and return 14 viral strategy outputs in one shot — costs 5 credits.
