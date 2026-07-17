@@ -101,6 +101,10 @@ type Profile = {
   last_active_date?: string;
   avatar_url?: string;
   notification_prefs?: Record<string, boolean>;
+  // Phase 5 audit quota — counts audits re-run today, resets every 24h.
+  // The worker checks + resets this before each audit (see checkAndIncrementDailyQuota).
+  audits_used_today?: number;
+  audit_quota_reset_at?: string;
 };
 
 type Ctx = { Bindings: Env; Variables: { userId: string; profile: Profile } };
@@ -289,6 +293,194 @@ async function mergeSettingsPrefs(env: Env, userId: string, patch: Record<string
   const merged = { ...existing, ...patch };
   await writeSettingsPrefs(env, userId, merged);
   return merged;
+}
+
+// ─── channel_audits table adapter (Phase 5) ──────────────────────────────────
+// The dedicated `channel_audits` table is the new source of truth for audit
+// persistence. The legacy jsonb blob in `settings.prefs.audits` is kept in
+// sync as a fallback (so the dashboard still works even if the table is
+// somehow unavailable, and existing in-flight deployments don't lose data).
+//
+// Writes go to BOTH the table and the jsonb blob.
+// Reads prefer the table, fall back to the jsonb blob.
+
+// Free-tier daily audit quota — separate from the 8-channel SAVED limit (which
+// is enforced by the DB trigger on channel_audits). This stops a user from
+// spamming refresh on the same 8 channels to drain our scraper credit budget.
+// The quota is per-user, per-24h-rolling-window (not calendar UTC day, to be
+// forgiving of timezone fuzz).
+const DAILY_AUDIT_QUOTA = 50;
+
+// Maps the audit table row (snake_case) to the audit entry shape the dashboard
+// expects (camelCase, with `avatar` instead of `avatar_url`).
+function channelAuditRowToEntry(r: any): any {
+  return {
+    url: r.url,
+    platform: r.platform,
+    channelName: r.channel_name,
+    channelHandle: r.channel_handle,
+    avatar: r.avatar_url,
+    source: r.source,
+    auditedAt: r.last_refreshed_at || r.created_at,
+  };
+}
+
+// Read the user's saved audits from the channel_audits table.
+// Falls back to settings.prefs.audits (jsonb) if the table is unavailable.
+async function listChannelAudits(env: Env, userId: string): Promise<any[]> {
+  try {
+    const rows = await sbFetch<any[]>(
+      env,
+      `channel_audits?user_id=eq.${encodeURIComponent(userId)}&order=last_refreshed_at.desc&select=*`,
+    );
+    if (rows !== null) {
+      return rows.map(channelAuditRowToEntry);
+    }
+  } catch (e) {
+    console.warn('listChannelAudits: table read failed, falling back to prefs.audits:', e);
+  }
+  // Fallback: read from settings.prefs.audits
+  const prefs = await readSettingsPrefs(env, userId);
+  return Array.isArray(prefs.audits) ? prefs.audits : [];
+}
+
+// Upsert an audit into the channel_audits table (dedupe via (user_id, url)
+// unique constraint — the table uses `Prefer: resolution=merge-duplicates` so
+// POST behaves as upsert on the constraint).
+//
+// Also mirrors the entry into settings.prefs.audits for backward compatibility.
+//
+// Returns { saved, count } where count is the user's total saved-audit count
+// (used by the frontend to show "3 of 8 channels saved").
+async function upsertChannelAudit(env: Env, userId: string, audit: any): Promise<{ saved: any; count: number }> {
+  const auditEntry = {
+    url: audit.url,
+    platform: audit.platform,
+    channelName: audit.channelName,
+    channelHandle: audit.channelHandle,
+    avatar: audit.avatar,
+    auditedAt: audit.auditedAt,
+  };
+
+  // 1. Upsert into channel_audits table.
+  let tableWriteOk = false;
+  try {
+    const body = {
+      user_id: userId,
+      url: audit.url,
+      platform: audit.platform,
+      channel_name: audit.channelName || null,
+      channel_handle: audit.channelHandle || null,
+      avatar_url: audit.avatar || null,
+      source: audit.source || null,
+      // last_refreshed_at is auto-touched by the BEFORE UPDATE trigger;
+      // on INSERT it defaults to now().
+    };
+    await sbFetch(env, 'channel_audits', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal,resolution=merge-duplicates' },
+      body: JSON.stringify(body),
+    });
+    // sbFetch returns null both on success (no content) and on failure (logged).
+    // Verify by reading back.
+    const verifyRows = await sbFetch<any[]>(
+      env,
+      `channel_audits?user_id=eq.${encodeURIComponent(userId)}&url=eq.${encodeURIComponent(audit.url)}&select=id`,
+    );
+    tableWriteOk = (verifyRows !== null && verifyRows.length > 0);
+    if (!tableWriteOk) {
+      console.warn('upsertChannelAudit: table write verification failed');
+    }
+  } catch (e) {
+    console.warn('upsertChannelAudit: table upsert failed:', e);
+  }
+
+  // 2. Mirror to settings.prefs.audits (backward-compat / fallback).
+  let prefs = await readSettingsPrefs(env, userId);
+  const audits = Array.isArray(prefs.audits) ? prefs.audits : [];
+  const filtered = audits.filter((a: any) => a.url !== audit.url);
+  filtered.unshift(auditEntry);
+  prefs.audits = filtered.slice(0, 8);
+  await writeSettingsPrefs(env, userId, prefs);
+
+  // 3. Count for the response — prefer table count (authoritative), fall back
+  //    to prefs count if the table is unavailable.
+  let count = filtered.length;
+  if (tableWriteOk) {
+    try {
+      const tableCount = await sbHead(env, `channel_audits?user_id=eq.${encodeURIComponent(userId)}`);
+      if (tableCount > 0 || filtered.length === 0) count = tableCount;
+    } catch {}
+  }
+
+  return { saved: auditEntry, count };
+}
+
+// Delete an audit by URL — removes from BOTH the table and the jsonb blob.
+// Returns true if either side deleted anything (best-effort).
+async function deleteChannelAudit(env: Env, userId: string, url: string): Promise<boolean> {
+  let tableDeleted = false;
+  // 1. Delete from the table.
+  try {
+    // First HEAD to check existence — Supabase DELETE returns 200 even if no rows matched.
+    const beforeCount = await sbHead(env, `channel_audits?user_id=eq.${encodeURIComponent(userId)}&url=eq.${encodeURIComponent(url)}`);
+    if (beforeCount > 0) {
+      await sbFetch(env, `channel_audits?user_id=eq.${encodeURIComponent(userId)}&url=eq.${encodeURIComponent(url)}`, {
+        method: 'DELETE',
+        headers: { Prefer: 'return=minimal' },
+      });
+      const afterCount = await sbHead(env, `channel_audits?user_id=eq.${encodeURIComponent(userId)}&url=eq.${encodeURIComponent(url)}`);
+      tableDeleted = (afterCount < beforeCount);
+    }
+  } catch (e) {
+    console.warn('deleteChannelAudit: table delete failed:', e);
+  }
+
+  // 2. Also delete from the jsonb blob.
+  const prefs = await readSettingsPrefs(env, userId);
+  const audits = Array.isArray(prefs.audits) ? prefs.audits : [];
+  const filtered = audits.filter((a: any) => a.url !== url);
+  const jsonbDeleted = (filtered.length !== audits.length);
+  if (jsonbDeleted) {
+    prefs.audits = filtered;
+    await writeSettingsPrefs(env, userId, prefs);
+  }
+
+  return tableDeleted || jsonbDeleted;
+}
+
+// Check + enforce the daily audit quota. If the user has hit the limit, return
+// allowed=false. Otherwise, increment the counter (resetting if the 24h window
+// has elapsed) and return allowed=true.
+//
+// Best-effort: if Supabase is unreachable, allow the audit through (we don't
+// want to block the user because their DB is briefly down).
+async function checkAndIncrementDailyQuota(env: Env, userId: string): Promise<{ allowed: boolean; used: number; quota: number; resetAt: string }> {
+  const quota = DAILY_AUDIT_QUOTA;
+  const profile = await fetchProfile(env, userId);
+  if (!profile) {
+    // Can't read profile — allow the audit (best-effort).
+    return { allowed: true, used: 0, quota, resetAt: new Date().toISOString() };
+  }
+  const now = Date.now();
+  const resetAtMs = profile.audit_quota_reset_at ? Date.parse(profile.audit_quota_reset_at) : 0;
+  const used = (typeof profile.audits_used_today === 'number') ? profile.audits_used_today : 0;
+  const isStale = (now - resetAtMs) > 24 * 60 * 60 * 1000;
+  const effectiveUsed = isStale ? 0 : used;
+
+  if (effectiveUsed >= quota) {
+    return { allowed: false, used: effectiveUsed, quota, resetAt: profile.audit_quota_reset_at || new Date().toISOString() };
+  }
+
+  // Increment — reset to 1 if stale, else used + 1.
+  const newUsed = isStale ? 1 : (effectiveUsed + 1);
+  const newResetAt = isStale ? new Date().toISOString() : (profile.audit_quota_reset_at || new Date().toISOString());
+  await updateProfile(env, userId, {
+    audits_used_today: newUsed,
+    audit_quota_reset_at: newResetAt,
+  });
+
+  return { allowed: true, used: newUsed, quota, resetAt: newResetAt };
 }
 
 async function awardCredits(env: Env, userId: string, delta: number, reason: string, referenceId?: string): Promise<boolean> {
@@ -3788,8 +3980,14 @@ Rules:
 // POST /api/audit-channel — runs a fresh audit for a single URL, caches the
 // result with adaptive TTL (1h default; 6h for accounts with >1M followers —
 // big accounts don't change stats hourly, and this conserves scraper credits),
-// and persists a lightweight entry to settings.prefs.audits for the user
-// (max 8 channels, deduped by URL).
+// and persists a lightweight entry to the `channel_audits` table (Phase 5 source
+// of truth) + mirrors it to settings.prefs.audits (legacy jsonb fallback).
+//
+// Two independent limits:
+//   - 8-channel SAVED limit — enforced by the DB trigger on channel_audits
+//     (user can only have ≤8 distinct URLs saved at any time)
+//   - 50-audit/day limit — enforced here via audits_used_today on profiles
+//     (caps scraper-credit spend per user per 24h rolling window)
 app.post('/audit-channel', requireAuth, async (c) => {
   const env = c.env as Env;
   const userId = c.get('userId') as string;
@@ -3804,6 +4002,19 @@ app.post('/audit-channel', requireAuth, async (c) => {
   const normalised = normaliseAuditInput(rawUrl, platformHint);
   if (!normalised) return json({ error: 'Unsupported input. Paste a full URL or a username with a platform prefix (yt:name, tt:name, ig:name, x:name, r:name).' }, 400);
   const url = normalised.url;
+
+  // ─── Daily quota check (BEFORE we spend scraper credits) ────────────────────
+  // This blocks users who have hit the 50-audit/day cap. It increments the
+  // counter even if the audit later fails — so a user spamming bogus URLs gets
+  // rate-limited quickly. (We don't refund on audit failure because the
+  // scraper credit was already spent upstream.)
+  const quota = await checkAndIncrementDailyQuota(env, userId);
+  if (!quota.allowed) {
+    return json({
+      error: `Daily audit limit reached (${quota.used}/${quota.quota}). Resets 24h after ${quota.resetAt}. Try again later.`,
+      quota,
+    }, 429);
+  }
 
   // Adaptive cache TTL: peek the existing cached value first. If we already
   // know the subscriber count from a previous audit, use the appropriate TTL.
@@ -3845,34 +4056,41 @@ app.post('/audit-channel', requireAuth, async (c) => {
   } catch {
     audit = await auditChannel(env, url, platformHint);
   }
-  if (audit.error) return json({ error: audit.error }, 400);
+  if (audit.error) return json({ error: audit.error, quota }, 400);
 
-  // Persist a lightweight entry to settings.prefs.audits (max 8, dedupe by URL)
-  const prefs = await readSettingsPrefs(env, userId);
-  const audits = Array.isArray(prefs.audits) ? prefs.audits : [];
-  const auditEntry = {
+  // Persist to channel_audits table (new) + mirror to settings.prefs.audits
+  // (legacy jsonb fallback). The 8-channel-per-user limit is enforced by a
+  // DB trigger on the table; if the user already has 8 SAVED channels and this
+  // is a new URL, the upsert will fail and we'll return a 409 with a clear
+  // message. (Re-auditing an existing URL is always allowed — it just refreshes.)
+  const { saved, count } = await upsertChannelAudit(env, userId, {
     url,
     platform: audit.platform,
     channelName: audit.channelName,
     channelHandle: audit.channelHandle,
     avatar: audit.avatar,
+    source: audit.source,
     auditedAt: audit.auditedAt,
-  };
-  const filtered = audits.filter((a: any) => a.url !== url);
-  filtered.unshift(auditEntry);
-  prefs.audits = filtered.slice(0, 8);
-  await writeSettingsPrefs(env, userId, prefs);
+  });
 
-  return json({ audit, saved: auditEntry });
+  return json({ audit, saved, count, quota });
 });
 
 // GET /api/channel-audits — returns the user's saved audits WITH the full audit
 // data (re-read from the 1h cache so it stays fresh without bloating the DB).
+//
+// Reads the audit METADATA (url, platform, channel name, etc.) from the
+// channel_audits table (Phase 5 source of truth), then for each row, hydrates
+// the full audit payload (recent videos, statistics, metrics) from the 1h KV
+// cache. If the cache is cold (e.g. the user just signed in after >1h gap),
+// we return the metadata + zeroed-out statistics so the card still renders.
+//
+// Falls back to settings.prefs.audits (legacy jsonb blob) if the table is
+// unreachable — so existing deployments don't break.
 app.get('/channel-audits', requireAuth, async (c) => {
   const env = c.env as Env;
   const userId = c.get('userId') as string;
-  const prefs = await readSettingsPrefs(env, userId);
-  const audits = Array.isArray(prefs.audits) ? prefs.audits : [];
+  const audits = await listChannelAudits(env, userId);
   const fullAudits = await Promise.all(
     audits.map(async (entry: any) => {
       try {
@@ -3891,20 +4109,28 @@ app.get('/channel-audits', requireAuth, async (c) => {
       };
     }),
   );
-  return json({ audits: fullAudits });
+  // Also surface the daily-quota info so the dashboard can show
+  // "3 of 50 daily audits used" + "4 of 8 channels saved".
+  const profile = await fetchProfile(env, userId);
+  const dailyQuota = {
+    used: (typeof profile?.audits_used_today === 'number') ? profile.audits_used_today : 0,
+    quota: DAILY_AUDIT_QUOTA,
+    resetAt: profile?.audit_quota_reset_at || null,
+  };
+  return json({ audits: fullAudits, count: fullAudits.length, dailyQuota });
 });
 
 // DELETE /api/channel-audits?url=... — remove an audit from user's saved list.
+// Deletes from BOTH the channel_audits table (new) and settings.prefs.audits
+// (legacy jsonb blob). Best-effort — returns success if either side removed
+// the row.
 app.delete('/channel-audits', requireAuth, async (c) => {
   const env = c.env as Env;
   const userId = c.get('userId') as string;
   const url = (c.req.query('url') || '').trim();
   if (!url) return json({ error: 'url query param is required' }, 400);
-  const prefs = await readSettingsPrefs(env, userId);
-  const audits = Array.isArray(prefs.audits) ? prefs.audits : [];
-  prefs.audits = audits.filter((a: any) => a.url !== url);
-  await writeSettingsPrefs(env, userId, prefs);
-  return json({ success: true });
+  const deleted = await deleteChannelAudit(env, userId, url);
+  return json({ success: true, deleted });
 });
 
 // GET /api/audit-credits?secret=... — returns live credit balances for all

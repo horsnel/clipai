@@ -336,10 +336,27 @@ export interface AuditChannelResponse {
     avatar: string;
     auditedAt: string;
   };
+  /** Number of saved audits the user now has (≤8). Phase 5. */
+  count?: number;
+  /** Daily audit quota state after this audit ran. Phase 5. */
+  quota?: {
+    allowed: boolean;
+    used: number;
+    quota: number;
+    resetAt: string;
+  };
 }
 
 export interface ChannelAuditsResponse {
   audits: ChannelAudit[];
+  /** Total saved audits for the user (≤8). Phase 5. */
+  count?: number;
+  /** Daily audit quota state (used to render "X/50 audits today"). Phase 5. */
+  dailyQuota?: {
+    used: number;
+    quota: number;
+    resetAt: string | null;
+  };
 }
 
 export interface SaveOnboardingResponse {

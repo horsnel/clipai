@@ -31,6 +31,10 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [selected, setSelected] = useState<ChannelAudit | null>(null);
+  // Phase 5 — quota + count from the GET response (for the header chip)
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+  const [dailyUsed, setDailyUsed] = useState<number | null>(null);
+  const dailyQuotaLimit = 50;
 
   const fetchAudits = useCallback(async () => {
     setLoading(true);
@@ -38,6 +42,11 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
     try {
       const data = await getChannelAudits();
       setAudits(data.audits || []);
+      if (typeof data.count === 'number') setSavedCount(data.count);
+      else setSavedCount(data.audits?.length ?? 0);
+      if (data.dailyQuota && typeof data.dailyQuota.used === 'number') {
+        setDailyUsed(data.dailyQuota.used);
+      }
     } catch (e: any) {
       setError(e?.message || 'Failed to load audits');
     } finally {
@@ -73,6 +82,16 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
             </h2>
             <p className="text-clip-muted text-xs mt-0.5">
               Free analytics snapshot of your linked channels
+              {savedCount !== null && (
+                <span className="ml-2 text-clip-muted/80">
+                  · {savedCount}/8 saved
+                  {dailyUsed !== null && (
+                    <span className={`ml-1 ${dailyUsed >= dailyQuotaLimit * 0.8 ? 'text-clip-amber' : ''}`}>
+                      · {dailyUsed}/{dailyQuotaLimit} audits today
+                    </span>
+                  )}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -152,7 +171,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
                 Add another
               </p>
               <p className="text-[10px] text-clip-muted">
-                {audits.length} / 8 channels
+                {(savedCount ?? audits.length)} / 8 channels
               </p>
             </button>
           )}
