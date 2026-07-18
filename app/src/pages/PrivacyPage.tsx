@@ -159,7 +159,7 @@ export function PrivacyPage({ onNavigate }: PrivacyPageProps) {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-clip-cyan mt-1">•</span>
-                <span><strong className="text-clip-text">Opt-out:</strong> Unsubscribe from marketing communications</span>
+                <span><strong className="text-clip-text">Opt out:</strong> Unsubscribe from marketing communications</span>
               </li>
             </ul>
           </section>

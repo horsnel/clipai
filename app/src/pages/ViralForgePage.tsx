@@ -16,7 +16,6 @@ import { CommentsPanel } from '../components/CommentsPanel';
 import { ShadowPanel } from '../components/ShadowPanel';
 import { consumePendingAnalysisId } from '@/lib/navState';
 import type { UnifiedAnalysis } from '../types';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
 import { PlatformIcon } from '@/components/BrandIcons';
 
 interface ViralForgePageProps {
@@ -134,7 +133,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
         });
         // Pre-fill the URL box with the source so a re-run is one click away
         if (row.source_url) setYtUrl(row.source_url);
-        toast.success('Re-opened saved analysis — no credit charged');
+        toast.success('Re-opened saved analysis: no credit charged');
       })
       .catch((e: any) => {
         toast.error(e?.message || 'Could not load that analysis');
@@ -167,7 +166,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
         ).sort((a, b) => b.net_votes - a.net_votes),
       );
       setVotedSet(prev => { const n = new Set(prev); n.delete(caption); return n; });
-      toast.error('Vote failed — try again');
+      toast.error('Vote failed: try again');
     }
   };
 
@@ -243,11 +242,11 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
   const TOOLS: { key: ActiveTool; label: string; icon: typeof Type; desc: string }[] = [
     { key: 'analysis', label: 'Deep Analysis', icon: Sparkles, desc: 'Paste a YouTube URL → 14 outputs' },
     { key: 'compare',  label: 'Compare',       icon: Trophy,    desc: 'Head-to-head competitor analysis' },
-    { key: 'playlist', label: 'Playlist',      icon: ListOrdered, desc: 'Sequence + distribute 2–10 videos' },
+    { key: 'playlist', label: 'Playlist',      icon: ListOrdered, desc: 'Sequence + distribute 2 to 10 videos' },
     { key: 'audio',    label: 'Audio Sync',    icon: Music,     desc: 'Match clip to trending sounds + beat drops' },
     { key: 'comments', label: 'Comments',      icon: MessageSquare, desc: 'Predict viewer reactions + pinned comment' },
-    { key: 'shadow',   label: 'Shadow Editor', icon: Ghost,     desc: 'Faceless-creator voiceover script from any URL' },
-    { key: 'titles',   label: 'Title Forge',   icon: TrendingUp, desc: 'SEO-optimised viral titles ranked by score' },
+    { key: 'shadow',   label: 'Shadow Editor', icon: Ghost,     desc: 'Faceless creator voiceover script from any URL' },
+    { key: 'titles',   label: 'Title Forge',   icon: TrendingUp, desc: 'SEO optimised viral titles ranked by score' },
     { key: 'captions', label: 'Caption Battle',icon: Flame,      desc: 'Generate & vote your best caption' },
     { key: 'hashtags', label: 'Hashtag Pack',  icon: Hash,       desc: 'Perfectly sized hashtag combos' },
     { key: 'hooks',    label: 'Hook Library',  icon: Type,       desc: 'Addictive opening lines for your video' },
@@ -299,9 +298,6 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
               Viral <span className="gradient-text">Forge</span>
             </h1>
-            <InfoIconPopup label="What is Viral Forge?" size="md" className="ml-1">
-              AI-powered titles, captions, hooks &amp; hashtags — built to go viral
-            </InfoIconPopup>
           </div>
         </div>
 
@@ -317,16 +313,13 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
               <t.icon className={`w-5 h-5 mb-2 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-muted'}`} />
               <div className="flex items-center gap-1">
                 <p className={`text-sm font-medium ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
-                <InfoIconPopup label={`What is ${t.label}?`} size="sm">
-                  {t.desc}
-                </InfoIconPopup>
               </div>
             </button>
           ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Input panel — hidden for self-managed tools (Compare/Playlist/Audio/Comments/Shadow) which have their own inputs */}
+          {/* Input panel: hidden for self-managed tools (Compare/Playlist/Audio/Comments/Shadow) which have their own inputs */}
           {!isSelfManaged && (
           <div className="lg:col-span-2 space-y-4">
             <div className="card-glass p-5 space-y-4">
@@ -336,9 +329,6 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                     <label className="text-sm font-medium text-clip-text block mb-2 flex items-center gap-2">
                       <PlatformIcon platform="youtube" className="w-4 h-4 text-clip-cyan" />
                       YouTube URL
-                      <InfoIconPopup label="How it works" size="sm" className="ml-1">
-                        Paste any YouTube video URL with English captions. We analyze the transcript and return 14 viral strategy outputs in one shot — costs 5 credits.
-                      </InfoIconPopup>
                     </label>
                     <input
                       type="url"
@@ -457,7 +447,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
           )}
 
           {/* Results panel — spans full width when self-managed (no input column) */}
-          <div className={isSelfManaged ? 'lg:col-span-5' : 'lg:col-span-3'}>
+          <div className={isSelfManaged ? 'lg:col span-5' : 'lg:col span-3'}>
             {/* ── COMPARE (Phase 2) ── */}
             {activeTool === 'compare' && (
               <ComparePanel user={user} onNavigate={onNavigate} />
@@ -564,7 +554,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                             <button key={cap.id} onClick={() => handleBattleVote(cap)}
                               className="card-glass p-4 text-left hover:border-clip-amber/40 hover:bg-clip-amber/3 transition-all group">
                               <p className="text-clip-text text-sm leading-relaxed mb-3">{cap.text}</p>
-                              <div className="flex items-center justify-between">
+                              <div className="flex items center justify between">
                                 <ViralPill score={cap.viralScore} />
                                 <span className="text-clip-muted text-xs group-hover:text-clip-amber transition-colors flex items-center gap-1">
                                   Vote <ChevronRight className="w-3 h-3" />
@@ -654,7 +644,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                     </div>
                     <div className="mt-4 pt-4 border-t border-white/[0.025] flex items-center gap-4 text-xs text-clip-muted">
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-clip-cyan/30 inline-block" /> Mega (high reach)</span>
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-clip-surface border border-white/[0.02] inline-block" /> Mid-tier</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-clip-surface border border-white/[0.02] inline-block" /> Mid tier</span>
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-clip-surface/50 inline-block" /> Niche</span>
                     </div>
                   </div>
@@ -756,9 +746,6 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
               <Sparkles className="w-5 h-5 text-clip-cyan flex-shrink-0" />
               <div className="flex items-center gap-2">
                 <p className="text-clip-text font-medium text-sm">Unlimited generations + priority AI</p>
-                <InfoIconPopup label="Why upgrade?" size="sm" className="ml-1">
-                  Free plan: 5 generations/day. Pro: unlimited ViralForge + ClipBot access.
-                </InfoIconPopup>
               </div>
             </div>
             <button onClick={() => onNavigate('pricing')} className="btn-primary text-sm px-5 py-2 whitespace-nowrap">
@@ -864,9 +851,9 @@ function getFallbackHooks(game: string): string[] {
     `Nobody was ready for what happened next in this ${game} match 👀`,
     `I bet you can't watch this ${game} clip without your jaw dropping`,
     `This is the moment I knew ${game} wasn't ready for me 😤`,
-    `Watch till the END — the final 3 seconds changed everything`,
+    `Watch till the END: the final 3 seconds changed everything`,
     `The enemies actually laughed at me before this happened 💀`,
     `Stop scrolling. You need to see this ${game} clutch 🔥`,
-    `My teammates said "it's over" — I said "hold on" 🎯`,
+    `My teammates said "it's over", I said "hold on" 🎯`,
   ];
 }

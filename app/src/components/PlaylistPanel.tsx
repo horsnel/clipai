@@ -79,7 +79,7 @@ export function PlaylistPanel({ user, onNavigate }: PlaylistPanelProps) {
         <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Analyzing all {urls.filter(u => u.trim()).length} videos + sequencing.<br />
-          <span className="text-xs">Takes longer than Deep Analysis — 30–60 seconds for fresh URLs.</span>
+          <span className="text-xs">Takes longer than Deep Analysis: 30 to 60 seconds for fresh URLs.</span>
         </p>
       </div>
     );
@@ -238,7 +238,7 @@ export function PlaylistPanel({ user, onNavigate }: PlaylistPanelProps) {
           </div>
           <div>
             <h3 className="font-display font-semibold text-clip-text">Playlist Architect</h3>
-            <p className="text-clip-muted text-xs">Sequence + distribute 2–10 videos · 5 credits</p>
+            <p className="text-clip-muted text-xs">Sequence + distribute 2 to 10 videos · 5 credits</p>
           </div>
           {!isPro && (
             <span className="ml-auto text-[10px] font-bold uppercase text-clip-amber bg-clip-amber/10 border border-clip-amber/20 px-2 py-1 rounded">
@@ -248,7 +248,7 @@ export function PlaylistPanel({ user, onNavigate }: PlaylistPanelProps) {
         </div>
 
         <p className="text-clip-muted text-sm mb-6">
-          Paste 2–10 YouTube URLs. We'll Deep-Analyze each one (reusing cached results where possible), then produce an optimal publishing order, per-platform distribution schedule, cross-promotion hooks, and a retention forecast.
+          Paste 2 to 10 YouTube URLs. We'll Deep Analyze each one (reusing cached results where possible), then produce an optimal publishing order, per platform distribution schedule, cross promotion hooks, and a retention forecast.
         </p>
 
         <div className="space-y-2">

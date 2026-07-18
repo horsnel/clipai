@@ -19,7 +19,7 @@ interface ResultsPageProps {
 
 // Fallback demo clips used when no real data is passed
 const DEMO_CLIPS: DetectedClip[] = [
-  { id: '1', thumbnail: '/gameplay-thumb-1.jpg', startTime: '02:34', endTime: '03:06', startSeconds: 154, endSeconds: 186, hypeScore: 96, duration: '0:32', caption: 'INSANE multi-kill 🔥', selected: true  },
+  { id: '1', thumbnail: '/gameplay-thumb-1.jpg', startTime: '02:34', endTime: '03:06', startSeconds: 154, endSeconds: 186, hypeScore: 96, duration: '0:32', caption: 'INSANE multi kill 🔥', selected: true  },
   { id: '2', thumbnail: '/gameplay-thumb-2.jpg', startTime: '08:12', endTime: '08:57', startSeconds: 492, endSeconds: 537, hypeScore: 88, duration: '0:45', caption: 'Clutch 1v4 🎯',       selected: false },
   { id: '3', thumbnail: '/gameplay-thumb-3.jpg', startTime: '15:45', endTime: '16:13', startSeconds: 945, endSeconds: 973, hypeScore: 92, duration: '0:28', caption: 'Team wipe 💀',        selected: false },
 ];
@@ -167,7 +167,7 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
                 className={`card-glass overflow-hidden cursor-pointer transition-all duration-300 ${
                   clip.selected ? 'border-clip-cyan/50 ring-1 ring-clip-cyan/30' : 'hover:border-white/[0.025]'
                 }`}>
-                <div className="relative aspect-video">
+                <div className="relative aspect video">
                   <img src={clip.thumbnail} alt={`Clip ${clip.id}`} className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/80 via-transparent to-transparent" />
                   <div className="absolute top-2 left-2">{getHypeBadge(clip.hypeScore)}</div>
@@ -179,7 +179,7 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
                   )}
                 </div>
                 <div className="p-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items center justify between">
                     <span className="text-clip-muted text-sm font-mono">{clip.startTime} – {clip.endTime}</span>
                     <Play className="w-4 h-4 text-clip-muted" />
                   </div>
@@ -293,7 +293,7 @@ export function ResultsPage({ user, onNavigate, clips: propClips }: ResultsPageP
                       { icon: Music, label: 'Beat Sync',  value: beatSyncEnabled,  set: setBeatSyncEnabled,  locked: plan === 'free' },
                       { icon: Image, label: 'Watermark',  value: watermarkEnabled, set: setWatermarkEnabled },
                     ].map(({ icon: Icon, label, value, set, locked }) => (
-                      <label key={label} className="flex items-center justify-between cursor-pointer">
+                      <label key={label} className="flex items center justify between cursor pointer">
                         <span className="text-sm text-clip-text flex items-center gap-2">
                           <Icon className="w-4 h-4 text-clip-cyan" /> {label}{locked ? ' 🔒' : ''}
                         </span>

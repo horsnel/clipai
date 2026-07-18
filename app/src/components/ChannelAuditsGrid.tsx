@@ -135,7 +135,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-display font-semibold text-clip-text mb-1 group-hover:text-clip-cyan transition-colors">
-                Audit your first channel — free
+                Audit your first channel: free
               </h3>
               <p className="text-clip-muted text-sm leading-relaxed">
                 Paste a YouTube, TikTok, X, Instagram, or Reddit link and we'll pull a free

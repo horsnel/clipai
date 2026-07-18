@@ -65,7 +65,7 @@ export function AudioTrendPanel({ user: _user, onNavigate: _onNavigate }: AudioT
         <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Fetching transcript + matching audio trends.<br />
-          <span className="text-xs">Takes 8–15 seconds if cached, longer if new.</span>
+          <span className="text-xs">Takes 8 to 15 seconds if cached, longer if new.</span>
         </p>
       </div>
     );

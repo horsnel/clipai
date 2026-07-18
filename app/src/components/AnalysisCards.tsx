@@ -134,7 +134,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
                   <iframe
                     src={`https://www.youtube-nocookie.com/embed/${embedId}?autoplay=1&rel=0`}
                     title={videoTitle}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allow="accelerometer; autoplay; clipboard write; encrypted media; gyroscope; picture-in-picture"
                     allowFullScreen
                     className="absolute inset-0 w-full h-full"
                   />
@@ -153,7 +153,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-16 h-16 rounded-full bg-clip-cyan/95 flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform">
+                    <div className="w-16 h-16 rounded-full bg-clip-cyan/95 flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform shadow-glow-cyan">
                       <Play className="w-7 h-7 text-black ml-1" fill="currentColor" />
                     </div>
                   </div>
@@ -260,7 +260,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
 
       {/* Caption Variants */}
       {a.caption_variants?.length > 0 && (
-        <Card icon={MessageSquare} title="Caption Pack" subtitle="Style-matched captions per segment" count={a.caption_variants.length}>
+        <Card icon={MessageSquare} title="Caption Pack" subtitle="Style matched captions per segment" count={a.caption_variants.length}>
           <div className="space-y-3">
             {a.caption_variants.map((seg, i) => (
               <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
@@ -377,7 +377,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
 
       {/* Sponsorship Spots */}
       {a.sponsorship_spots?.length > 0 && (
-        <Card icon={Volume2} title="Sponsorship Sweet Spots" subtitle="Energy lulls for native mid-roll reads" count={a.sponsorship_spots.length} accent="amber">
+        <Card icon={Volume2} title="Sponsorship Sweet Spots" subtitle="Energy lulls for native mid roll reads" count={a.sponsorship_spots.length} accent="amber">
           <div className="space-y-3">
             {a.sponsorship_spots.map((s, i) => (
               <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
@@ -427,18 +427,18 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
 
       {/* Shadow Editor Script */}
       {a.shadow_editor_script?.act1 && (
-        <Card icon={Pencil} title="Shadow Editor Script" subtitle="3-act faceless commentary (TTS-ready)" accent="violet">
+        <Card icon={Pencil} title="Shadow Editor Script" subtitle="3-act faceless commentary (TTS ready)" accent="violet">
           <div className="space-y-3">
             <div>
-              <p className="text-xs uppercase tracking-wider text-clip-cyan mb-1">Act 1 — Hook</p>
+              <p className="text-xs uppercase tracking-wider text-clip-cyan mb-1">Act 1: Hook</p>
               <CopyItem text={a.shadow_editor_script.act1} label="Act 1 copied" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-clip-amber mb-1">Act 2 — Tension</p>
+              <p className="text-xs uppercase tracking-wider text-clip-amber mb-1">Act 2: Tension</p>
               <CopyItem text={a.shadow_editor_script.act2} label="Act 2 copied" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wider text-violet-500 mb-1">Act 3 — Payoff</p>
+              <p className="text-xs uppercase tracking-wider text-violet-500 mb-1">Act 3: Payoff</p>
               <CopyItem text={a.shadow_editor_script.act3} label="Act 3 copied" />
             </div>
           </div>

@@ -114,7 +114,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
                 </button>
                 <Button
                   onClick={() => onNavigate('auth')}
-                  className="bg-clip-cyan text-black hover:brightness-110 font-semibold px-5 py-2 rounded-xl"
+                  className="bg-clip-cyan text-black hover:brightness-110 font-semibold px-5 py-2 rounded-xl shadow-glow-cyan-sm hover:shadow-glow-cyan transition-all"
                 >
                   Sign Up
                 </Button>
@@ -169,7 +169,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
                   </button>
                   <Button
                     onClick={() => handleNavClick('auth')}
-                    className="w-full bg-clip-cyan text-black hover:brightness-110 font-semibold py-3 rounded-xl"
+                    className="w-full bg-clip-cyan text-black hover:brightness-110 font-semibold py-3 rounded-xl shadow-glow-cyan-sm"
                   >
                     Sign Up Free
                   </Button>

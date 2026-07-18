@@ -7,7 +7,6 @@ import {
 import { toast } from 'sonner';
 import { apiClient } from '@/services/api';
 import { SkeletonList } from '../components/Loading';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface GrowthIntelPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -131,9 +130,6 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
               Growth <span className="gradient-text">Intel</span>
             </h1>
-            <InfoIconPopup label="What is Growth Intel?" size="md" className="ml-1">
-              Data-driven tools to grow faster than everyone else
-            </InfoIconPopup>
           </div>
         </div>
 
@@ -165,9 +161,6 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <div className="card-glass p-5 space-y-4">
               <h3 className="font-display font-semibold text-clip-text flex items-center gap-2">
                 <Eye className="w-4 h-4 text-clip-cyan" /> Competitor Spy
-                <InfoIconPopup label="How Competitor Spy works" size="sm" className="ml-1">
-                  Enter any gaming creator's YouTube channel. AI analyses their top videos and tells you exactly what's working.
-                </InfoIconPopup>
               </h3>
               <div>
                 <label className="text-xs text-clip-muted uppercase tracking-wider block mb-2">YouTube Channel URL</label>
@@ -253,9 +246,6 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <div className="card-glass p-5 space-y-4">
               <h3 className="font-display font-semibold text-clip-text flex items-center gap-2">
                 <Clock className="w-4 h-4 text-clip-cyan" /> Best Time to Post
-                <InfoIconPopup label="How Best Time to Post works" size="sm" className="ml-1">
-                  Get the optimal posting schedule for your game and platform in Nigeria (WAT).
-                </InfoIconPopup>
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -293,7 +283,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                   <div className="p-4 border-b border-white/[0.025]">
                     <p className="font-medium text-clip-text">{timingResult.platform} — Nigeria (WAT)</p>
                   </div>
-                  <div className="divide-y divide-white/[0.02]">
+                  <div className="divide-y divide white/[0.02]">
                     {timingResult.slots.map((slot, i) => (
                       <div key={i} className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3">
                         <span className="text-clip-muted text-xs sm:text-sm w-16 sm:w-20 font-medium flex-shrink-0">{slot.day}</span>
@@ -327,9 +317,6 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <div className="card-glass p-5 space-y-4">
               <h3 className="font-display font-semibold text-clip-text flex items-center gap-2">
                 <BarChart2 className="w-4 h-4 text-clip-cyan" /> A/B Title Predictor
-                <InfoIconPopup label="How A/B Title Predictor works" size="sm" className="ml-1">
-                  Enter 2 title options — AI predicts which will perform better based on live search data and CTR patterns.
-                </InfoIconPopup>
               </h3>
               <div className="space-y-3">
                 {[
@@ -426,15 +413,15 @@ function getFallbackSpy(url: string): SpyResult {
   const name = url.split('@')[1]?.split('/')[0] ?? 'Creator';
   return {
     channelName: name,
-    avgViews: '45K–280K',
-    postingFrequency: '5–7 videos/week',
+    avgViews: '45K,280K',
+    postingFrequency: '5 to 7 videos/week',
     bestPerformingGame: 'Call of Duty / Bloodstrike',
-    titlePattern: '[Action verb] + [game] + [number/outcome] + [emoji] — e.g. "I CLUTCHED a 1v5 in COD 😤"',
-    thumbnailStyle: 'High-contrast face reaction + big bold text + game UI in background',
+    titlePattern: '[Action verb] + [game] + [number/outcome] + [emoji] , e.g. "I CLUTCHED a 1v5 in COD 😤"',
+    thumbnailStyle: 'High contrast face reaction + big bold text + game UI in background',
     topFormulas: [
       'Emotional reaction title: "I can\'t believe this happened in [game]…"',
       'Challenge format: "Only using [weapon/item] in [game] for 24 hours"',
-      'Result reveal: "[X] kills with [Y] weapon — new personal record 🔥"',
+      'Result reveal: "[X] kills with [Y] weapon: new personal record 🔥"',
       'Controversy hook: "[game] devs don\'t want you to know this trick"',
       'POV format: "POV: you\'re the last player alive and it\'s all on you"',
     ],
@@ -446,13 +433,13 @@ function getFallbackTiming(platform: string, game: string): TimingResult {
   return {
     platform,
     slots: [
-      { day: 'Friday',   time: '7:00 PM – 9:00 PM',  score: 96, label: 'PEAK'  },
-      { day: 'Saturday', time: '3:00 PM – 11:00 PM',  score: 94, label: 'PEAK'  },
-      { day: 'Sunday',   time: '2:00 PM – 8:00 PM',   score: 91, label: 'PEAK'  },
-      { day: 'Thursday', time: '7:00 PM – 9:00 PM',   score: 82, label: 'GREAT' },
-      { day: 'Monday',   time: '8:00 PM – 10:00 PM',  score: 71, label: 'GREAT' },
-      { day: 'Wednesday',time: '7:30 PM – 9:30 PM',   score: 68, label: 'GOOD'  },
-      { day: 'Tuesday',  time: '7:00 PM – 9:00 PM',   score: 62, label: 'GOOD'  },
+      { day: 'Friday',   time: '7:00 PM , 9:00 PM',  score: 96, label: 'PEAK'  },
+      { day: 'Saturday', time: '3:00 PM , 11:00 PM',  score: 94, label: 'PEAK'  },
+      { day: 'Sunday',   time: '2:00 PM , 8:00 PM',   score: 91, label: 'PEAK'  },
+      { day: 'Thursday', time: '7:00 PM , 9:00 PM',   score: 82, label: 'GREAT' },
+      { day: 'Monday',   time: '8:00 PM , 10:00 PM',  score: 71, label: 'GREAT' },
+      { day: 'Wednesday',time: '7:30 PM , 9:30 PM',   score: 68, label: 'GOOD'  },
+      { day: 'Tuesday',  time: '7:00 PM , 9:00 PM',   score: 62, label: 'GOOD'  },
     ],
     insight: `For ${game} on ${platform} in Nigeria: Friday and weekend evenings (7–10 PM WAT) deliver 40–60% more impressions than weekday mornings. Nigerian teens are most active after school and before midnight. Avoid 6 AM–3 PM on weekdays.`,
   };
@@ -468,7 +455,7 @@ function getFallbackAB(titleA: string, titleB: string): ABResult {
     scoreB: Math.max(scoreB, winner === 'B' ? scoreA + 5 : scoreB),
     reasoning: `Title ${winner} wins because it uses a stronger emotional hook in the opening words, which increases the chance of a stop-scroll reaction. It also contains more specific detail that sets expectations — viewers who click are more likely to watch till the end, boosting retention metrics.`,
     improvements: [
-      'Add an emoji in the first 4 words — increases CTR by ~15% on mobile',
+      'Add an emoji in the first 4 words: increases CTR by ~15% on mobile',
       'Include a specific number (kills, seconds, HP) to make it more concrete',
       'End with a question or cliffhanger to drive comment engagement',
     ],

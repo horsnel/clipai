@@ -11,7 +11,6 @@ import {
   updateNotifications as apiUpdateNotifications,
   getReferralStats,
 } from '@/services/api';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface SettingsPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator'; referralCode?: string; credits?: number } | null;
@@ -105,15 +104,12 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
             <h1 className="font-display font-bold text-2xl sm:text-3xl text-clip-text">
               Settings
             </h1>
-            <InfoIconPopup label="Settings overview" size="md">
-              Manage your account and preferences
-            </InfoIconPopup>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="lg:col span-1">
             <div className="card-glass p-2 space-y-1">
               {tabs.map((tab) => (
                 <button
@@ -172,7 +168,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
           </div>
 
           {/* Content */}
-          <div className="lg:col-span-3">
+          <div className="lg:col span-3">
             {/* Profile Tab */}
             {activeTab === 'profile' && (
               <div className="space-y-6">
@@ -284,9 +280,6 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                       <h3 className="font-display font-semibold text-lg text-clip-text">
                         Upgrade Your Plan
                       </h3>
-                      <InfoIconPopup label="Why upgrade?" size="sm">
-                        Get more clips and advanced features
-                      </InfoIconPopup>
                     </div>
                     <Button onClick={() => onNavigate('pricing')} className="btn-primary">
                       <Sparkles className="w-4 h-4 mr-2" />
@@ -305,9 +298,6 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                     <h3 className="font-display font-semibold text-lg text-clip-text">
                       Your Referral Code
                     </h3>
-                    <InfoIconPopup label="How referrals work" size="sm">
-                      Share this code with friends and earn 5 free clips for each signup!
-                    </InfoIconPopup>
                   </div>
                   <div className="flex gap-3">
                     <div className="flex-1 bg-clip-surface border border-white/[0.02] rounded-xl px-4 py-3 font-mono text-clip-text">
@@ -358,9 +348,6 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <p className="text-clip-text font-medium">{item.label}</p>
-                          <InfoIconPopup label={`What is ${item.label}?`} size="sm">
-                            {item.desc}
-                          </InfoIconPopup>
                         </div>
                       </div>
                       <button

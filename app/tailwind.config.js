@@ -48,7 +48,7 @@ module.exports = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        // ClipAI Custom Colors — deep darkened palette (no glow, darkened hues)
+        // ClipAI Custom Colors — deep darkened palette (glow restored on darkened hues)
         'clip-dark': '#050507',
         'clip-surface': '#0B0B0F',
         'clip-border': '#131318',
@@ -70,6 +70,11 @@ module.exports = {
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
         'card': '0 18px 50px rgba(0, 0, 0, 0.45)',
+        // Brand glow — restored. Built on the darkened cyan so the halo
+        // reads as a soft teal bloom rather than a neon spike.
+        'glow-cyan': '0 0 24px rgba(14, 122, 136, 0.45)',
+        'glow-cyan-sm': '0 0 12px rgba(14, 122, 136, 0.35)',
+        'glow-amber': '0 0 24px rgba(122, 79, 8, 0.45)',
       },
       fontFamily: {
         'display': ['Sora', 'sans-serif'],
@@ -101,6 +106,12 @@ module.exports = {
           "0%": { width: "0%" },
           "100%": { width: "100%" },
         },
+        // Brand pulse-glow — restored. Slow soft pulsing glow used on the
+        // LandingPage AI POWERED badge and other key CTAs.
+        "pulse-glow": {
+          "0%, 100%": { boxShadow: "0 0 12px rgba(14, 122, 136, 0.4), 0 0 24px rgba(14, 122, 136, 0.2)" },
+          "50%":      { boxShadow: "0 0 18px rgba(14, 122, 136, 0.6), 0 0 36px rgba(14, 122, 136, 0.3)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -109,6 +120,7 @@ module.exports = {
         "float": "float 3s ease-in-out infinite",
         "scan": "scan 2s linear infinite",
         "progress": "progress 2s ease-out forwards",
+        "pulse-glow": "pulse-glow 2.5s ease-in-out infinite",
       },
     },
   },

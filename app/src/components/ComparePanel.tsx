@@ -70,7 +70,7 @@ export function ComparePanel({ user, onNavigate }: ComparePanelProps) {
         <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Fetching both transcripts + running comparison LLM call.<br />
-          <span className="text-xs">Takes 15–30 seconds if either URL is new.</span>
+          <span className="text-xs">Takes 15 to 30 seconds if either URL is new.</span>
         </p>
       </div>
     );
@@ -218,7 +218,7 @@ export function ComparePanel({ user, onNavigate }: ComparePanelProps) {
           </div>
           <div>
             <h3 className="font-display font-semibold text-clip-text">Competitor Lab</h3>
-            <p className="text-clip-muted text-xs">Head-to-head viral gap analysis · 10 credits</p>
+            <p className="text-clip-muted text-xs">Head to head viral gap analysis · 10 credits</p>
           </div>
           {!isPro && (
             <span className="ml-auto text-[10px] font-bold uppercase text-clip-amber bg-clip-amber/10 border border-clip-amber/20 px-2 py-1 rounded">

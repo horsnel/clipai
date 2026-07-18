@@ -231,7 +231,7 @@ export function TopicStealWidget({
             </p>
             <p className="text-clip-muted text-sm mb-4 max-w-md mx-auto">
               Run a Deep Analysis on any YouTube video. Your topics will anonymously feed this
-              dashboard for every other creator — and theirs will feed yours.
+              dashboard for every other creator: and theirs will feed yours.
             </p>
             {onNavigate && (
               <button
@@ -247,7 +247,7 @@ export function TopicStealWidget({
         )}
 
         {state === 'ready' && (
-          <ul className="divide-y divide-white/[0.02]">
+          <ul className="divide-y divide white/[0.02]">
             {topics.map((t, i) => {
               const widthPct = Math.max(6, (t.mention_count / maxMentions) * 100);
               return (

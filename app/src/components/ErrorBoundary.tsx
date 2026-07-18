@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="min-h-screen bg-clip-dark flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center space-y-6">
-          <div className="flex justify-center">
+          <div className="flex justify center">
             <Logo size="lg" showWord />
           </div>
 
@@ -56,7 +56,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </h1>
             <p className="text-clip-muted text-sm leading-relaxed">
               We hit an unexpected error. Our team has been notified.
-              Try reloading — your data is safe.
+              Try reloading: your data is safe.
             </p>
           </div>
 

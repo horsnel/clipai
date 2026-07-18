@@ -31,7 +31,7 @@ const PLANS = [
     credits: '200 credits',
     color: 'text-blue-600',
     icon: Sparkles,
-    perks: ['200 credits / month', 'Unlimited ClipBot', 'Real-time Trend Radar'],
+    perks: ['200 credits / month', 'Unlimited ClipBot', 'Real time Trend Radar'],
   },
   {
     id: 'pro',
@@ -126,10 +126,11 @@ export function UpgradeModal({ state, onClose, onNavigate }: UpgradeModalProps) 
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-clip-muted hover:text-clip-text hover:bg-white/[0.025] rounded-lg transition-colors flex-shrink-0"
+            className="w-9 h-9 rounded-full border border-white/15 hover:border-red-500/60 text-clip-muted hover:text-red-400 flex items-center justify-center transition-colors flex-shrink-0"
             aria-label="Close"
+            title="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" strokeWidth={2.5} />
           </button>
         </div>
 

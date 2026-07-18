@@ -4097,27 +4097,55 @@ app.post('/audit-channel', requireAuth, async (c) => {
 
   let audit: any;
   let refreshTtl = inferredTtl;
-  try {
-    audit = await withCache(env, auditCacheKey, inferredTtl, async () => {
+
+  if (cacheHit) {
+    // Fresh cache hit — return the cached audit immediately. No scraper
+    // credits spent, no credit charge for the user.
+    audit = peeked.data;
+  } else {
+    // Cache miss (or stale). Run a fresh audit. We DON'T use withCache
+    // here because withCache would cache the result unconditionally —
+    // including error payloads like { error: "rate_limited" }. Caching
+    // an error would make every subsequent audit for the same URL fail
+    // for the full TTL window. Instead we run manually and only cache
+    // successful (no `.error`) results.
+    try {
       const fresh = await auditChannel(env, url, platformHint);
-      // Compute the appropriate TTL from the FRESH result (in case the cached
-      // value was missing or stale). If the fresh audit shows a big account,
-      // bump the TTL up so we conserve scraper credits on subsequent calls.
-      const subs = Number(fresh?.statistics?.subscribers || 0);
-      refreshTtl = subs >= BIG_ACCOUNT_THRESHOLD ? BIG_ACCOUNT_TTL : DEFAULT_TTL;
-      return fresh;
-    });
-    // If withCache wrote with the inferred TTL but the fresh result is a big
-    // account, re-write with the longer TTL so the next call benefits.
-    if (refreshTtl > inferredTtl) {
-      try {
-        await cacheWrite(env, auditCacheKey, audit, refreshTtl);
-      } catch {}
+      if (fresh && !fresh.error) {
+        const subs = Number(fresh?.statistics?.subscribers || 0);
+        refreshTtl = subs >= BIG_ACCOUNT_THRESHOLD ? BIG_ACCOUNT_TTL : DEFAULT_TTL;
+        // Write to L1 + KV cache so the next call hits.
+        try {
+          await cacheWrite(env, auditCacheKey, fresh, refreshTtl);
+        } catch (e: any) {
+          console.warn('[audit-channel] cacheWrite failed:', e?.message);
+        }
+      } else if (fresh?.error) {
+        // Scraper returned an error payload (rate limit, not found, etc).
+        // Don't cache it. Try to serve stale data if we have any so the
+        // user still sees *something*.
+        const stale = await cacheReadStale<any>(env, auditCacheKey);
+        if (stale && !stale.error) {
+          audit = stale;
+        } else {
+          audit = fresh;  // bubble the error up to the user
+        }
+      } else {
+        audit = fresh;
+      }
+      if (!audit) audit = fresh;
+    } catch (e: any) {
+      // auditChannel threw — try stale fallback before giving up.
+      const stale = await cacheReadStale<any>(env, auditCacheKey);
+      if (stale && !stale.error) {
+        console.warn(`[audit-channel] upstream failed, serving stale: ${e?.message}`);
+        audit = stale;
+      } else {
+        return json({ error: `Audit failed: ${e?.message || 'unknown error'}` }, 500);
+      }
     }
-  } catch {
-    audit = await auditChannel(env, url, platformHint);
   }
-  if (audit.error) return json({ error: audit.error, quota }, 400);
+  if (audit?.error) return json({ error: audit.error, quota }, 400);
 
   // ─── Phase 5b — charge 1 credit per audit (first one free, cache hits free) ──
   // Cache hits don't spend scraper credits, so they're always free. The first
@@ -4173,6 +4201,27 @@ app.get('/channel-audits', requireAuth, async (c) => {
         if (cached?.data) {
           return { ...cached.data, url: entry.url };
         }
+        // Cache is completely cold (no fresh OR stale entry). Fire a
+        // background refresh so the next dashboard refresh will have the
+        // full audit data. We don't await this — return metadata immediately
+        // so the listing stays fast.
+        try {
+          const refreshUrl = entry.url;
+          const refreshPlatform = entry.platform;
+          // Use ctx.waitUntil pattern: kick off the promise but don't block.
+          (async () => {
+            try {
+              const fresh = await auditChannel(env, refreshUrl, refreshPlatform);
+              if (fresh && !fresh.error) {
+                const subs = Number(fresh?.statistics?.subscribers || 0);
+                const ttl = subs >= 1_000_000 ? 6 * 60 * 60 : 60 * 60;
+                await cacheWrite(env, key, fresh, ttl);
+              }
+            } catch (e: any) {
+              console.warn('[channel-audits] background refresh failed:', e?.message);
+            }
+          })();
+        } catch {}
       } catch {}
       // Fallback to entry metadata only
       return {

@@ -87,7 +87,7 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
       {/* Square container */}
       <div className="card-glass overflow-hidden hover:border-white/[0.12] transition-colors">
 
-        {/* Top banner (gradient) — avatar overlaps this edge */}
+        {/* Top banner (gradient), avatar overlaps this edge */}
         <div className={`relative h-20 bg-gradient-to-br ${config.banner} overflow-hidden`}>
           {/* Faint platform icon watermark in the banner */}
           <PlatformIcon platform={audit.platform} className={`absolute -right-3 -top-3 w-20 h-20 ${config.iconColor} opacity-10`} />

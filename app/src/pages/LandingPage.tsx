@@ -28,7 +28,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         phone.style.opacity = '0';
         phone.style.transform = 'translateY(80px) scale(0.92) rotateX(18deg)';
         setTimeout(() => {
-          phone.style.transition = 'all 1s cubic-bezier(0.33, 1, 0.68, 1)';
+          phone.style.transition = 'all 1s cubic bezier(0.33, 1, 0.68, 1)';
           phone.style.opacity = '1';
           phone.style.transform = 'translateY(0) scale(1) rotateX(0deg)';
         }, 100);
@@ -40,7 +40,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           (word as HTMLElement).style.opacity = '0';
           (word as HTMLElement).style.transform = 'translateY(30px) rotateX(35deg)';
           setTimeout(() => {
-            (word as HTMLElement).style.transition = 'all 0.6s cubic-bezier(0.33, 1, 0.68, 1)';
+            (word as HTMLElement).style.transition = 'all 0.6s cubic bezier(0.33, 1, 0.68, 1)';
             (word as HTMLElement).style.opacity = '1';
             (word as HTMLElement).style.transform = 'translateY(0) rotateX(0deg)';
           }, 200 + i * 80);
@@ -48,14 +48,14 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
       }
 
       if (cards) {
-        const cardElements = cards.querySelectorAll('.feature-card');
+        const cardElements = cards.querySelectorAll('.feature card');
         cardElements.forEach((card, i) => {
           (card as HTMLElement).style.opacity = '0';
           (card as HTMLElement).style.transform = i === 0 
             ? 'translateY(60px) rotateZ(-3deg)' 
             : 'translateY(60px) rotateZ(3deg)';
           setTimeout(() => {
-            (card as HTMLElement).style.transition = 'all 0.7s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            (card as HTMLElement).style.transition = 'all 0.7s cubic bezier(0.34, 1.56, 0.64, 1)';
             (card as HTMLElement).style.opacity = '1';
             (card as HTMLElement).style.transform = 'translateY(0) rotateZ(0deg)';
           }, 600 + i * 150);
@@ -102,7 +102,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
           {/* Subheadline */}
           <p className="text-center text-clip-muted text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-8 px-4">
-            ClipAI streams any YouTube video to Gemini and returns titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more viral outputs — in seconds. No uploads. No rendering. No storage.
+            ClipAI streams any YouTube video to Gemini and returns titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more viral outputs: in seconds. No uploads. No rendering. No storage.
           </p>
 
           {/* CTAs */}
@@ -138,7 +138,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/60 via-transparent to-transparent" />
               
               {/* Floating badge */}
-              <div className="absolute top-4 right-4 bg-clip-cyan text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+              <div className="absolute top-4 right-4 bg-clip-cyan text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-glow-cyan animate-pulse-glow">
                 <Sparkles className="w-3.5 h-3.5" />
                 AI POWERED
               </div>
@@ -160,10 +160,10 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </div>
                 <div>
                   <h3 className="font-display font-semibold text-clip-text mb-1">
-                    Viral Forge — 14 outputs per URL
+                    Viral Forge: 14 outputs per URL
                   </h3>
                   <p className="text-clip-muted text-sm">
-                    Titles, hook score, captions, distribution pack, thumbnail concepts, pinned comments, sponsorship spots — all from one paste.
+                    Titles, hook score, captions, distribution pack, thumbnail concepts, pinned comments, sponsorship spots: all from one paste.
                   </p>
                 </div>
               </div>
@@ -176,7 +176,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </div>
                 <div>
                   <h3 className="font-display font-semibold text-clip-text mb-1">
-                    Topic Steal — network trends
+                    Topic Steal: network trends
                   </h3>
                   <p className="text-clip-muted text-sm">
                     See which topics every ClipAI creator is analysing this week. Anonymous aggregation across all Deep Analyses.
@@ -199,7 +199,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               One paste. <span className="gradient-text">14 viral strategies.</span>
             </h2>
             <p className="text-clip-muted text-base sm:text-lg">
-              Viral Forge turns any YouTube URL into titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more outputs — all from one Gemini call.
+              Viral Forge turns any YouTube URL into titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more outputs: all from one Gemini call.
             </p>
           </div>
 
@@ -342,8 +342,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               
               <div className="space-y-5 mb-8">
                 {[
-                  { icon: Zap, text: 'Beat-synced transitions' },
-                  { icon: Sparkles, text: 'Auto-captions that match your style' },
+                  { icon: Zap, text: 'Beat synced transitions' },
+                  { icon: Sparkles, text: 'Auto captions that match your style' },
                   { icon: Gamepad2, text: 'Watermark + outro branding' },
                 ].map((item) => (
                   <div key={item.text} className="flex items-center gap-4">
@@ -391,7 +391,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 />
                 <Button
                   onClick={() => onNavigate('auth')}
-                  className="btn-primary whitespace-nowrap"
+                  className="btn primary whitespace nowrap"
                 >
                   Create Free Account
                 </Button>

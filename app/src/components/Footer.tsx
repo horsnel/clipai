@@ -14,7 +14,7 @@ export function Footer({ onNavigate }: FooterProps) {
       <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 py-12 lg:py-16">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 lg:gap-16">
           {/* Brand */}
-          <div className="md:col-span-2">
+          <div className="md:col span-2">
             <button
               onClick={() => onNavigate('landing')}
               className="flex items-center gap-2 group mb-4"
@@ -22,7 +22,7 @@ export function Footer({ onNavigate }: FooterProps) {
               <Logo size="sm" showWord />
             </button>
             <p className="text-clip-muted text-sm leading-relaxed max-w-sm mb-6">
-              The AI growth platform for gaming creators. Trend Radar, ViralForge, ClipBot coach, and Caption Battle — built for the games you actually play. Made in Lagos.
+              The AI growth platform for gaming creators. Trend Radar, ViralForge, ClipBot coach, and Caption Battle: built for the games you actually play. Made in Lagos.
             </p>
             <div className="flex items-center gap-3">
               <a

@@ -11,7 +11,7 @@ html {
   outline-offset: 2px;
 }
 
-/* Button hover lift effect */
+/* Button hover lift effect + restored glow halo */
 .btn-primary,
 .btn-secondary {
   transition: all 0.2s ease;
@@ -19,6 +19,7 @@ html {
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
+  box-shadow: 0 0 24px rgba(14, 122, 136, 0.45), 0 0 48px rgba(14, 122, 136, 0.2);
 }
 
 .btn-secondary:hover:not(:disabled) {
@@ -54,9 +55,10 @@ html {
   border: 2px solid #050507;
 }
 
-/* Input focus states */
+/* Input focus states — restored glow ring */
 .input-dark:focus {
   border-color: rgba(14, 122, 136, 0.5);
+  box-shadow: 0 0 0 3px rgba(14, 122, 136, 0.18), 0 0 24px rgba(14, 122, 136, 0.12);
 }
 
 /* Animation utilities */
@@ -125,12 +127,13 @@ html {
 .stagger-4 { animation-delay: 0.4s; }
 .stagger-5 { animation-delay: 0.5s; }
 
-/* Loading spinner */
+/* Loading spinner — restored glow */
 .spinner {
   border: 2px solid rgba(14, 122, 136, 0.18);
   border-top-color: #0E7A88;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  box-shadow: 0 0 12px rgba(14, 122, 136, 0.35);
 }
 
 @keyframes spin {

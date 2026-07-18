@@ -82,9 +82,9 @@ export function ParticleLoader({
     >
       {/* Particle canvas */}
       <div className="relative w-48 h-48 mx-auto">
-        {/* Glow halo */}
-        <div className="absolute inset-0 rounded-full bg-clip-cyan/6 blur-2xl animate-pulse" />
-        <div className="absolute inset-4 rounded-full bg-clip-cyan/20 blur-xl animate-pulse" style={{ animationDelay: '300ms' }} />
+        {/* Glow halo: restored soft teal bloom */}
+        <div className="absolute inset-0 rounded-full bg-clip-cyan/10 blur-2xl animate-pulse" />
+        <div className="absolute inset-4 rounded-full bg-clip-cyan/25 blur-xl animate-pulse" style={{ animationDelay: '300ms' }} />
 
         {/* Orbiting rings */}
         <div
@@ -100,7 +100,7 @@ export function ParticleLoader({
           style={{ animation: 'clipai-spin 3s linear infinite' }}
         />
 
-        {/* Particles flying toward center */}
+        {/* Particles flying toward center — with restored glow trail */}
         {particles.map((p) => (
           <div
             key={p.id}
@@ -111,17 +111,21 @@ export function ParticleLoader({
               width: `${p.size}px`,
               height: `${p.size}px`,
               background: p.hue === 'cyan' ? '#0E7A88' : '#8B5CF6',
+              boxShadow: p.hue === 'cyan'
+                ? '0 0 8px rgba(14, 122, 136, 0.8), 0 0 16px rgba(14, 122, 136, 0.4)'
+                : '0 0 8px rgba(139, 92, 246, 0.8), 0 0 16px rgba(139, 92, 246, 0.4)',
               animation: `clipai-particle-in ${p.duration}ms ease-in ${p.delay}ms infinite`,
             }}
           />
         ))}
 
-        {/* Central pulsing core */}
+        {/* Central pulsing core — with restored glow halo */}
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
           <div
             className="w-6 h-6 rounded-full bg-clip-cyan"
             style={{
               animation: 'clipai-core-pulse 1.5s ease-in-out infinite',
+              boxShadow: '0 0 24px rgba(14, 122, 136, 0.7), 0 0 48px rgba(14, 122, 136, 0.35)',
             }}
           />
         </div>

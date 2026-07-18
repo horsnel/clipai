@@ -8,7 +8,6 @@ import { toast } from 'sonner';
 import { TrendCardModal } from '../components/TrendCardModal';
 import { SkeletonList } from '../components/Loading';
 import { TopicStealWidget } from '../components/TopicStealWidget';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface TrendRadarPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -137,9 +136,6 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
                 Trend <span className="gradient-text">Radar</span>
               </h1>
-              <InfoIconPopup label="What is Trend Radar?" size="md" className="ml-1">
-                What's blowing up across YouTube, Reddit, Google, TikTok &amp; X — RIGHT NOW
-              </InfoIconPopup>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -236,9 +232,6 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <span className="text-sm font-medium text-clip-text">
                 {filtered.length} trends tracked
               </span>
-              <InfoIconPopup label="How to use" size="sm" className="ml-1">
-                Tap any trend to get keywords, titles, captions &amp; hashtags
-              </InfoIconPopup>
             </div>
             {isLoading && (
               <div className="flex items-center gap-2 text-clip-muted text-xs">
@@ -248,7 +241,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
             )}
           </div>
 
-          <div className="divide-y divide-white/[0.02]">
+          <div className="divide-y divide white/[0.02]">
             {isLoading ? (
               <div className="p-2">
                 <SkeletonList count={8} avatar />
@@ -352,9 +345,6 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <Zap className="w-5 h-5 text-clip-amber flex-shrink-0" />
               <div className="flex items-center gap-2">
                 <p className="text-clip-text font-medium text-sm">Unlock hourly trend updates + sound tracker</p>
-                <InfoIconPopup label="Why upgrade?" size="sm" className="ml-1">
-                  Free plan refreshes every 24h. Pro refreshes every hour.
-                </InfoIconPopup>
               </div>
             </div>
             <button onClick={() => onNavigate('pricing')}

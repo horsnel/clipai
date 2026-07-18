@@ -69,7 +69,7 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
             onClick={() => onNavigate('landing')}
             className="inline-flex items-center gap-2 group mb-6"
           >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-clip-cyan to-blue-600 flex items-center justify-center transition-shadow">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-clip-cyan to-blue-600 flex items-center justify-center shadow-glow-cyan transition-shadow">
               <Zap className="w-6 h-6 text-black" />
             </div>
             <span className="font-display font-bold text-2xl text-clip-text">
@@ -231,7 +231,7 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
         </p>
         {!isConfigured && (
           <p className="text-center text-amber-600 text-xs mt-3">
-            Supabase not configured — auth will not work until env vars are set.
+            Supabase not configured: auth will not work until env vars are set.
           </p>
         )}
       </div>

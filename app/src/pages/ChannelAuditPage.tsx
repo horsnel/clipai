@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { auditChannel } from '@/services/api';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
 import { PlatformIcon } from '@/components/BrandIcons';
 import { platformTerms } from '@/lib/platformTerminology';
 import type { ChannelAudit, AuditPlatform } from '../types';
@@ -176,13 +175,15 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
       </div>
 
       <div className="w-full max-w-2xl relative z-10">
-        {/* Top bar — back + skip */}
+        {/* Top bar: back + skip */}
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={onComplete}
-            className="text-clip-muted hover:text-clip-text text-xs transition-colors flex items-center gap-1"
+            className="w-9 h-9 rounded-full border border-white/10 hover:border-white/30 text-clip-muted hover:text-clip-text flex items-center justify-center transition-colors"
+            aria-label="Skip for now"
+            title="Skip for now"
           >
-            <ArrowLeft className="w-3 h-3" /> Skip for now
+            <ArrowLeft className="w-4 h-4" />
           </button>
           <span className="text-[10px] text-clip-muted/70 uppercase tracking-wider">
             1st free · then 1 credit each
@@ -191,7 +192,7 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
 
         {/* Card */}
         <div className="card-glass p-6 sm:p-8">
-          {/* Header — title + info icon (no inline explanation paragraph) */}
+          {/* Header: title + info icon (no inline explanation paragraph) */}
           <div className="flex items-center gap-3 mb-3">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-clip-cyan/15 to-purple-500/15 flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-clip-cyan" />
@@ -200,16 +201,6 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
               <h2 className="font-display font-bold text-xl text-clip-text">
                 Free {selectedPlatform ? platformTerms(selectedPlatform).entityTitle : 'Channel'} Audit
               </h2>
-              <InfoIconPopup label="What is an Audit?" size="md">
-                Paste a link to your YouTube, TikTok, X, Instagram, or Reddit
-                channel, profile, or subreddit — or just type the username and pick a platform — and
-                we'll pull a free analytics report: subscribers or followers, total views,
-                recent posts, and engagement rate. You can audit up to {MAX_AUDITS} entities.
-                <br /><br />
-                YouTube and Reddit audits return real follower counts and engagement data.
-                TikTok, X, and Instagram audits use third-party scrapers (Sociavault, ScrapeCreators,
-                SocialData) — without API keys they fall back to a lite mode showing recent posts only.
-              </InfoIconPopup>
             </div>
           </div>
 
@@ -249,7 +240,7 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Paste URL or @username — e.g. youtube.com/@MrBeast  or  @khaby.lame"
+                placeholder="Paste URL or @username: e.g. youtube.com/@MrBeast  or  @khaby.lame"
                 disabled={submitting}
                 className="input-dark pl-10 w-full disabled:opacity-50"
               />

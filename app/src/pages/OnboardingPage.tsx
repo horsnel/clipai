@@ -28,7 +28,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { saveOnboarding } from '@/services/api';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
 import { PlatformIcon, GameIcon } from '@/components/BrandIcons';
 import type { PlatformId } from '@/components/BrandIcons';
 
@@ -79,7 +78,7 @@ const GOALS = [
 const EXPERIENCE = [
   { id: 'new',       label: 'New creator',         desc: 'Just starting out',                icon: Sparkles, color: 'text-clip-cyan' },
   { id: 'casual',    label: 'Casual',              desc: 'Posting occasionally',             icon: Zap,      color: 'text-clip-amber' },
-  { id: 'pro',       label: 'Semi-pro',            desc: 'Posting regularly',                icon: Flame,    color: 'text-red-500' },
+  { id: 'pro',       label: 'Semi pro',            desc: 'Posting regularly',                icon: Flame,    color: 'text-red-500' },
   { id: 'veteran',   label: 'Veteran',             desc: 'Years of experience',              icon: Trophy,   color: 'text-purple-500' },
 ];
 
@@ -159,7 +158,7 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
       </div>
 
       <div className="w-full max-w-xl relative z-10">
-        {/* Top bar — progress + skip */}
+        {/* Top bar: progress + skip */}
         <div className="flex items-center justify-between mb-8">
           {/* Progress dots */}
           <div className="flex items-center gap-2">
@@ -204,9 +203,6 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
                 <h2 className="font-display font-bold text-xl text-clip-text">
                   What do you play?
                 </h2>
-                <InfoIconPopup label="Why we ask" size="sm" className="ml-1">
-                  Pick your primary game — we'll tailor trends, hashtags & titles to it.
-                </InfoIconPopup>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {POPULAR_GAMES.map(g => (
@@ -253,9 +249,6 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
                 <h2 className="font-display font-bold text-xl text-clip-text">
                   Where do you post?
                 </h2>
-                <InfoIconPopup label="Why we ask" size="sm" className="ml-1">
-                  Pick all the platforms you create content for. We'll tune caption length & hashtags per platform.
-                </InfoIconPopup>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {PLATFORMS.map(p => {
@@ -294,9 +287,6 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
                 <h2 className="font-display font-bold text-xl text-clip-text">
                   What's your main goal?
                 </h2>
-                <InfoIconPopup label="Why we ask" size="sm" className="ml-1">
-                  We'll prioritise features & suggestions based on what you're trying to achieve.
-                </InfoIconPopup>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {GOALS.map(g => {
@@ -337,9 +327,6 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
                 <h2 className="font-display font-bold text-xl text-clip-text">
                   How experienced are you?
                 </h2>
-                <InfoIconPopup label="Why we ask" size="sm" className="ml-1">
-                  This helps us calibrate the complexity of suggestions we give you.
-                </InfoIconPopup>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {EXPERIENCE.map(e => {
@@ -375,13 +362,15 @@ export function OnboardingPage({ user, onNavigate: _onNavigate, onComplete }: On
             <button
               onClick={back}
               disabled={step === 0}
-              className={`flex items-center gap-1.5 text-sm font-medium transition-colors ${
+              className={`flex items-center justify-center w-9 h-9 rounded-full border transition-colors ${
                 step === 0
-                  ? 'text-clip-muted/40 cursor-not-allowed'
-                  : 'text-clip-muted hover:text-clip-text'
+                  ? 'text-clip-muted/40 cursor-not-allowed border-white/[0.04]'
+                  : 'text-clip-muted hover:text-clip-text hover:border-white/30 border-white/10'
               }`}
+              aria-label="Back"
+              title="Back"
             >
-              <ArrowLeft className="w-4 h-4" /> Back
+              <ArrowLeft className="w-4 h-4" />
             </button>
 
             <div className="flex items-center gap-1.5 text-clip-muted text-xs">

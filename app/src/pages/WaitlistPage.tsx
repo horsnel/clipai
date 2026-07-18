@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { joinWaitlist, listClips } from '@/services/api';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
 import { GameIcon } from '@/components/BrandIcons';
 
 interface WaitlistPageProps {
@@ -22,7 +21,7 @@ interface Clip {
 }
 
 const FALLBACK_CLIPS: Clip[] = [
-  { id:'1', thumbnail:'/gameplay-thumb-1.jpg', title:'Epic Multi-Kill',          game:'Call of Duty',   hypeScore:96, duration:'0:32', createdAt:'2 hours ago',  status:'ready' },
+  { id:'1', thumbnail:'/gameplay-thumb-1.jpg', title:'Epic Multi Kill',          game:'Call of Duty',   hypeScore:96, duration:'0:32', createdAt:'2 hours ago',  status:'ready' },
   { id:'2', thumbnail:'/gameplay-thumb-2.jpg', title:'Clutch Victory',           game:'Bloodstrike',    hypeScore:88, duration:'0:45', createdAt:'5 hours ago',  status:'ready' },
   { id:'3', thumbnail:'/gameplay-thumb-3.jpg', title:'Team Fight Domination',    game:'Mobile Legends', hypeScore:92, duration:'0:28', createdAt:'1 day ago',    status:'ready' },
 ];
@@ -62,7 +61,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
       if (!mounted || !data.clips?.length) return;
       const mapped: Clip[] = data.clips.slice(0, 3).map(c => ({
         id: c.id,
-        thumbnail: '/gameplay-thumb-' + (((parseInt(c.id.slice(0, 2), 16) || 0) % 3) + 1) + '.jpg',
+        thumbnail: '/gameplay thumb-' + (((parseInt(c.id.slice(0, 2), 16) || 0) % 3) + 1) + '.jpg',
         title: c.title || 'Untitled clip',
         game: c.game || 'Gaming',
         hypeScore: c.hype_score || 80,
@@ -112,7 +111,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
       </div>
 
       <div className="relative max-w-4xl mx-auto">
-        {/* Clips This Month stat card — moved here from the Dashboard */}
+        {/* Clips This Month stat card: moved here from the Dashboard */}
         <div className="card-glass p-5 sm:p-6 mb-8 relative overflow-hidden">
           <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
             <div className="flex items-center gap-4 min-w-0">
@@ -150,7 +149,7 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
           </div>
           <p className="text-clip-muted text-xs">
             {PLAN_LIMITS[user?.plan ?? 'free'].clips === Infinity
-              ? 'Unlimited clips on your Creator plan — editor ships soon.'
+              ? 'Unlimited clips on your Creator plan: editor ships soon.'
               : `${Math.max(0, PLAN_LIMITS[user?.plan ?? 'free'].clips - (user?.clipsUsed ?? 0))} clips remaining this month · editor ships soon.`}
           </p>
           <div className="absolute top-3 right-3 sm:top-4 sm:right-4 opacity-30 pointer-events-none">
@@ -230,19 +229,15 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
               The <span className="gradient-text">AI Video Editor</span><br />
               is reloading.
             </h1>
-            <InfoIconPopup label="What is the ClipAI Editor?" size="md">
-              We're rebuilding the ClipAI editor with auto-cut, beat-sync, vertical reframing, and one-tap TikTok export.
-              Join the waitlist — get early access, <span className="text-clip-cyan font-semibold">+25 bonus credits</span> when it ships, and lock in launch pricing.
-            </InfoIconPopup>
           </div>
         </div>
 
         {/* What's coming grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
           {[
-            { icon: Zap,      title: 'Auto-Cut AI',      desc: 'AI finds your hype moments and snaps cuts to action beats.' },
-            { icon: Sparkles, title: 'Beat-Sync Renders', desc: 'Transitions land on the drop. Vertical 9:16 by default.' },
-            { icon: Bell,     title: 'One-Tap Export',    desc: 'TikTok, Reels, Shorts — watermark-free on paid plans.' },
+            { icon: Zap,      title: 'Auto Cut AI',      desc: 'AI finds your hype moments and snaps cuts to action beats.' },
+            { icon: Sparkles, title: 'Beat Sync Renders', desc: 'Transitions land on the drop. Vertical 9:16 by default.' },
+            { icon: Bell,     title: 'One Tap Export',    desc: 'TikTok, Reels, Shorts: watermark free on paid plans.' },
           ].map((f) => (
             <div key={f.title} className="card-glass p-5 hover:border-white/[0.025] transition-all">
               <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center mb-3">
@@ -250,9 +245,6 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
               </div>
               <div className="flex items-center gap-1.5 mb-1">
                 <h3 className="font-display font-semibold text-clip-text">{f.title}</h3>
-                <InfoIconPopup label={`How ${f.title} works`} size="sm">
-                  {f.desc}
-                </InfoIconPopup>
               </div>
             </div>
           ))}
@@ -294,9 +286,6 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
               </div>
               <div className="flex items-center gap-1.5">
                 <h3 className="font-display font-semibold text-clip-text">Join the Waitlist</h3>
-                <InfoIconPopup label="Waitlist perks" size="sm">
-                  +25 credits when the editor launches.
-                </InfoIconPopup>
               </div>
             </div>
 
@@ -347,9 +336,6 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
             </Button>
             <div className="flex items-center justify-center gap-1.5 mt-3">
               <span className="text-clip-muted text-xs">Reserve your spot</span>
-              <InfoIconPopup label="Email policy" size="sm">
-                No spam. We email you once when the editor launches.
-              </InfoIconPopup>
             </div>
           </form>
         )}
@@ -357,16 +343,13 @@ export function WaitlistPage({ user, onNavigate }: WaitlistPageProps) {
         {/* Perks row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-10 max-w-3xl mx-auto">
           {[
-            { icon: Trophy,   label: 'Climb the leaderboard while you wait',      detail: 'Earn XP from any ClipAI activity — your rank updates in real time on the public Leaderboard.' },
+            { icon: Trophy,   label: 'Climb the leaderboard while you wait',      detail: 'Earn XP from any ClipAI activity: your rank updates in real time on the public Leaderboard.' },
             { icon: Sparkles, label: 'Free ViralForge + ClipBot access today',    detail: 'Full access to all 14 ViralForge outputs and unlimited ClipBot chat on paid plans, starting today.' },
-            { icon: Lock,     label: 'Lock in launch pricing before it goes up', detail: 'Founding members keep their plan price forever — even after we raise public rates at editor launch.' },
+            { icon: Lock,     label: 'Lock in launch pricing before it goes up', detail: 'Founding members keep their plan price forever: even after we raise public rates at editor launch.' },
           ].map((p) => (
             <div key={p.label} className="flex items-center gap-2 text-clip-muted text-xs text-center justify-center">
               <p.icon className="w-4 h-4 text-clip-cyan flex-shrink-0" />
               <span>{p.label}</span>
-              <InfoIconPopup label="Perk details" size="sm">
-                {p.detail}
-              </InfoIconPopup>
             </div>
           ))}
         </div>

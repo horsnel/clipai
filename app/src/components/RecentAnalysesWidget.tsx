@@ -129,7 +129,7 @@ export function RecentAnalysesWidget({
               Recent Deep Analyses
             </h3>
             <p className="text-clip-muted text-xs mt-0.5">
-              Re-open any past URL — instant, no credit charge
+              Re-open any past URL: instant, no credit charge
             </p>
           </div>
         </div>
@@ -180,7 +180,7 @@ export function RecentAnalysesWidget({
         )}
 
         {state === 'ready' && (
-          <ul className="divide-y divide-white/[0.02]">
+          <ul className="divide-y divide white/[0.02]">
             {analyses.map(a => {
               const ytId = a.source_video_id || '';
               const thumb = a.thumbnail_url || (ytId ? `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg` : '');
@@ -190,7 +190,7 @@ export function RecentAnalysesWidget({
                   className="relative group flex items-center gap-3 py-2.5 px-2 -mx-2 rounded-lg hover:bg-white/[0.02] transition-colors cursor-pointer"
                   onClick={() => onReopen?.(a)}
                 >
-                  {/* Thumbnail — click to play inline, doesn't trigger row click */}
+                  {/* Thumbnail: click to play inline, doesn't trigger row click */}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -308,7 +308,7 @@ export function RecentAnalysesWidget({
               <iframe
                 src={`https://www.youtube-nocookie.com/embed/${playingAnalysis.source_video_id}?autoplay=1&rel=0`}
                 title={playingAnalysis.video_title || 'YouTube video'}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allow="accelerometer; autoplay; clipboard write; encrypted media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="absolute inset-0 w-full h-full"
               />

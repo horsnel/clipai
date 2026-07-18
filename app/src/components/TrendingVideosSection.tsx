@@ -1,11 +1,9 @@
 /**
- * TrendingVideosSection.tsx — Dashboard widget showing trending gaming videos
- * across multiple platforms (YouTube, TikTok, X) with a one-click
- * "Copy Pack" button (title + caption + hashtags).
+ * TrendingVideosSection.tsx — Dashboard widget showing trending gaming
+ * YouTube videos with a one-click copy button (title + caption + hashtags).
  *
- * Designed to replace the old "Clips This Month" card on the dashboard.
- * No auth required — it's a free inspiration widget powered by
- * GET /api/trending-videos (6h global cache, one LLM call for all videos).
+ * No auth required. Powered by GET /api/trending-videos (6h global cache,
+ * one LLM call for all videos).
  */
 import { useState, useEffect } from 'react';
 import {
@@ -24,7 +22,7 @@ interface TrendingVideosSectionProps {
   game?: string;
 }
 
-type Platform = 'youtube' | 'tiktok' | 'twitter' | 'instagram';
+type Platform = 'youtube';
 
 interface PlatformStyle {
   label: string;
@@ -41,27 +39,6 @@ const PLATFORM_STYLES: Record<Platform, PlatformStyle> = {
     iconClass: 'text-red-500',
     platformId: 'youtube',
     fallbackBg: 'bg-gradient-to-br from-red-500/20 to-red-900/20',
-  },
-  tiktok: {
-    label: 'TikTok',
-    badgeClass: 'bg-black/90 text-white border border-white/20',
-    iconClass: 'text-clip-cyan',
-    platformId: 'tiktok',
-    fallbackBg: 'bg-gradient-to-br from-cyan-500/15 to-pink-500/15',
-  },
-  twitter: {
-    label: 'X',
-    badgeClass: 'bg-black/90 text-white border border-white/20',
-    iconClass: 'text-white',
-    platformId: 'twitter',
-    fallbackBg: 'bg-gradient-to-br from-slate-700/30 to-slate-900/30',
-  },
-  instagram: {
-    label: 'Instagram',
-    badgeClass: 'bg-gradient-to-r from-purple-600/90 to-pink-500/90 text-white',
-    iconClass: 'text-pink-400',
-    platformId: 'instagram',
-    fallbackBg: 'bg-gradient-to-br from-purple-500/20 via-pink-500/15 to-amber-500/15',
   },
 };
 
@@ -97,7 +74,6 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [copiedId, setCopiedId]   = useState<string | null>(null);
-  const [activePlatform, setActivePlatform] = useState<Platform | 'all'>('all');
 
   useEffect(() => {
     let mounted = true;
@@ -106,7 +82,10 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
     getTrendingVideos(game)
       .then((data) => {
         if (!mounted) return;
-        setVideos(data.videos || []);
+        // Only show YouTube videos (per product decision: other platforms
+        // don't expose public view counts reliably, so we limit to YouTube)
+        const yt = (data.videos || []).filter(v => v.platform === 'youtube');
+        setVideos(yt);
       })
       .catch((e) => {
         if (!mounted) return;
@@ -119,7 +98,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
   const handleCopy = async (v: TrendingVideo) => {
     const text = buildCopyPack(v);
     if (!text) {
-      toast.error('No copy pack available for this video');
+      toast.error('No copy content available for this video');
       return;
     }
     try {
@@ -132,17 +111,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
     }
   };
 
-  const filteredVideos = activePlatform === 'all'
-    ? videos
-    : videos.filter((v) => v.platform === activePlatform);
-
-  const FILTER_TABS: Array<{ key: Platform | 'all'; label: string; platformId?: PlatformId }> = [
-    { key: 'all',       label: 'All' },
-    { key: 'youtube',   label: 'YouTube',   platformId: 'youtube' },
-    { key: 'tiktok',    label: 'TikTok',    platformId: 'tiktok' },
-    { key: 'twitter',   label: 'X',         platformId: 'twitter' },
-    { key: 'instagram', label: 'Instagram', platformId: 'instagram' },
-  ];
+  const filteredVideos = videos;
 
   return (
     <section>
@@ -157,7 +126,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
               Trending Gaming Videos
             </h3>
             <p className="text-clip-muted text-xs mt-0.5 truncate">
-              Multi-platform · one-click copy: title · caption · hashtags
+              One click copy: title · caption · hashtags
             </p>
           </div>
         </div>
@@ -165,31 +134,6 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
           Live
         </span>
       </div>
-
-      {/* Platform filter tabs */}
-      {!loading && !error && videos.length > 0 && (
-        <div className="flex items-center gap-1 mb-3 overflow-x-auto">
-          {FILTER_TABS.map((tab) => {
-            const isActive = activePlatform === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActivePlatform(tab.key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                  isActive
-                    ? 'bg-clip-cyan/6 text-clip-cyan border border-clip-cyan/25'
-                    : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.02] border border-transparent'
-                }`}
-              >
-                {tab.platformId
-                  ? <PlatformIcon platform={tab.platformId} className="w-3.5 h-3.5" />
-                  : <Flame className="w-3.5 h-3.5" />}
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       {/* Body */}
       <div>
@@ -204,9 +148,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
           <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
             <PlatformIcon platform="youtube" className="w-8 h-8 text-clip-muted opacity-50" />
             <p className="text-clip-muted text-sm">
-              {videos.length === 0
-                ? 'No trending videos right now. Check back soon.'
-                : 'No videos on this platform right now.'}
+              No trending videos right now. Check back soon.
             </p>
           </div>
         ) : (
@@ -325,20 +267,6 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                       </div>
                     ) : null}
                   </div>
-
-                  {/* Copy button — mobile fallback (full-width bar) */}
-                  {hasPack && (
-                    <button
-                      onClick={() => handleCopy(v)}
-                      className="sm:hidden w-full py-2 text-xs font-medium text-clip-cyan border-t border-white/[0.02] hover:bg-clip-cyan/3 transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      {copiedId === v.id ? (
-                        <><Check className="w-3.5 h-3.5" /> Copied</>
-                      ) : (
-                        <><Copy className="w-3.5 h-3.5" /> Copy pack</>
-                      )}
-                    </button>
-                  )}
                 </div>
               );
             })}

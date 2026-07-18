@@ -5,7 +5,6 @@ import {
   ChevronRight, Sparkles 
 } from 'lucide-react';
 import { getLeaderboard } from '@/services/api';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface LeaderboardPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -104,9 +103,6 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
             <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
               Leaderboard
             </h1>
-            <InfoIconPopup label="What is the Leaderboard?" size="md">
-              Top creators ranked by total hype score
-            </InfoIconPopup>
           </div>
         </div>
 
@@ -276,9 +272,6 @@ export function LeaderboardPage({ user, onNavigate }: LeaderboardPageProps) {
                   <p className="font-display font-semibold text-clip-text">
                     Unlock More Clips
                   </p>
-                  <InfoIconPopup label="Why upgrade?" size="sm">
-                    Upgrade to Pro or Creator to create unlimited highlights
-                  </InfoIconPopup>
                 </div>
               </div>
               <button

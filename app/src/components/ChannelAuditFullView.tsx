@@ -131,13 +131,14 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
       {/* ─── Sticky top bar ─── */}
       <div className="sticky top-0 z-20 bg-clip-dark/95 backdrop-blur-md border-b border-white/[0.04]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+          {/* Back button: icon-only (no text), like Claude's */}
           <button
             onClick={onExit}
-            className="inline-flex items-center gap-1.5 text-sm text-clip-muted hover:text-clip-text transition-colors px-3 py-1.5 rounded-lg hover:bg-white/[0.025]"
+            aria-label="Back to audits"
+            title="Back to audits"
+            className="w-9 h-9 rounded-full border border-white/10 text-clip-muted hover:text-clip-text hover:border-white/30 flex items-center justify-center transition-colors flex-shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Back to audits</span>
-            <span className="sm:hidden">Back</span>
           </button>
           <div className="flex items-center gap-2 min-w-0 flex-1 justify-center">
             <PlatformIcon platform={audit.platform} className={`w-4 h-4 ${config.iconColor} flex-shrink-0`} />
@@ -149,10 +150,11 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
           <button
             onClick={handleRefresh}
             disabled={loading || refreshing}
-            className="inline-flex items-center gap-1.5 text-xs text-clip-muted hover:text-clip-cyan disabled:opacity-50 transition-colors px-3 py-1.5 rounded-lg hover:bg-white/[0.025]"
+            aria-label="Refresh insights"
+            title="Refresh"
+            className="w-9 h-9 rounded-full border border-white/10 text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/40 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
@@ -529,7 +531,7 @@ function OverviewTab({ insights, config }: { insights: AuditInsights; config: an
 
 function BestVideosTab({ insights }: { insights: AuditInsights }) {
   if (!insights.bestPerformingVideos.length) {
-    return <EmptyTab text="No best-performing video data available." />;
+    return <EmptyTab text="No best performing video data available." />;
   }
   return (
     <SectionCard icon={TrendingUp} title="Best Performing Videos" accent="text-green-500">
@@ -574,7 +576,7 @@ function BestVideosTab({ insights }: { insights: AuditInsights }) {
 
 function WorstVideosTab({ insights }: { insights: AuditInsights }) {
   if (!insights.worstPerformingVideos.length) {
-    return <EmptyTab text="No worst-performing video data available." />;
+    return <EmptyTab text="No worst performing video data available." />;
   }
   return (
     <SectionCard icon={TrendingDown} title="Worst Performing Videos" accent="text-red-500">

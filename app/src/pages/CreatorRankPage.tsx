@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getMyRank } from '@/services/api';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface CreatorRankPageProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -177,7 +176,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
       link.download = `clipai-rank-${currentRank.id}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
-      toast.success('Rank card downloaded — share it on socials!');
+      toast.success('Rank card downloaded: share it on socials!');
     } catch (err: any) {
       toast.error(err?.message || 'Could not generate card');
     } finally {
@@ -207,9 +206,6 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
               <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
                 Creator <span className="gradient-text">Rank</span>
               </h1>
-              <InfoIconPopup label="What is Creator Rank?" size="md">
-                Level up. Earn XP. Become a GOD TIER creator.
-              </InfoIconPopup>
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -304,7 +300,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
                 { label: 'Clips Analysed', value: String(clipsDone), icon: Star },
                 { label: 'Weekly XP',     value: weeklyXP.toLocaleString(), icon: Zap },
                 { label: 'Streak Record', value: `${Math.max(streak, 7)} days`, icon: Flame },
-                { label: 'Global Rank',   value: globalRank ? `#${globalRank.toLocaleString()}` : '—', icon: Trophy },
+                { label: 'Global Rank',   value: globalRank ? `#${globalRank.toLocaleString()}` : ',', icon: Trophy },
               ].map(stat => (
                 <div key={stat.label} className="card-glass p-4 text-center">
                   <stat.icon className="w-5 h-5 text-clip-cyan mx-auto mb-2" />
@@ -366,7 +362,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
                         {isCurrent && <span className="text-xs px-2 py-0.5 bg-clip-cyan/6 text-clip-cyan rounded-full border border-clip-cyan/20 flex-shrink-0">CURRENT</span>}
                       </div>
                       <p className="text-clip-muted text-xs mb-2 font-mono">
-                        {rank.minXP.toLocaleString()} – {rank.maxXP === Infinity ? '∞' : rank.maxXP.toLocaleString()} XP
+                        {rank.minXP.toLocaleString()} , {rank.maxXP === Infinity ? '∞' : rank.maxXP.toLocaleString()} XP
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {rank.perks.map((perk, i) => (
@@ -396,7 +392,7 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
               <Crown className="w-4 h-4 text-clip-amber" />
               <span className="font-medium text-clip-text">Top Creators This Week</span>
             </div>
-            <div className="divide-y divide-white/[0.02]">
+            <div className="divide-y divide white/[0.02]">
               {MOCK_TOP.map((creator, i) => (
                 <div key={i} className={`flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 ${
                   creator.name === 'You' ? 'bg-clip-cyan/3' : 'hover:bg-white/[0.02]'
@@ -445,9 +441,6 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
               <TrendingUp className="w-5 h-5 text-clip-cyan flex-shrink-0" />
               <div className="flex items-center gap-1.5 flex-1 min-w-0">
                 <h3 className="font-display font-semibold text-clip-text text-sm">Earn XP</h3>
-                <InfoIconPopup label="How XP works" size="sm">
-                  Every action on ClipAI earns you XP. The more you create, the higher you rank.
-                </InfoIconPopup>
               </div>
             </div>
             {XP_ACTIONS.map((action, i) => (
@@ -463,9 +456,6 @@ export function CreatorRankPage({ user, onNavigate }: CreatorRankPageProps) {
             <div className="card-glass p-5 border-clip-amber/20 bg-clip-amber/3 text-center">
               <div className="flex items-center justify-center gap-1.5">
                 <p className="text-clip-amber text-sm font-medium">🔥 Streak Bonus</p>
-                <InfoIconPopup label="Streak bonus" size="sm">
-                  Log in 7 days in a row and get a 2× XP multiplier for 24 hours
-                </InfoIconPopup>
               </div>
             </div>
             {user?.plan === 'free' && (

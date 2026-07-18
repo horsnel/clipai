@@ -335,7 +335,7 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
                     { label: 'Auto Captions', value: captionsEnabled, set: setCaptionsEnabled },
                     { label: 'Beat Sync',             value: beatSyncEnabled, set: setBeatSyncEnabled },
                   ].map(({ label, value, set }) => (
-                    <label key={label} className="flex items-center justify-between cursor-pointer group">
+                    <label key={label} className="flex items center justify between cursor pointer group">
                       <span className="text-sm text-clip-text group-hover:text-clip-cyan transition-colors">{label}</span>
                       <button onClick={() => set(!value)}
                         className={`w-12 h-6 rounded-full transition-colors relative ${value ? 'bg-clip-cyan' : 'bg-clip-surface'}`}>
@@ -362,8 +362,8 @@ export function UploadPage({ user, onNavigate }: UploadPageProps) {
             <div className="card-glass p-4">
               <p className="text-xs text-clip-muted mb-2 font-medium uppercase tracking-wider">Credit Cost</p>
               <div className="space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-clip-muted">AI scan</span><span className="text-clip-text">10 cr</span></div>
-                <div className="flex justify-between"><span className="text-clip-muted">AI captions</span><span className="text-clip-text">{captionsEnabled ? '5 cr' : '—'}</span></div>
+                <div className="flex justify between"><span className="text-clip-muted">AI scan</span><span className="text-clip-text">10 cr</span></div>
+                <div className="flex justify between"><span className="text-clip-muted">AI captions</span><span className="text-clip-text">{captionsEnabled ? '5 cr' : '—'}</span></div>
                 <div className="border-t border-white/[0.025] mt-2 pt-2 flex justify-between font-medium">
                   <span className="text-clip-muted">Total</span>
                   <span className="text-clip-cyan">{captionsEnabled ? 15 : 10} cr</span>

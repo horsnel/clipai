@@ -93,13 +93,14 @@ export function ChannelAuditModal({ audit, onClose, onDelete, onViewFull }: Chan
         <div className={`relative h-28 bg-gradient-to-br ${config.banner} overflow-hidden`}>
           {/* Watermark icon */}
           <PlatformIcon platform={audit.platform} className={`absolute -right-6 -top-6 w-40 h-40 ${config.iconColor} opacity-10`} />
-          {/* Close button */}
+          {/* Close button — circled X */}
           <button
             onClick={onClose}
             aria-label="Close"
-            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+            title="Close"
+            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm hover:bg-black/80 border border-white/15 hover:border-white/40 text-white flex items-center justify-center transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" strokeWidth={2.5} />
           </button>
           {/* Platform badge */}
           <span className={`absolute top-3 left-3 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur-sm text-white border border-white/10`}>

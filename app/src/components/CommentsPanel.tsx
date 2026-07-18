@@ -63,7 +63,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
         <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Reading transcript + predicting viewer reactions.<br />
-          <span className="text-xs">Takes 6–12 seconds if cached.</span>
+          <span className="text-xs">Takes 6 to 12 seconds if cached.</span>
         </p>
       </div>
     );

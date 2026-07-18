@@ -64,7 +64,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
         <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Reading transcript + writing faceless-creator script.<br />
-          <span className="text-xs">Takes 12–25 seconds if cached, longer if new.</span>
+          <span className="text-xs">Takes 12 to 25 seconds if cached, longer if new.</span>
         </p>
       </div>
     );
@@ -92,7 +92,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
           </div>
           <div>
             <h3 className="font-display font-semibold text-clip-text">Shadow Editor</h3>
-            <p className="text-clip-muted text-xs">Turn any YouTube video into a faceless-creator script</p>
+            <p className="text-clip-muted text-xs">Turn any YouTube video into a faceless creator script</p>
           </div>
         </div>
 

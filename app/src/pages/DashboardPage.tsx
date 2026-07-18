@@ -7,9 +7,8 @@ import {
 import { TopicStealWidget } from '@/components/TopicStealWidget';
 import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
 import { TrendingVideosSection } from '@/components/TrendingVideosSection';
-import { TrendingViewsChart } from '@/components/TrendingViewsChart';
 import { ChannelAuditsGrid } from '@/components/ChannelAuditsGrid';
-import { InfoIconPopup } from '@/components/InfoIconPopup';
+import { ToolsGuide } from '@/components/ToolsGuide';
 import { setPendingAnalysisId } from '@/lib/navState';
 import type { AnalysisSummary } from '../types';
 
@@ -155,11 +154,6 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
         {/* ── Channel Audits Grid (HERO — audited channels as avatar squares) ── */}
         <ChannelAuditsGrid onNavigate={onNavigate} />
 
-        {/* ── Trending Views chart ── */}
-        <div className="mb-10">
-          <TrendingViewsChart />
-        </div>
-
         {/* ── Trending Gaming Videos ── */}
         <div className="mb-10">
           <TrendingVideosSection />
@@ -195,9 +189,6 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
                   <span className="font-display font-semibold text-clip-text group-hover:text-clip-cyan transition-colors">
                     {card.label}
                   </span>
-                  <InfoIconPopup label={`What is ${card.label}?`} size="sm" className="ml-1">
-                    {card.desc}
-                  </InfoIconPopup>
                 </div>
 
                 {!card.locked && (
@@ -209,6 +200,9 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
             ))}
           </div>
         </div>
+
+        {/* Tools & platform usage guidance for first-time users */}
+        <ToolsGuide onNavigate={onNavigate} />
 
         {/* Topic Steal — anonymized network trends (Phase 1) */}
         <div className="mb-10">

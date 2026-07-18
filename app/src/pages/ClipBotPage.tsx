@@ -30,7 +30,7 @@ const STARTER_PROMPTS = [
 const WELCOME_MSG: Message = {
   id: 'welcome',
   role: 'assistant',
-  content: `Yo! I'm **ClipBot** 🤖 — your personal AI gaming content coach.\n\nI know everything about going viral on TikTok, YouTube Shorts, and Reels — especially in the Nigerian and African gaming scene.\n\nAsk me anything:\n• Viral titles & captions for your game\n• Growth strategies for your channel\n• What's trending right now\n• Content calendars & posting schedules\n• How to fix a flopping channel\n\nWhat do you want to work on? 🔥`,
+  content: `Yo! I'm **ClipBot** 🤖 , your personal AI gaming content coach.\n\nI know everything about going viral on TikTok, YouTube Shorts, and Reels: especially in the Nigerian and African gaming scene.\n\nAsk me anything:\n• Viral titles & captions for your game\n• Growth strategies for your channel\n• What's trending right now\n• Content calendars & posting schedules\n• How to fix a flopping channel\n\nWhat do you want to work on? 🔥`,
   timestamp: new Date(),
 };
 
@@ -217,7 +217,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
 
           {/* Typing indicator — no bubble */}
           {isTyping && (
-            <div className="flex justify-start">
+            <div className="flex justify start">
               <div className="px-1 py-2">
                 <TypingDots />
               </div>
@@ -327,7 +327,7 @@ function getFallbackReply(msg: string): string {
   }
 
   if (lower.includes('grow') || lower.includes('channel')) {
-    return `To grow a gaming channel fast in Nigeria, here's what actually works right now:\n\n• **Post 1x daily on TikTok** — volume beats perfection at the start\n• **Use Nigerian gaming hashtags** — #naijagamer #gamingafrica #[yourgame]\n• **Best posting times:** 7–9 PM WAT when Nigerian teens are off school\n• **First 2 seconds are everything** — start mid-action, never with an intro\n• **Comment bait** — end every video with "drop a 💀 if you would've rage quit"\n• **Duet/stitch** popular clips in your game — free reach from existing audiences\n\nWhich platform are you focusing on?`;
+    return `To grow a gaming channel fast in Nigeria, here's what actually works right now:\n\n• **Post 1x daily on TikTok** , volume beats perfection at the start\n• **Use Nigerian gaming hashtags** , #naijagamer #gamingafrica #[yourgame]\n• **Best posting times:** 7 to 9 PM WAT when Nigerian teens are off school\n• **First 2 seconds are everything** , start mid action, never with an intro\n• **Comment bait** , end every video with "drop a 💀 if you would've rage quit"\n• **Duet/stitch** popular clips in your game — free reach from existing audiences\n\nWhich platform are you focusing on?`;
   }
 
   if (lower.includes('time') || lower.includes('post') || lower.includes('when')) {
@@ -335,12 +335,12 @@ function getFallbackReply(msg: string): string {
   }
 
   if (lower.includes('flop') || lower.includes('views') || lower.includes('not working')) {
-    return `If your videos are flopping, here are the most common reasons and fixes:\n\n• **Weak hook** — first 1–2 seconds aren't stopping the scroll. Start with the most exciting moment.\n• **Too long** — keep clips under 30 seconds. Cut everything before the hype.\n• **Wrong hashtags** — don't use mega tags only. Mix mega + mid + niche (3+5+5 rule).\n• **Posting dead times** — post 7–9 PM WAT on weekdays, any time on weekends.\n• **No call to action** — always ask for something: "drop a 💀", "comment your score", "share if you agree"\n\nSend me your last video's title and I'll tell you exactly what to fix.`;
+    return `If your videos are flopping, here are the most common reasons and fixes:\n\n• **Weak hook** — first 1–2 seconds aren't stopping the scroll. Start with the most exciting moment.\n• **Too long** , keep clips under 30 seconds. Cut everything before the hype.\n• **Wrong hashtags** , don't use mega tags only. Mix mega + mid + niche (3+5+5 rule).\n• **Posting dead times** — post 7–9 PM WAT on weekdays, any time on weekends.\n• **No call to action** — always ask for something: "drop a 💀", "comment your score", "share if you agree"\n\nSend me your last video's title and I'll tell you exactly what to fix.`;
   }
 
   if (lower.includes('plan') || lower.includes('calendar') || lower.includes('schedule')) {
-    return `Here's a simple 30-day content plan for a gaming channel:\n\n• **Week 1:** Post daily — 1 highlight clip, 1 reaction, 1 tip, 1 "first time playing" style video, rest are pure highlights\n• **Week 2:** Find your 2 best performing formats and double down\n• **Week 3:** Add trending sounds to your clips. Stitch/duet 2 viral gaming videos.\n• **Week 4:** Post your best clip yet. Ask followers what game they want to see next.\n\nKey rule: **Analyse week 1 data before week 2 starts.** Double what worked, cut what didn't.\n\nWant a more specific plan for your game?`;
+    return `Here's a simple 30-day content plan for a gaming channel:\n\n• **Week 1:** Post daily: 1 highlight clip, 1 reaction, 1 tip, 1 "first time playing" style video, rest are pure highlights\n• **Week 2:** Find your 2 best performing formats and double down\n• **Week 3:** Add trending sounds to your clips. Stitch/duet 2 viral gaming videos.\n• **Week 4:** Post your best clip yet. Ask followers what game they want to see next.\n\nKey rule: **Analyse week 1 data before week 2 starts.** Double what worked, cut what didn't.\n\nWant a more specific plan for your game?`;
   }
 
-  return `Great question! Here's my take:\n\nThe gaming content scene — especially in Nigeria — is moving incredibly fast right now. The creators winning are doing 3 things:\n\n• **Speed** — upload within 24 hours of a highlight happening while the adrenaline shows\n• **Authenticity** — genuine reactions beat polished edits every time for teenage audiences\n• **Consistency** — the algorithm rewards creators who show up daily, even with short clips\n\nTell me more about what you're working on and I'll give you specific advice. What game do you mainly play?`;
+  return `Great question! Here's my take:\n\nThe gaming content scene: especially in Nigeria: is moving incredibly fast right now. The creators winning are doing 3 things:\n\n• **Speed** , upload within 24 hours of a highlight happening while the adrenaline shows\n• **Authenticity** , genuine reactions beat polished edits every time for teenage audiences\n• **Consistency** , the algorithm rewards creators who show up daily, even with short clips\n\nTell me more about what you're working on and I'll give you specific advice. What game do you mainly play?`;
 }
