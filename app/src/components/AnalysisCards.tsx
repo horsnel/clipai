@@ -153,7 +153,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-16 h-16 rounded-full bg-clip-cyan/95 flex items-center justify-center backdrop-blur-sm shadow-glow-cyan group-hover:scale-110 transition-transform">
+                    <div className="w-16 h-16 rounded-full bg-clip-cyan/95 flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform">
                       <Play className="w-7 h-7 text-black ml-1" fill="currentColor" />
                     </div>
                   </div>
@@ -345,7 +345,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
             {a.thumbnail_concepts.map((t, i) => (
               <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <p className="text-sm font-bold text-clip-text mb-1"
-                  style={{ color: t.color === 'yellow' ? '#FBBF24' : t.color === 'red' ? '#F87171' : t.color === 'cyan' ? '#00C2D6' : undefined }}>
+                  style={{ color: t.color === 'yellow' ? '#FBBF24' : t.color === 'red' ? '#F87171' : t.color === 'cyan' ? '#0E7A88' : undefined }}>
                   {t.text}
                 </p>
                 <p className="text-[10px] text-clip-muted font-mono">{t.position} · {t.font_weight} · {t.color}</p>

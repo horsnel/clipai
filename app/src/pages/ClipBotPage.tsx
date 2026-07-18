@@ -272,7 +272,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
                 type="submit"
                 disabled={!input.trim() || isTyping}
                 aria-label="Send message"
-                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.025] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:shadow-[0_0_20px_rgba(0, 194, 214, 0.35)] enabled:hover:scale-105 enabled:active:scale-95"
+                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.025] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:hover:scale-105 enabled:active:scale-95"
               >
                 {isTyping ? (
                   <Loader2 className="w-[18px] h-[18px] animate-spin" />

@@ -136,15 +136,6 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
     ? videos
     : videos.filter((v) => v.platform === activePlatform);
 
-  // Count per platform for the filter tabs
-  const platformCounts: Record<string, number> = {
-    all: videos.length,
-    youtube: videos.filter((v) => v.platform === 'youtube').length,
-    tiktok: videos.filter((v) => v.platform === 'tiktok').length,
-    twitter: videos.filter((v) => v.platform === 'twitter').length,
-    instagram: videos.filter((v) => v.platform === 'instagram').length,
-  };
-
   const FILTER_TABS: Array<{ key: Platform | 'all'; label: string; platformId?: PlatformId }> = [
     { key: 'all',       label: 'All' },
     { key: 'youtube',   label: 'YouTube',   platformId: 'youtube' },
@@ -154,9 +145,9 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
   ];
 
   return (
-    <div className="card-glass overflow-hidden">
+    <section>
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/[0.025]">
+      <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
             <Flame className="w-5 h-5 text-red-500" />
@@ -177,9 +168,8 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
 
       {/* Platform filter tabs */}
       {!loading && !error && videos.length > 0 && (
-        <div className="flex items-center gap-1 px-5 py-2 border-b border-white/[0.025] overflow-x-auto">
+        <div className="flex items-center gap-1 mb-3 overflow-x-auto">
           {FILTER_TABS.map((tab) => {
-            const count = platformCounts[tab.key] || 0;
             const isActive = activePlatform === tab.key;
             return (
               <button
@@ -195,9 +185,6 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                   ? <PlatformIcon platform={tab.platformId} className="w-3.5 h-3.5" />
                   : <Flame className="w-3.5 h-3.5" />}
                 {tab.label}
-                <span className={`text-[10px] px-1 rounded ${isActive ? 'bg-clip-cyan/20' : 'bg-white/[0.02]'}`}>
-                  {count}
-                </span>
               </button>
             );
           })}
@@ -205,7 +192,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
       )}
 
       {/* Body */}
-      <div className="p-3 sm:p-4">
+      <div>
         {loading ? (
           <SkeletonVideoGrid count={6} />
         ) : error ? (
@@ -358,6 +345,6 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }

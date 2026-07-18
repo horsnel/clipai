@@ -241,7 +241,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
         onClick={() => setMode('semi')}
         aria-label="Open ClipBot chat"
         title="Chat with ClipBot"
-        className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-clip-cyan to-violet-600 text-black shadow-[0_0_30px_rgba(0,194,214,0.45)] hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center group"
+        className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-clip-cyan to-violet-600 text-black hover:scale-105 active:scale-95 transition-all duration-200 flex items-center justify-center group"
       >
         <Bot className="w-7 h-7" strokeWidth={2.2} />
         {/* Online dot */}
@@ -457,7 +457,7 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
                 type="submit"
                 disabled={!input.trim() || isTyping}
                 aria-label="Send message"
-                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.025] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:shadow-[0_0_20px_rgba(0,194,214,0.35)] enabled:hover:scale-105 enabled:active:scale-95"
+                className="ml-2 w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full transition-all duration-200 disabled:bg-white/[0.025] disabled:text-clip-muted/40 disabled:cursor-not-allowed enabled:bg-gradient-to-br enabled:from-clip-cyan enabled:to-violet-600 enabled:text-clip-dark enabled:hover:scale-105 enabled:active:scale-95"
               >
                 {isTyping ? (
                   <Loader2 className="w-[18px] h-[18px] animate-spin" />

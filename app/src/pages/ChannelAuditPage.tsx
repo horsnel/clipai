@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import { auditChannel } from '@/services/api';
 import { InfoIconPopup } from '@/components/InfoIconPopup';
 import { PlatformIcon } from '@/components/BrandIcons';
+import { platformTerms } from '@/lib/platformTerminology';
 import type { ChannelAudit, AuditPlatform } from '../types';
 
 interface ChannelAuditPageProps {
@@ -197,13 +198,13 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
             </div>
             <div className="flex items-center gap-1.5">
               <h2 className="font-display font-bold text-xl text-clip-text">
-                Free Channel Audit
+                Free {selectedPlatform ? platformTerms(selectedPlatform).entityTitle : 'Channel'} Audit
               </h2>
-              <InfoIconPopup label="What is a Channel Audit?" size="md">
+              <InfoIconPopup label="What is an Audit?" size="md">
                 Paste a link to your YouTube, TikTok, X, Instagram, or Reddit
-                channel — or just type the username and pick a platform — and
-                we'll pull a free analytics report: subscribers, total views,
-                recent posts, and engagement rate. You can audit up to {MAX_AUDITS} channels.
+                channel, profile, or subreddit — or just type the username and pick a platform — and
+                we'll pull a free analytics report: subscribers or followers, total views,
+                recent posts, and engagement rate. You can audit up to {MAX_AUDITS} entities.
                 <br /><br />
                 YouTube and Reddit audits return real follower counts and engagement data.
                 TikTok, X, and Instagram audits use third-party scrapers (Sociavault, ScrapeCreators,
@@ -284,8 +285,8 @@ export function ChannelAuditPage({ user: _user, onNavigate: _onNavigate, onCompl
           <div className="flex items-center justify-between gap-3 mt-6 pt-5 border-t border-white/[0.025]">
             <p className="text-xs text-clip-muted">
               {completedAudits.length > 0
-                ? `${completedAudits.length} channel${completedAudits.length === 1 ? '' : 's'} audited`
-                : 'You can add channels later from the dashboard'}
+                ? `${completedAudits.length} ${selectedPlatform ? platformTerms(selectedPlatform).entityPlural : 'channels'} audited`
+                : 'You can add more later from the dashboard'}
             </p>
             <Button
               onClick={onComplete}
@@ -313,7 +314,7 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
           <div
             className="absolute inset-0"
             style={{
-              background: 'linear-gradient(110deg, transparent 30%, rgba(0, 194, 214, 0.10) 50%, transparent 80%)',
+              background: 'linear-gradient(110deg, transparent 30%, rgba(14, 122, 136, 0.10) 50%, transparent 80%)',
               backgroundSize: '200% 100%',
               animation: 'clipai-shimmer 2.4s ease-in-out infinite',
             }}
@@ -348,6 +349,7 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
   // Done — show a compact preview row
   const audit = entry.audit!;
   const platform = audit.platform;
+  const terms = platformTerms(platform);
   const platformColor = platform === 'youtube' ? 'text-red-500' : platform === 'tiktok' ? 'text-clip-cyan' : platform === 'instagram' ? 'text-pink-400' : platform === 'reddit' ? 'text-orange-500' : 'text-slate-300';
 
   return (
@@ -379,8 +381,8 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
       {/* Quick stats (real-audit platforms) */}
       {!audit.statistics.hiddenSubscriberCount && (
         <div className="hidden sm:flex items-center gap-3 text-xs text-clip-muted flex-shrink-0">
-          <span className="tabular-nums">{formatShort(audit.statistics.subscribers)} {platform === 'reddit' ? 'subs' : 'subs'}</span>
-          <span className="tabular-nums">{formatShort(audit.statistics.totalViews)} {platform === 'reddit' ? 'karma' : 'views'}</span>
+          <span className="tabular-nums">{formatShort(audit.statistics.subscribers)} {terms.followersShort}</span>
+          <span className="tabular-nums">{formatShort(audit.statistics.totalViews)} {terms.viewsNoun}</span>
         </div>
       )}
 
@@ -389,7 +391,7 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
         target="_blank"
         rel="noopener noreferrer"
         className="text-clip-muted hover:text-clip-cyan transition-colors flex-shrink-0"
-        aria-label="Open channel"
+        aria-label={terms.openEntityLabel}
       >
         <ExternalLink className="w-4 h-4" />
       </a>

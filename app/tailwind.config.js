@@ -48,13 +48,13 @@ module.exports = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        // ClipAI Custom Colors — darkened palette (Phase: deeper dark)
+        // ClipAI Custom Colors — deep darkened palette (no glow, darkened hues)
         'clip-dark': '#050507',
         'clip-surface': '#0B0B0F',
         'clip-border': '#131318',
-        'clip-cyan': '#00C2D6',
-        'clip-amber': '#C97F08',
-        'clip-red': '#D63A3A',
+        'clip-cyan': '#0E7A88',
+        'clip-amber': '#7A4F08',
+        'clip-red': '#8A2828',
         'clip-text': '#A8AEB8',
         'clip-muted': '#565B6A',
       },
@@ -69,7 +69,6 @@ module.exports = {
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
-        'glow-cyan': '0 0 30px rgba(0, 240, 255, 0.18)',
         'card': '0 18px 50px rgba(0, 0, 0, 0.45)',
       },
       fontFamily: {
@@ -94,10 +93,6 @@ module.exports = {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-10px)" },
         },
-        "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 20px rgba(0, 240, 255, 0.2)" },
-          "50%": { boxShadow: "0 0 40px rgba(0, 240, 255, 0.4)" },
-        },
         "scan": {
           "0%": { transform: "translateY(-100%)" },
           "100%": { transform: "translateY(100%)" },
@@ -112,7 +107,6 @@ module.exports = {
         "accordion-up": "accordion-up 0.2s ease-out",
         "caret-blink": "caret-blink 1.25s ease-out infinite",
         "float": "float 3s ease-in-out infinite",
-        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         "scan": "scan 2s linear infinite",
         "progress": "progress 2s ease-out forwards",
       },

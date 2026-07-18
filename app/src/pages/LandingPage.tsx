@@ -138,7 +138,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/60 via-transparent to-transparent" />
               
               {/* Floating badge */}
-              <div className="absolute top-4 right-4 bg-clip-cyan text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 animate-pulse-glow">
+              <div className="absolute top-4 right-4 bg-clip-cyan text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5" />
                 AI POWERED
               </div>

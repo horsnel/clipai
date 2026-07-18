@@ -233,15 +233,6 @@ function AppContentInner({
   if (isLoading) {
     return (
       <div className="min-h-screen bg-clip-dark flex flex-col items-center justify-center gap-10 relative overflow-hidden">
-        {/* Ambient cyan glow halo */}
-        <div
-          className="absolute w-[480px] h-[480px] rounded-full blur-3xl opacity-25 pointer-events-none"
-          style={{
-            background: 'radial-gradient(circle, #00C2D6 0%, transparent 65%)',
-            animation: 'clipai-boot-pulse 2.4s ease-in-out infinite',
-          }}
-        />
-
         {/* Logo + wordmark with fade-in */}
         <div
           className="relative flex flex-col items-center gap-4"
@@ -274,17 +265,13 @@ function AppContentInner({
           <div
             className="absolute inset-y-0 w-1/3 rounded-full"
             style={{
-              background: 'linear-gradient(90deg, transparent 0%, #00C2D6 50%, transparent 100%)',
+              background: 'linear-gradient(90deg, transparent 0%, #0E7A88 50%, transparent 100%)',
               animation: 'clipai-boot-sweep 1.4s ease-in-out infinite',
             }}
           />
         </div>
 
         <style>{`
-          @keyframes clipai-boot-pulse {
-            0%, 100% { opacity: 0.25; transform: scale(1); }
-            50% { opacity: 0.4; transform: scale(1.05); }
-          }
           @keyframes clipai-boot-rise {
             from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }

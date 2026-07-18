@@ -23,6 +23,7 @@ import {
 import { PlatformIcon } from '@/components/BrandIcons';
 import { SkeletonShimmer, SkeletonList } from './Loading';
 import { getAuditInsights } from '@/services/api';
+import { platformTerms } from '@/lib/platformTerminology';
 import { toast } from 'sonner';
 import type { ChannelAudit, AuditPlatform, AuditInsights } from '../types';
 
@@ -79,6 +80,7 @@ const TABS: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
 
 export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProps) {
   const config = PLATFORM_CONFIG[audit.platform] || PLATFORM_CONFIG.youtube;
+  const terms = platformTerms(audit.platform);
   const hasRealStats = !audit.statistics.hiddenSubscriberCount;
 
   const [insights, setInsights] = useState<AuditInsights | null>(null);
@@ -188,7 +190,7 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
                   rel="noopener noreferrer"
                   className={`inline-flex items-center gap-1 text-xs ${config.accent} hover:underline`}
                 >
-                  Open channel <ExternalLink className="w-3 h-3" />
+                  {terms.openEntityLabel} <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
             </div>
@@ -205,21 +207,21 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
       <div className="max-w-5xl mx-auto px-4 sm:px-6 mt-5">
         {hasRealStats ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <BigStat icon={Users}      value={formatCount(audit.statistics.subscribers)} label={audit.platform === 'reddit' ? 'Subredditors' : 'Subscribers'} color={config.accent} />
-            <BigStat icon={Eye}        value={formatCount(audit.statistics.totalViews)}  label={audit.platform === 'reddit' ? 'Total Karma' : 'Total Views'} color={config.accent} />
-            <BigStat icon={Video}      value={formatCount(audit.statistics.videoCount)}  label={audit.platform === 'youtube' ? 'Videos' : 'Posts'} color={config.accent} />
-            <BigStat icon={TrendingUp} value={`${audit.metrics.avgEngagementRate.toFixed(1)}%`} label="Engagement" color={config.accent} />
+            <BigStat icon={Users}      value={formatCount(audit.statistics.subscribers)} label={terms.followersLabel} color={config.accent} />
+            <BigStat icon={Eye}        value={formatCount(audit.statistics.totalViews)}  label={terms.totalViewsLabel} color={config.accent} />
+            <BigStat icon={Video}      value={formatCount(audit.statistics.videoCount)}  label={terms.postsLabel} color={config.accent} />
+            <BigStat icon={TrendingUp} value={`${audit.metrics.avgEngagementRate.toFixed(1)}%`} label={terms.engagementLabel} color={config.accent} />
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2.5">
             <BigStat icon={Video} value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label="Posts Found" color={config.accent} />
-            <BigStat icon={AlertCircle} value="N/A" label="Followers" color="text-clip-muted" />
+            <BigStat icon={AlertCircle} value="N/A" label={terms.followersLabel} color="text-clip-muted" />
           </div>
         )}
         {hasRealStats && audit.metrics.recentVideoCount > 0 && (
           <div className="mt-2.5 flex items-center justify-center gap-2 text-xs text-clip-muted bg-clip-surface/50 rounded-lg py-2 border border-white/[0.02]">
             <TrendingUp className="w-3.5 h-3.5 text-clip-cyan" />
-            Avg {audit.platform === 'reddit' ? 'score' : 'views'} on last {audit.metrics.recentVideoCount} {audit.platform === 'youtube' ? 'videos' : 'posts'}:{' '}
+            Avg {terms.viewsNoun} on last {audit.metrics.recentVideoCount} {terms.postsLabel.toLowerCase()}:{' '}
             <span className="font-bold text-clip-text tabular-nums">{formatCount(audit.metrics.avgRecentViews)}</span>
             <span className="text-clip-muted/60">·</span>
             <span>Total: {formatCount(audit.metrics.totalRecentViews)}</span>
@@ -327,7 +329,7 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
           <div className="mt-8">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-display font-semibold text-sm text-clip-text">
-                All {audit.platform === 'youtube' ? 'Videos' : 'Posts'} ({audit.recentVideos.length})
+                All {terms.postsLabel} ({audit.recentVideos.length})
               </h3>
             </div>
             <div className="space-y-2">

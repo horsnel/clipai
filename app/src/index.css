@@ -67,8 +67,7 @@
   
   .btn-primary {
     @apply bg-clip-cyan text-black font-semibold px-6 py-3 rounded-xl 
-           hover:brightness-110 hover:-translate-y-0.5 transition-all duration-200
-           shadow-glow-cyan;
+           hover:brightness-110 hover:-translate-y-0.5 transition-all duration-200;
   }
   
   .btn-secondary {
@@ -148,6 +147,6 @@
 
 /* Selection */
 ::selection {
-  background: rgba(0, 194, 214, 0.25);
+  background: rgba(14, 122, 136, 0.25);
   color: #A8AEB8;
 }

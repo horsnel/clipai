@@ -6,7 +6,7 @@
  *   2. <SkeletonShimmer />  — skeleton card with branded pulse
  *   3. <ProgressBar />      — slim top-of-screen progress bar (NProgress style)
  *
- * Brand: cyan (#00C2D6) + violet (#8B5CF6) on near-black (#08080A).
+ * Brand: cyan (#0E7A88) + violet (#8B5CF6) on near-black (#08080A).
  */
 
 import { useEffect, useState, useRef } from 'react';
@@ -110,8 +110,7 @@ export function ParticleLoader({
               top: `${p.startY}%`,
               width: `${p.size}px`,
               height: `${p.size}px`,
-              background: p.hue === 'cyan' ? '#00C2D6' : '#8B5CF6',
-              boxShadow: `0 0 8px ${p.hue === 'cyan' ? '#00C2D6' : '#8B5CF6'}`,
+              background: p.hue === 'cyan' ? '#0E7A88' : '#8B5CF6',
               animation: `clipai-particle-in ${p.duration}ms ease-in ${p.delay}ms infinite`,
             }}
           />
@@ -122,7 +121,6 @@ export function ParticleLoader({
           <div
             className="w-6 h-6 rounded-full bg-clip-cyan"
             style={{
-              boxShadow: '0 0 24px #00C2D6, 0 0 48px #00C2D6',
               animation: 'clipai-core-pulse 1.5s ease-in-out infinite',
             }}
           />
@@ -195,7 +193,7 @@ export function SkeletonShimmer({
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'linear-gradient(110deg, transparent 30%, rgba(0, 194, 214, 0.06) 50%, rgba(139,92,246,0.06) 60%, transparent 80%)',
+          background: 'linear-gradient(110deg, transparent 30%, rgba(14, 122, 136, 0.06) 50%, rgba(139,92,246,0.06) 60%, transparent 80%)',
           backgroundSize: '200% 100%',
           animation: 'clipai-shimmer 2.4s ease-in-out infinite',
         }}
@@ -255,7 +253,7 @@ export function SkeletonGrid({ count = 4 }: { count?: number }) {
             <div
               className="absolute inset-0"
               style={{
-                background: 'linear-gradient(110deg, transparent 30%, rgba(0, 194, 214, 0.06) 50%, rgba(139,92,246,0.06) 60%, transparent 80%)',
+                background: 'linear-gradient(110deg, transparent 30%, rgba(14, 122, 136, 0.06) 50%, rgba(139,92,246,0.06) 60%, transparent 80%)',
                 backgroundSize: '200% 100%',
                 animation: 'clipai-shimmer 2.4s ease-in-out infinite',
               }}
@@ -302,7 +300,7 @@ export function SkeletonVideoGrid({ count = 6 }: { count?: number }) {
             <div
               className="absolute inset-0"
               style={{
-                background: 'linear-gradient(110deg, transparent 30%, rgba(0, 194, 214, 0.06) 50%, rgba(139,92,246,0.06) 60%, transparent 80%)',
+                background: 'linear-gradient(110deg, transparent 30%, rgba(14, 122, 136, 0.06) 50%, rgba(139,92,246,0.06) 60%, transparent 80%)',
                 backgroundSize: '200% 100%',
                 animation: 'clipai-shimmer 2.4s ease-in-out infinite',
               }}
@@ -339,7 +337,7 @@ export function SkeletonTable({ count = 5 }: { count?: number }) {
             <div
               className="absolute inset-0"
               style={{
-                background: 'linear-gradient(110deg, transparent 30%, rgba(0, 194, 214, 0.06) 50%, transparent 80%)',
+                background: 'linear-gradient(110deg, transparent 30%, rgba(14, 122, 136, 0.06) 50%, transparent 80%)',
                 backgroundSize: '200% 100%',
                 animation: 'clipai-shimmer 2.4s ease-in-out infinite',
               }}
@@ -394,8 +392,8 @@ export function ProgressBar({ active }: { active: boolean }) {
         className="h-full transition-all duration-300 ease-out"
         style={{
           width: `${width}%`,
-          background: 'linear-gradient(90deg, #00C2D6 0%, #8B5CF6 100%)',
-          boxShadow: '0 0 8px #00C2D6',
+          background: 'linear-gradient(90deg, #0E7A88 0%, #8B5CF6 100%)',
+          boxShadow: '0 0 8px #0E7A88',
         }}
       />
     </div>

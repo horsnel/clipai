@@ -114,7 +114,7 @@ export function Navbar({ currentPage, onNavigate, isLoggedIn }: NavbarProps) {
                 </button>
                 <Button
                   onClick={() => onNavigate('auth')}
-                  className="bg-clip-cyan text-black hover:brightness-110 font-semibold px-5 py-2 rounded-xl shadow-glow-cyan"
+                  className="bg-clip-cyan text-black hover:brightness-110 font-semibold px-5 py-2 rounded-xl"
                 >
                   Sign Up
                 </Button>

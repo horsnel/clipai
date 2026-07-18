@@ -15,6 +15,7 @@ import {
   Users, Eye, TrendingUp, Video, AlertCircle,
 } from 'lucide-react';
 import { PlatformIcon } from '@/components/BrandIcons';
+import { platformTerms } from '@/lib/platformTerminology';
 import type { ChannelAudit, AuditPlatform } from '../types';
 
 interface ChannelAuditCardProps {
@@ -74,6 +75,7 @@ function formatCount(n: number): string {
 
 export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
   const config = PLATFORM_CONFIG[audit.platform] || PLATFORM_CONFIG.youtube;
+  const terms = platformTerms(audit.platform);
   const hasRealStats = (audit.platform === 'youtube' || audit.platform === 'reddit' || audit.platform === 'tiktok' || audit.platform === 'instagram' || audit.platform === 'twitter') && !audit.statistics.hiddenSubscriberCount;
   const avatarFallback = audit.channelHandle || audit.channelName || '?';
 
@@ -127,13 +129,13 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
           {/* Analytics inside the square */}
           {hasRealStats ? (
             <div className="grid grid-cols-3 gap-1.5">
-              <Stat icon={Users}    value={formatCount(audit.statistics.subscribers)} label="Subs"     color={config.accent} />
-              <Stat icon={Eye}      value={formatCount(audit.statistics.totalViews)}  label="Views"    color={config.accent} />
-              <Stat icon={TrendingUp} value={formatCount(audit.metrics.avgRecentViews)} label="Avg/vid" color={config.accent} />
+              <Stat icon={Users}      value={formatCount(audit.statistics.subscribers)} label={terms.followersShort} color={config.accent} />
+              <Stat icon={Eye}        value={formatCount(audit.statistics.totalViews)}  label={terms.viewsLabel}    color={config.accent} />
+              <Stat icon={TrendingUp} value={formatCount(audit.metrics.avgRecentViews)} label="Avg/post" color={config.accent} />
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-1.5">
-              <Stat icon={Video}      value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label="Posts" color={config.accent} />
+              <Stat icon={Video}      value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label={terms.postsLabel} color={config.accent} />
               <Stat icon={AlertCircle} value="N/A" label="Stats" color="text-clip-muted" />
             </div>
           )}

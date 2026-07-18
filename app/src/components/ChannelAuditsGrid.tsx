@@ -138,8 +138,8 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
                 Audit your first channel — free
               </h3>
               <p className="text-clip-muted text-sm leading-relaxed">
-                Paste a YouTube, TikTok, X, or Instagram link and we'll pull a free
-                analytics snapshot: subscribers, total views, recent videos, engagement rate.
+                Paste a YouTube, TikTok, X, Instagram, or Reddit link and we'll pull a free
+                analytics snapshot: subscribers or followers, total views, recent posts, engagement rate.
               </p>
             </div>
             <div className="hidden sm:flex items-center gap-1 text-clip-cyan text-xs flex-shrink-0">
@@ -171,7 +171,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
                 Add another
               </p>
               <p className="text-[10px] text-clip-muted">
-                {(savedCount ?? audits.length)} / 8 channels
+                {(savedCount ?? audits.length)} / 8 audited
               </p>
             </button>
           )}

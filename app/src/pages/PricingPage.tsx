@@ -239,7 +239,7 @@ export function PricingPage({ user, onNavigate, isLoggedIn }: PricingPageProps) 
               {/* Popular badge */}
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
-                  <span className="bg-clip-cyan text-black text-xs font-bold px-4 py-1.5 rounded-full whitespace-nowrap shadow-glow-cyan">
+                  <span className="bg-clip-cyan text-black text-xs font-bold px-4 py-1.5 rounded-full whitespace-nowrap">
                     MOST POPULAR
                   </span>
                 </div>
