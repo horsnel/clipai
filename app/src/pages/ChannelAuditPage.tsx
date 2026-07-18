@@ -309,10 +309,19 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
   if (entry.status === 'loading') {
     return (
       <div className="flex items-center gap-3 p-3 rounded-xl bg-clip-surface/50 border border-white/[0.025]">
-        <Loader2 className="w-5 h-5 text-clip-cyan animate-spin flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-clip-text truncate">Auditing…</p>
-          <p className="text-xs text-clip-muted truncate">{entry.url}</p>
+        <div className="w-10 h-10 rounded-full bg-clip-border flex-shrink-0 relative overflow-hidden">
+          <div
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(110deg, transparent 30%, rgba(0, 194, 214, 0.10) 50%, transparent 80%)',
+              backgroundSize: '200% 100%',
+              animation: 'clipai-shimmer 2.4s ease-in-out infinite',
+            }}
+          />
+        </div>
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="h-3 rounded bg-clip-border w-2/3" />
+          <div className="h-2 rounded bg-clip-border/60 w-1/3" />
         </div>
       </div>
     );

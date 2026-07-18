@@ -1,5 +1,5 @@
 /**
- * ChannelAuditModal.tsx — Full-screen overlay showing the detailed channel audit.
+ * ChannelAuditModal.tsx — Quick-preview overlay showing the channel audit.
  *
  * Layout:
  *   - Backdrop blur + click-to-close
@@ -9,6 +9,7 @@
  *   - Big stats row: subscribers / total views / video count / avg engagement
  *   - Recent videos table (thumbnail + title + views + likes + published date)
  *   - Note for non-YouTube platforms
+ *   - "View Full Audit" button → opens ChannelAuditFullView with extensive AI insights
  *   - Delete audit button (bottom)
  *
  * Esc to close. Click outside to close.
@@ -16,7 +17,7 @@
 import { useEffect } from 'react';
 import {
   X, ExternalLink, Users, Eye, Video, TrendingUp, Heart,
-  AlertCircle, Trash2, MessageCircle,
+  AlertCircle, Trash2, MessageCircle, Maximize2,
 } from 'lucide-react';
 import { PlatformIcon } from '@/components/BrandIcons';
 import type { ChannelAudit, AuditPlatform } from '../types';
@@ -25,6 +26,8 @@ interface ChannelAuditModalProps {
   audit: ChannelAudit;
   onClose: () => void;
   onDelete?: (url: string) => void;
+  /** Open the full-page audit view with extensive AI insights. */
+  onViewFull?: () => void;
 }
 
 const PLATFORM_CONFIG: Record<AuditPlatform, {
@@ -59,7 +62,7 @@ function timeAgo(iso: string): string {
   return 'just now';
 }
 
-export function ChannelAuditModal({ audit, onClose, onDelete }: ChannelAuditModalProps) {
+export function ChannelAuditModal({ audit, onClose, onDelete, onViewFull }: ChannelAuditModalProps) {
   const config = PLATFORM_CONFIG[audit.platform] || PLATFORM_CONFIG.youtube;
   const hasRealStats = !audit.statistics.hiddenSubscriberCount;
 
@@ -253,19 +256,30 @@ export function ChannelAuditModal({ audit, onClose, onDelete }: ChannelAuditModa
           </div>
         )}
 
-        {/* ─── Footer: audited at + delete ─── */}
-        <div className="px-6 sm:px-8 mt-6 mb-6 pt-4 border-t border-white/[0.025] flex items-center justify-between gap-3">
+        {/* ─── Footer: audited at + view full + delete ─── */}
+        <div className="px-6 sm:px-8 mt-6 mb-6 pt-4 border-t border-white/[0.025] flex items-center justify-between gap-3 flex-wrap">
           <span className="text-[10px] text-clip-muted/70 uppercase tracking-wider">
             Audited {timeAgo(audit.auditedAt)}
           </span>
-          {onDelete && (
-            <button
-              onClick={() => { onDelete(audit.url); onClose(); }}
-              className="inline-flex items-center gap-1.5 text-xs text-clip-muted hover:text-red-500 transition-colors px-2 py-1 rounded"
-            >
-              <Trash2 className="w-3.5 h-3.5" /> Remove audit
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {onViewFull && (
+              <button
+                onClick={onViewFull}
+                className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-clip-cyan/10 text-clip-cyan border border-clip-cyan/30 hover:bg-clip-cyan/20 transition-colors"
+              >
+                <Maximize2 className="w-3.5 h-3.5" />
+                View Full Audit
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={() => { onDelete(audit.url); onClose(); }}
+                className="inline-flex items-center gap-1.5 text-xs text-clip-muted hover:text-red-500 transition-colors px-2 py-1 rounded"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Remove
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

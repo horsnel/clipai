@@ -7,7 +7,7 @@ import { Zap, Copy, ThumbsUp, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { voteOnCaption, getTopCaptions, apiClient, analyseYouTube, getAnalysis } from '@/services/api';
-import { ParticleLoader } from '../components/Loading';
+import { SkeletonList, SkeletonShimmer } from '../components/Loading';
 import { AnalysisCards } from '../components/AnalysisCards';
 import { ComparePanel } from '../components/ComparePanel';
 import { PlaylistPanel } from '../components/PlaylistPanel';
@@ -487,12 +487,12 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             {activeTool === 'analysis' && (
               <div className="space-y-3">
                 {analysisLoading ? (
-                  <div className="card-glass p-8 flex flex-col items-center justify-center min-h-[400px]">
-                    <ParticleLoader />
-                    <p className="text-xs text-clip-muted mt-6">
+                  <div className="card-glass p-5">
+                    <div className="flex items-center gap-2 mb-4 text-clip-muted text-xs">
+                      <div className="w-3 h-3 border border-clip-cyan border-t-transparent rounded-full animate-spin" />
                       Fetching transcript → running unified analysis → 14 outputs…
-                    </p>
-                    <p className="text-[10px] text-clip-muted mt-1">This usually takes 8-20 seconds</p>
+                    </div>
+                    <SkeletonList count={5} avatar />
                   </div>
                 ) : analysis ? (
                   <AnalysisCards
@@ -788,15 +788,16 @@ function ViralPill({ score }: { score: number }) {
 function EmptyState({ label, loading }: { label: string; loading?: boolean }) {
   if (loading) {
     return (
-      <div className="card-glass p-8">
-        <ParticleLoader
-          stages={[
-            `Crafting ${label}…`,
-            'Optimising for virality…',
-            'Ranking by viral score…',
-          ]}
-          stageIntervalMs={1500}
-        />
+      <div className="card-glass p-5">
+        <div className="flex items-center gap-2 mb-4 text-clip-muted text-xs">
+          <div className="w-3 h-3 border border-clip-cyan border-t-transparent rounded-full animate-spin" />
+          Crafting {label}…
+        </div>
+        <div className="space-y-3">
+          {[0, 1, 2, 3].map(i => (
+            <SkeletonShimmer key={i} lines={2} avatar />
+          ))}
+        </div>
       </div>
     );
   }

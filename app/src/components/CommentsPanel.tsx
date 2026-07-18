@@ -7,7 +7,7 @@ import {
 import { toast } from 'sonner';
 import { analyseComments } from '@/services/api';
 import type { CommentsResponse, PredictedCommentsResult } from '../types';
-import { ParticleLoader } from './Loading';
+import { SkeletonList } from './Loading';
 import { PlatformIcon } from './BrandIcons';
 
 interface CommentsPanelProps {
@@ -60,7 +60,7 @@ export function CommentsPanel({ user: _user, onNavigate: _onNavigate }: Comments
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <ParticleLoader />
+        <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Reading transcript + predicting viewer reactions.<br />
           <span className="text-xs">Takes 6–12 seconds if cached.</span>

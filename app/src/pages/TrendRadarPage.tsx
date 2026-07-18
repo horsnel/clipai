@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { TrendCardModal } from '../components/TrendCardModal';
-import { ParticleLoader } from '../components/Loading';
+import { SkeletonList } from '../components/Loading';
 import { TopicStealWidget } from '../components/TopicStealWidget';
 import { InfoIconPopup } from '@/components/InfoIconPopup';
 
@@ -250,16 +250,9 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
 
           <div className="divide-y divide-white/[0.02]">
             {isLoading ? (
-              <ParticleLoader
-                stages={[
-                  'Scanning YouTube trending…',
-                  'Mining Reddit gaming subs…',
-                  'Pulling Google Trends…',
-                  'Searching TikTok + X…',
-                  'Synthesizing top trends…',
-                ]}
-                stageIntervalMs={1400}
-              />
+              <div className="p-2">
+                <SkeletonList count={8} avatar />
+              </div>
             ) : filtered.length === 0 ? (
               <div className="p-12 text-center text-clip-muted">
                 <TrendingUp className="w-10 h-10 mx-auto mb-3 opacity-30" />

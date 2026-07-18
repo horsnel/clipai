@@ -6,7 +6,7 @@ import {
 import { toast } from 'sonner';
 import { compareVideos } from '@/services/api';
 import type { CompareResponse, ComparisonResult } from '../types';
-import { ParticleLoader } from './Loading';
+import { SkeletonList } from './Loading';
 import { PlatformIcon } from './BrandIcons';
 
 interface ComparePanelProps {
@@ -67,7 +67,7 @@ export function ComparePanel({ user, onNavigate }: ComparePanelProps) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <ParticleLoader />
+        <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Fetching both transcripts + running comparison LLM call.<br />
           <span className="text-xs">Takes 15–30 seconds if either URL is new.</span>

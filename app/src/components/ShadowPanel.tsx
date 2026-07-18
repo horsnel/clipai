@@ -6,7 +6,7 @@ import {
 import { toast } from 'sonner';
 import { analyseShadow } from '@/services/api';
 import type { ShadowResponse, ShadowEditorResult } from '../types';
-import { ParticleLoader } from './Loading';
+import { SkeletonList } from './Loading';
 import { PlatformIcon } from './BrandIcons';
 
 interface ShadowPanelProps {
@@ -61,7 +61,7 @@ export function ShadowPanel({ user: _user, onNavigate: _onNavigate }: ShadowPane
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <ParticleLoader />
+        <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Reading transcript + writing faceless-creator script.<br />
           <span className="text-xs">Takes 12–25 seconds if cached, longer if new.</span>

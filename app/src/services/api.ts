@@ -21,6 +21,7 @@ import type {
   AnalysisSummary,
   AudioTrendResponse,
   AuditChannelResponse,
+  AuditInsightsResponse,
   ChannelAuditsResponse,
   CommentsResponse,
   CompareResponse,
@@ -412,6 +413,23 @@ export async function getChannelAudits(): Promise<ChannelAuditsResponse> {
 
 export async function deleteChannelAudit(url: string): Promise<{ success: boolean }> {
   return apiClient.delete<{ success: boolean }>(`/channel-audits?url=${encodeURIComponent(url)}`);
+}
+
+// ─── Audit Insights (extensive AI review) ────────────────────────────────────
+// POST /api/audit-insights — generates an extensive AI review of an audited
+// channel: best/worst performing videos, SWOT, recommendations, growth
+// opportunities, content gaps, etc. Reuses the cached audit data so it's free
+// (no credit charge). Insights are cached for 30min on the server.
+export async function getAuditInsights(
+  url: string,
+  platform?: string,
+  force = false,
+): Promise<AuditInsightsResponse> {
+  return apiClient.post<AuditInsightsResponse>('/audit-insights', {
+    url,
+    platform,
+    force,
+  });
 }
 
 // ─── Video Editor Waitlist ─────────────────────────────────────────────────

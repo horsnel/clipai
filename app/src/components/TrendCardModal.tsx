@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/services/api';
-import { ParticleLoader } from './Loading';
+import { SkeletonList } from './Loading';
 import type { TrendItem } from '../pages/TrendRadarPage';
 
 interface TrendCardModalProps {
@@ -170,14 +170,13 @@ export function TrendCardModal({ trend, onClose }: TrendCardModalProps) {
         {/* Body — scrollable */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {isLoading && (
-            <ParticleLoader
-              stages={[
-                'Decoding the trend…',
-                'Writing scroll-stopping titles…',
-                'Crafting captions + hashtags…',
-              ]}
-              stageIntervalMs={1300}
-            />
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-clip-muted text-xs">
+                <div className="w-3 h-3 border border-clip-cyan border-t-transparent rounded-full animate-spin" />
+                Decoding the trend · writing titles · crafting captions…
+              </div>
+              <SkeletonList count={5} avatar />
+            </div>
           )}
 
           {error && !isLoading && (

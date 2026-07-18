@@ -237,6 +237,124 @@ export function SkeletonList({ count = 5, avatar = false }: { count?: number; av
   );
 }
 
+// ─── SkeletonGrid ────────────────────────────────────────────────────────────
+// Renders N skeleton cards in a responsive grid — drop-in for audit cards,
+// dashboard widgets, etc. Mimics the size+shape of ChannelAuditCard.
+
+export function SkeletonGrid({ count = 4 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="card-glass overflow-hidden"
+          aria-hidden="true"
+        >
+          {/* Banner placeholder (matches ChannelAuditCard h-20 banner) */}
+          <div className="h-20 bg-clip-surface relative overflow-hidden">
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'linear-gradient(110deg, transparent 30%, rgba(0, 194, 214, 0.06) 50%, rgba(139,92,246,0.06) 60%, transparent 80%)',
+                backgroundSize: '200% 100%',
+                animation: 'clipai-shimmer 2.4s ease-in-out infinite',
+              }}
+            />
+          </div>
+          {/* Avatar circle overlapping banner */}
+          <div className="px-4 pb-3">
+            <div className="flex justify-center -mt-8 mb-2">
+              <div className="w-16 h-16 rounded-full bg-clip-surface ring-2 ring-clip-border ring-offset-2 ring-offset-clip-surface" />
+            </div>
+            <div className="text-center mb-3 space-y-1.5">
+              <div className="h-3 rounded bg-clip-border mx-auto w-2/3" />
+              <div className="h-2 rounded bg-clip-border/60 mx-auto w-1/3" />
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[0, 1, 2].map((j) => (
+                <div key={j} className="bg-clip-surface/60 rounded-lg py-1.5 border border-white/[0.025] flex flex-col items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-clip-border/70" />
+                  <div className="h-2 w-3/4 rounded bg-clip-border/50" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── SkeletonVideoGrid ───────────────────────────────────────────────────────
+// Renders N skeleton video cards in a 1-2-3 col grid — for TrendingVideosSection.
+
+export function SkeletonVideoGrid({ count = 6 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="rounded-xl overflow-hidden border border-white/[0.02] bg-clip-surface/40"
+          aria-hidden="true"
+        >
+          {/* 16:9 thumbnail placeholder */}
+          <div className="aspect-video bg-clip-surface relative overflow-hidden">
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'linear-gradient(110deg, transparent 30%, rgba(0, 194, 214, 0.06) 50%, rgba(139,92,246,0.06) 60%, transparent 80%)',
+                backgroundSize: '200% 100%',
+                animation: 'clipai-shimmer 2.4s ease-in-out infinite',
+              }}
+            />
+          </div>
+          <div className="p-3 space-y-2">
+            <div className="h-3 rounded bg-clip-border w-full" />
+            <div className="h-3 rounded bg-clip-border w-2/3" />
+            <div className="flex items-center gap-2 mt-2">
+              <div className="h-2 w-1/3 rounded bg-clip-border/60" />
+              <div className="h-2 w-1/4 rounded bg-clip-border/40" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── SkeletonTable ───────────────────────────────────────────────────────────
+// Renders N skeleton rows that look like a table of recent videos (thumbnail
+// + title + meta). For audit modal full video list loading.
+
+export function SkeletonTable({ count = 5 }: { count?: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={i}
+          className="flex items-center gap-3 p-2 rounded-lg bg-clip-surface/30 border border-white/[0.02]"
+          aria-hidden="true"
+        >
+          <div className="w-20 h-12 rounded-md bg-clip-surface relative overflow-hidden flex-shrink-0">
+            <div
+              className="absolute inset-0"
+              style={{
+                background: 'linear-gradient(110deg, transparent 30%, rgba(0, 194, 214, 0.06) 50%, transparent 80%)',
+                backgroundSize: '200% 100%',
+                animation: 'clipai-shimmer 2.4s ease-in-out infinite',
+              }}
+            />
+          </div>
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 rounded bg-clip-border w-full" />
+            <div className="h-2 rounded bg-clip-border/60 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── ProgressBar ─────────────────────────────────────────────────────────────
 // Slim progress bar that sits at the top of the viewport. Mount when loading,
 // unmount when done. Auto-progresses to 90% then waits for unmount.

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTrendingVideos } from '@/services/api';
-import { ParticleLoader } from './Loading';
+import { SkeletonVideoGrid } from './Loading';
 import { PlatformIcon } from './BrandIcons';
 import type { TrendingVideo } from '../types';
 import type { PlatformId } from './BrandIcons';
@@ -207,14 +207,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
       {/* Body */}
       <div className="p-3 sm:p-4">
         {loading ? (
-          <ParticleLoader
-            stages={[
-              'Scanning YouTube trending…',
-              'Pulling TikTok + X + Instagram…',
-              'Generating copy packs…',
-            ]}
-            stageIntervalMs={1400}
-          />
+          <SkeletonVideoGrid count={6} />
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
             <AlertTriangle className="w-8 h-8 text-clip-amber/70" />

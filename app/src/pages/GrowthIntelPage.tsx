@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/services/api';
-import { ParticleLoader } from '../components/Loading';
+import { SkeletonList } from '../components/Loading';
 import { InfoIconPopup } from '@/components/InfoIconPopup';
 
 interface GrowthIntelPageProps {
@@ -188,14 +188,9 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             </div>
 
             {spyLoading && (
-              <ParticleLoader
-                stages={[
-                  'Scraping channel data…',
-                  'Analysing top videos…',
-                  'Reverse-engineering their formula…',
-                ]}
-                stageIntervalMs={1500}
-              />
+              <div className="p-2">
+                <SkeletonList count={4} avatar />
+              </div>
             )}
 
             {spyResult && (
@@ -287,14 +282,9 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             </div>
 
             {timingLoading && (
-              <ParticleLoader
-                stages={[
-                  'Analysing Nigerian audience activity…',
-                  'Cross-referencing platform peaks…',
-                  'Computing optimal slots…',
-                ]}
-                stageIntervalMs={1400}
-              />
+              <div className="p-2">
+                <SkeletonList count={4} avatar />
+              </div>
             )}
 
             {timingResult && (
@@ -365,14 +355,9 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             </div>
 
             {abLoading && (
-              <ParticleLoader
-                stages={[
-                  'Scoring hook strength…',
-                  'Measuring scroll-stop power…',
-                  'Comparing CTR potential…',
-                ]}
-                stageIntervalMs={1300}
-              />
+              <div className="p-2">
+                <SkeletonList count={4} avatar />
+              </div>
             )}
 
             {abResult && (

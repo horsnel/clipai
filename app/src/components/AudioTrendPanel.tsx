@@ -6,7 +6,7 @@ import {
 import { toast } from 'sonner';
 import { analyseAudioTrend } from '@/services/api';
 import type { AudioTrendResponse, AudioTrendResult } from '../types';
-import { ParticleLoader } from './Loading';
+import { SkeletonList } from './Loading';
 import { PlatformIcon } from './BrandIcons';
 
 interface AudioTrendPanelProps {
@@ -62,7 +62,7 @@ export function AudioTrendPanel({ user: _user, onNavigate: _onNavigate }: AudioT
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <ParticleLoader />
+        <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Fetching transcript + matching audio trends.<br />
           <span className="text-xs">Takes 8–15 seconds if cached, longer if new.</span>

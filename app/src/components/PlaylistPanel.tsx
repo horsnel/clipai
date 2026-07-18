@@ -6,7 +6,7 @@ import {
 import { toast } from 'sonner';
 import { sequencePlaylist } from '@/services/api';
 import type { PlaylistResponse, PlaylistResult } from '../types';
-import { ParticleLoader } from './Loading';
+import { SkeletonList } from './Loading';
 import { PlatformIcon } from './BrandIcons';
 
 interface PlaylistPanelProps {
@@ -76,7 +76,7 @@ export function PlaylistPanel({ user, onNavigate }: PlaylistPanelProps) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <ParticleLoader />
+        <SkeletonList count={3} avatar />
         <p className="text-clip-muted text-sm mt-4 text-center max-w-md">
           Analyzing all {urls.filter(u => u.trim()).length} videos + sequencing.<br />
           <span className="text-xs">Takes longer than Deep Analysis — 30–60 seconds for fresh URLs.</span>

@@ -4207,6 +4207,396 @@ app.delete('/channel-audits', requireAuth, async (c) => {
   return json({ success: true, deleted });
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+// POST /api/audit-insights — Extensive AI review of an audited channel
+// ════════════════════════════════════════════════════════════════════════════
+// Body: { url: string, platform?: string, force?: boolean }
+//
+// Reads the cached audit (1h-6h KV cache) — does NOT re-spend scraper credits.
+// Generates an extensive AI review including:
+//   - Executive summary (channel health score + narrative)
+//   - Best performing videos analysis (top 3 with reasons)
+//   - Worst performing videos analysis (bottom 3 with reasons)
+//   - SWOT (strengths / weaknesses / opportunities / threats)
+//   - Content themes detected
+//   - Posting cadence analysis
+//   - Engagement trend direction
+//   - Recommendations to get back on track (prioritized, actionable)
+//   - Growth opportunities
+//   - Content gaps to fill
+//
+// Insights are cached separately for 30min (insights are expensive to regenerate).
+// Free for the user (no credit charge — insights reuse cached audit data).
+app.post('/audit-insights', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+  const body = await c.req.json().catch(() => ({}));
+  const rawUrl = (body.url || '').toString().trim();
+  const platformHint = (body.platform || '').toString().trim();
+  const force = !!body.force;
+  if (!rawUrl) return json({ error: 'url is required' }, 400);
+
+  // Normalise the URL to match the cache key used by /audit-channel
+  const normalised = normaliseAuditInput(rawUrl, platformHint);
+  if (!normalised) return json({ error: 'Unsupported input. Paste a full URL or a username with a platform prefix.' }, 400);
+  const canonicalUrl = normalised.url;
+
+  // Pull the cached audit (1h-6h TTL) — this is the same KV cache the audit
+  // endpoint wrote to. If the cache is cold, we run a fresh audit (this DOES
+  // spend scraper credits upstream, but no user-side credit charge).
+  const auditCacheKey = await hashKey('channel_audit_v1', canonicalUrl);
+  let audit: any;
+  const peeked = await cacheRead<any>(env, auditCacheKey);
+  if (peeked?.data && (peeked.fresh || !force)) {
+    audit = peeked.data;
+  } else {
+    try {
+      audit = await auditChannel(env, canonicalUrl, platformHint);
+      // Re-cache for 1h (don't bump to 6h even if it's a big account — we
+      // don't want to surprise the user with a long TTL on a forced refresh)
+      await cacheWrite(env, auditCacheKey, audit, 60 * 60);
+    } catch (e: any) {
+      return json({ error: `Audit failed: ${e?.message || 'unknown error'}` }, 500);
+    }
+  }
+  if (audit?.error) return json({ error: audit.error }, 400);
+  if (!audit?.recentVideos?.length) {
+    return json({
+      error: 'No recent videos available for this channel — cannot generate insights.',
+      audit,
+    }, 400);
+  }
+
+  // Insights cache (30min) — keyed on the audit cache key + a version tag so
+  // we can bust the cache if we change the prompt.
+  const INSIGHTS_VERSION = 'v2-2026-07-18';
+  const insightsKey = await hashKey('channel_insights', INSIGHTS_VERSION, canonicalUrl);
+  if (!force) {
+    const cached = await cacheRead<any>(env, insightsKey);
+    if (cached?.fresh && cached.data?.insights) {
+      return json({
+        insights: cached.data.insights,
+        audit: { platform: audit.platform, channelName: audit.channelName, channelHandle: audit.channelHandle, url: canonicalUrl },
+        cached: true,
+        generatedAt: cached.data.generatedAt,
+      });
+    }
+  }
+
+  // Generate insights via LLM
+  try {
+    const insights = await generateAuditInsights(env, audit);
+    const generatedAt = new Date().toISOString();
+    // Cache for 30min
+    await cacheWrite(env, insightsKey, { insights, generatedAt }, 30 * 60);
+    return json({
+      insights,
+      audit: { platform: audit.platform, channelName: audit.channelName, channelHandle: audit.channelHandle, url: canonicalUrl },
+      cached: false,
+      generatedAt,
+    });
+  } catch (e: any) {
+    console.error('[audit-insights] LLM failed:', e);
+    return json({
+      error: `Failed to generate insights: ${e?.message || 'unknown error'}`,
+      audit: { platform: audit.platform, channelName: audit.channelName, channelHandle: audit.channelHandle, url: canonicalUrl },
+    }, 500);
+  }
+});
+
+// ─── generateAuditInsights ───────────────────────────────────────────────────
+// Builds the LLM prompt from the audit data and parses the response into the
+// AuditInsights shape. Falls back to deterministic heuristics if the LLM fails
+// to return valid JSON.
+async function generateAuditInsights(env: Env, audit: any): Promise<any> {
+  const videos = (audit.recentVideos || []).slice(0, 10);
+  const stats = audit.statistics || {};
+  const metrics = audit.metrics || {};
+
+  // Sort videos by views (descending) — best performers first
+  const byViewsDesc = [...videos].sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0));
+  const byViewsAsc = [...byViewsDesc].reverse();
+
+  // Compute posting cadence from publishedAt timestamps
+  const timestamps = videos
+    .map((v: any) => v.publishedAt ? new Date(v.publishedAt).getTime() : 0)
+    .filter((t: number) => t > 0)
+    .sort((a: number, b: number) => b - a); // newest first
+  let avgGapDays = 0;
+  let postingCadenceLabel = 'Unknown';
+  if (timestamps.length >= 2) {
+    const gaps: number[] = [];
+    for (let i = 0; i < timestamps.length - 1; i++) {
+      gaps.push((timestamps[i] - timestamps[i + 1]) / 86400000);
+    }
+    avgGapDays = gaps.reduce((s, g) => s + g, 0) / gaps.length;
+    if (avgGapDays < 1) postingCadenceLabel = 'Multiple times per day';
+    else if (avgGapDays < 3) postingCadenceLabel = 'Every 1-3 days';
+    else if (avgGapDays < 7) postingCadenceLabel = 'Every 4-7 days';
+    else if (avgGapDays < 14) postingCadenceLabel = 'Every 1-2 weeks';
+    else if (avgGapDays < 30) postingCadenceLabel = 'Every 2-4 weeks';
+    else postingCadenceLabel = 'Less than once a month';
+  }
+
+  // Engagement trend: compare first half vs second half of recent videos
+  let engagementTrend: 'up' | 'down' | 'flat' = 'flat';
+  if (videos.length >= 4) {
+    const half = Math.floor(videos.length / 2);
+    const recent = videos.slice(0, half);
+    const older = videos.slice(half);
+    const avgRecent = recent.reduce((s: number, v: any) => s + (v.viewCount || 0), 0) / recent.length;
+    const avgOlder = older.reduce((s: number, v: any) => s + (v.viewCount || 0), 0) / older.length;
+    if (avgOlder > 0) {
+      const ratio = avgRecent / avgOlder;
+      if (ratio > 1.15) engagementTrend = 'up';
+      else if (ratio < 0.85) engagementTrend = 'down';
+    }
+  }
+
+  // Health score (0-100) — deterministic baseline, may be overridden by LLM
+  const subs = stats.subscribers || 0;
+  const avgViews = metrics.avgRecentViews || 0;
+  const avgEng = metrics.avgEngagementRate || 0;
+  let healthScore = 50;
+  if (subs > 0 && avgViews > 0) {
+    const viewsRatio = avgViews / subs; // 0-1+, higher = healthier
+    if (viewsRatio > 0.5) healthScore += 25;
+    else if (viewsRatio > 0.2) healthScore += 15;
+    else if (viewsRatio > 0.05) healthScore += 5;
+    else healthScore -= 10;
+  }
+  if (avgEng > 5) healthScore += 15;
+  else if (avgEng > 2) healthScore += 8;
+  else if (avgEng < 0.5) healthScore -= 8;
+  if (engagementTrend === 'up') healthScore += 10;
+  else if (engagementTrend === 'down') healthScore -= 10;
+  if (postingCadenceLabel.includes('day') || postingCadenceLabel.includes('3 days')) healthScore += 5;
+  else if (postingCadenceLabel.includes('month')) healthScore -= 5;
+  healthScore = Math.max(5, Math.min(98, healthScore));
+
+  // Build video summaries for the LLM (compact — titles + key stats only)
+  const videoSummaries = videos.map((v: any, i: number) => {
+    const daysAgo = v.publishedAt ? Math.floor((Date.now() - new Date(v.publishedAt).getTime()) / 86400000) : '?';
+    return `${i + 1}. "${v.title}" — ${v.viewCount || 0} views, ${v.likeCount || 0} likes, ${v.commentCount || 0} comments, ${daysAgo}d ago, ${v.duration || 'unknown duration'}`;
+  }).join('\n');
+
+  const platformLabel = audit.platform === 'youtube' ? 'YouTube'
+    : audit.platform === 'tiktok' ? 'TikTok'
+    : audit.platform === 'instagram' ? 'Instagram'
+    : audit.platform === 'twitter' ? 'X'
+    : audit.platform === 'reddit' ? 'Reddit' : audit.platform;
+
+  const system = `You are an expert content strategist who has audited thousands of ${platformLabel} channels. You analyze channel performance data and produce actionable, specific, data-driven insights for creators. You return ONLY valid JSON — no markdown, no prose outside the JSON.`;
+
+  const prompt = `Audit this ${platformLabel} channel and produce an extensive AI review.
+
+CHANNEL: ${audit.channelName} (${audit.channelHandle || audit.url || 'no handle'})
+PLATFORM: ${platformLabel}
+SUBSCRIBERS: ${stats.subscribers || 'N/A'}
+TOTAL VIEWS: ${stats.totalViews || 'N/A'}
+VIDEO COUNT: ${stats.videoCount || 'N/A'}
+AVG RECENT VIEWS: ${avgViews}
+AVG ENGAGEMENT RATE: ${avgEng}%
+POSTING CADENCE: ${postingCadenceLabel} (avg ${avgGapDays.toFixed(1)} days between posts)
+ENGAGEMENT TREND: ${engagementTrend.toUpperCase()}
+CHANNEL DESCRIPTION: ${(audit.description || 'No description available').slice(0, 500)}
+
+RECENT VIDEOS (newest first, with stats):
+${videoSummaries}
+
+Produce a JSON object with this exact shape:
+{
+  "healthScore": <number 0-100>,
+  "healthLabel": "<string: 'Excellent' | 'Strong' | 'Moderate' | 'Needs Work' | 'Critical'>",
+  "executiveSummary": "<2-3 sentence narrative summary of channel health, citing specific numbers>",
+  "bestPerformingVideos": [
+    {
+      "title": "<video title>",
+      "views": <number>,
+      "likes": <number>,
+      "comments": <number>,
+      "whyItWorked": "<1-2 sentence specific explanation of why this video outperformed — title hook, topic, format, timing, etc.>",
+      "replicationTip": "<specific actionable tip on how the creator can replicate this success>"
+    }
+  ],
+  "worstPerformingVideos": [
+    {
+      "title": "<video title>",
+      "views": <number>,
+      "likes": <number>,
+      "comments": <number>,
+      "whyItUnderperformed": "<1-2 sentence specific explanation — weak hook, poor timing, oversaturated topic, etc.>",
+      "fixTip": "<specific actionable tip on how to fix this type of underperformance>"
+    }
+  ],
+  "swot": {
+    "strengths": ["<3-4 specific strengths>"],
+    "weaknesses": ["<3-4 specific weaknesses>"],
+    "opportunities": ["<3-4 specific opportunities>"],
+    "threats": ["<2-3 specific threats>"]
+  },
+  "contentThemes": [
+    {"theme": "<theme name>", "frequency": "<string: how often it appears>", "performance": "<string: how well it performs>"}
+  ],
+  "postingCadence": {
+    "currentPattern": "<string describing current cadence>",
+    "recommendation": "<string with specific recommendation>",
+    "optimalFrequency": "<string: suggested posting frequency>"
+  },
+  "engagementTrend": {
+    "direction": "<'up' | 'down' | 'flat'>",
+    "analysis": "<1-2 sentence explanation of the trend>",
+    "benchmark": "<string: how this compares to typical channels of this size>"
+  },
+  "recommendations": [
+    {
+      "priority": "<'high' | 'medium' | 'low'>",
+      "category": "<string: e.g. 'Content Strategy', 'Posting Schedule', 'Engagement', 'Title Optimization', 'Format'>",
+      "title": "<short title>",
+      "description": "<2-3 sentence specific actionable description>",
+      "expectedImpact": "<string: expected impact if implemented>"
+    }
+  ],
+  "growthOpportunities": [
+    {"opportunity": "<string>", "rationale": "<string>", "effort": "<'low' | 'medium' | 'high'>", "impact": "<'low' | 'medium' | 'high'>"}
+  ],
+  "contentGaps": [
+    {"gap": "<string describing the missing content type>", "suggestion": "<string: what to create>"}
+  ],
+  "nextSteps": ["<3-5 prioritized action items the creator should do this week>"]
+}
+
+Rules:
+- Be SPECIFIC. Cite actual video titles, view counts, and stats. No generic advice like "post more consistently" — say "post every Tuesday and Thursday at 7pm based on your top performer published on Tuesday 7pm".
+- Use REAL data from the videos above, not made-up examples.
+- Limit bestPerformingVideos to top 3, worstPerformingVideos to bottom 3.
+- Limit recommendations to 5-7 items, prioritized.
+- Limit growthOpportunities to 3-4 items.
+- Limit contentGaps to 2-3 items.
+- Limit nextSteps to 3-5 items.
+- Keep all strings concise but information-dense. No fluff.
+- Return ONLY the JSON object, no markdown fences.`;
+
+  let insights: any;
+  try {
+    insights = await llmJson<any>(env, prompt, system, 6000);
+  } catch (e: any) {
+    console.warn('[audit-insights] LLM failed, falling back to heuristics:', e?.message);
+    insights = buildHeuristicInsights(audit, {
+      healthScore,
+      postingCadenceLabel,
+      avgGapDays,
+      engagementTrend,
+      byViewsDesc,
+      byViewsAsc,
+    });
+  }
+
+  // Validate / fill missing fields with heuristic fallbacks so the frontend
+  // never renders an empty section.
+  if (!insights.bestPerformingVideos?.length) {
+    insights.bestPerformingVideos = byViewsDesc.slice(0, 3).map((v: any) => ({
+      title: v.title,
+      views: v.viewCount || 0,
+      likes: v.likeCount || 0,
+      comments: v.commentCount || 0,
+      whyItWorked: 'Top performer by view count — analyze the title hook and topic for replication.',
+      replicationTip: 'Re-create this format with a fresh angle or related topic.',
+    }));
+  }
+  if (!insights.worstPerformingVideos?.length) {
+    insights.worstPerformingVideos = byViewsAsc.slice(0, 3).map((v: any) => ({
+      title: v.title,
+      views: v.viewCount || 0,
+      likes: v.likeCount || 0,
+      comments: v.commentCount || 0,
+      whyItUnderperformed: 'Lowest performer by view count — likely weak hook or oversaturated topic.',
+      fixTip: 'Test a more specific, curiosity-driven title and a stronger cold open in the first 3 seconds.',
+    }));
+  }
+  if (typeof insights.healthScore !== 'number') insights.healthScore = healthScore;
+  if (!insights.healthLabel) {
+    insights.healthLabel = healthScore >= 80 ? 'Excellent'
+      : healthScore >= 65 ? 'Strong'
+      : healthScore >= 45 ? 'Moderate'
+      : healthScore >= 25 ? 'Needs Work' : 'Critical';
+  }
+  if (!insights.executiveSummary) {
+    insights.executiveSummary = `${audit.channelName} has ${stats.subscribers || 'an unknown number of'} subscribers and averages ${avgViews} views per recent video with a ${avgEng}% engagement rate. The channel's engagement trend is ${engagementTrend}, with a ${postingCadenceLabel.toLowerCase()} posting cadence.`;
+  }
+  if (!insights.swot) {
+    insights.swot = {
+      strengths: [`${stats.subscribers || 'N/A'} subscribers on ${platformLabel}`],
+      weaknesses: [`Posting cadence: ${postingCadenceLabel}`],
+      opportunities: ['Leverage top-performing video formats for new content'],
+      threats: ['Engagement trend is ' + engagementTrend],
+    };
+  }
+  if (!insights.postingCadence) {
+    insights.postingCadence = {
+      currentPattern: postingCadenceLabel,
+      recommendation: engagementTrend === 'down' ? 'Increase posting frequency to reverse the decline' : 'Maintain current cadence',
+      optimalFrequency: postingCadenceLabel,
+    };
+  }
+  if (!insights.engagementTrend) {
+    insights.engagementTrend = {
+      direction: engagementTrend,
+      analysis: `Recent videos are ${engagementTrend === 'up' ? 'outperforming' : engagementTrend === 'down' ? 'underperforming' : 'in line with'} older content.`,
+      benchmark: 'Compared to the channel\'s own recent average.',
+    };
+  }
+  if (!insights.recommendations?.length) {
+    insights.recommendations = [{
+      priority: 'high',
+      category: 'Content Strategy',
+      title: 'Analyze your top performer',
+      description: `Your top video "${byViewsDesc[0]?.title || ''}" received ${byViewsDesc[0]?.viewCount || 0} views. Deconstruct what worked — title hook, topic, format, posting time — and apply those patterns to your next 3 uploads.`,
+      expectedImpact: 'Potential 30-50% view lift on next videos',
+    }];
+  }
+  if (!insights.contentThemes?.length) insights.contentThemes = [];
+  if (!insights.growthOpportunities?.length) insights.growthOpportunities = [];
+  if (!insights.contentGaps?.length) insights.contentGaps = [];
+  if (!insights.nextSteps?.length) {
+    insights.nextSteps = [
+      `Replicate the format of "${byViewsDesc[0]?.title || 'your top video'}"`,
+      `Refresh the angle of "${byViewsAsc[0]?.title || 'your lowest video'}"`,
+      'Maintain your current posting cadence' + (engagementTrend === 'down' ? ' but test new hooks' : ''),
+    ];
+  }
+
+  return insights;
+}
+
+// Heuristic fallback (no LLM) — used when llmJson fails or returns garbage.
+function buildHeuristicInsights(audit: any, ctx: any): any {
+  const { healthScore, postingCadenceLabel, avgGapDays, engagementTrend, byViewsDesc, byViewsAsc } = ctx;
+  return {
+    healthScore,
+    healthLabel: healthScore >= 80 ? 'Excellent' : healthScore >= 65 ? 'Strong' : healthScore >= 45 ? 'Moderate' : healthScore >= 25 ? 'Needs Work' : 'Critical',
+    executiveSummary: `${audit.channelName} shows a ${engagementTrend} engagement trend with a ${postingCadenceLabel.toLowerCase()} posting cadence. Health score: ${healthScore}/100.`,
+    bestPerformingVideos: [],
+    worstPerformingVideos: [],
+    swot: { strengths: [], weaknesses: [], opportunities: [], threats: [] },
+    contentThemes: [],
+    postingCadence: {
+      currentPattern: postingCadenceLabel,
+      recommendation: engagementTrend === 'down' ? 'Increase posting frequency' : 'Maintain current cadence',
+      optimalFrequency: postingCadenceLabel,
+    },
+    engagementTrend: {
+      direction: engagementTrend,
+      analysis: `Recent videos are ${engagementTrend === 'up' ? 'outperforming' : engagementTrend === 'down' ? 'underperforming' : 'in line with'} older content.`,
+      benchmark: 'Compared to channel\'s recent average.',
+    },
+    recommendations: [],
+    growthOpportunities: [],
+    contentGaps: [],
+    nextSteps: [],
+  };
+}
+
 // GET /api/audit-credits?secret=... — returns live credit balances for all
 // configured audit scrapers. Operator-only (requires WORKER_SECRET, same as
 // /trends/_diag). Useful as a health indicator in the admin UI.

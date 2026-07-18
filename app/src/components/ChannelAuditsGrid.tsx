@@ -12,12 +12,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Page } from '../App';
 import {
-  Plus, Loader2, AlertTriangle, Sparkles,
+  Plus, AlertTriangle, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getChannelAudits, deleteChannelAudit } from '@/services/api';
 import { ChannelAuditCard } from './ChannelAuditCard';
 import { ChannelAuditModal } from './ChannelAuditModal';
+import { ChannelAuditFullView } from './ChannelAuditFullView';
+import { SkeletonGrid } from './Loading';
 import type { ChannelAudit } from '../types';
 
 interface ChannelAuditsGridProps {
@@ -31,6 +33,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
   const [selected, setSelected] = useState<ChannelAudit | null>(null);
+  const [fullViewAudit, setFullViewAudit] = useState<ChannelAudit | null>(null);
   // Phase 5 — quota + count from the GET response (for the header chip)
   const [savedCount, setSavedCount] = useState<number | null>(null);
   const [dailyUsed, setDailyUsed] = useState<number | null>(null);
@@ -108,10 +111,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
 
       {/* Body */}
       {loading ? (
-        <div className="card-glass p-10 flex flex-col items-center justify-center gap-2">
-          <Loader2 className="w-6 h-6 text-clip-cyan animate-spin" />
-          <p className="text-clip-muted text-xs">Loading your audits…</p>
-        </div>
+        <SkeletonGrid count={4} />
       ) : error ? (
         <div className="card-glass p-8 flex flex-col items-center justify-center gap-2 text-center">
           <AlertTriangle className="w-7 h-7 text-clip-amber/70" />
@@ -178,14 +178,27 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal — quick preview */}
       {selected && (
         <ChannelAuditModal
           audit={selected}
           onClose={() => setSelected(null)}
           onDelete={handleDelete}
+          onViewFull={() => {
+            setFullViewAudit(selected);
+            setSelected(null);
+          }}
+        />
+      )}
+
+      {/* Full-page view — extensive AI insights */}
+      {fullViewAudit && (
+        <ChannelAuditFullView
+          audit={fullViewAudit}
+          onExit={() => setFullViewAudit(null)}
         />
       )}
     </div>
   );
 }
+
