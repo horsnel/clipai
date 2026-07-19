@@ -115,13 +115,13 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all border-l-2 ${
                     activeTab === tab.id
-                      ? 'bg-clip-cyan text-black'
-                      : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.025]'
+                      ? 'bg-clip-cyan text-black border-clip-cyan'
+                      : 'text-clip-muted hover:text-clip-text hover:bg-white/[0.06] border-transparent'
                   }`}
                 >
-                  <tab.icon className="w-4 h-4" />
+                  <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-black' : 'text-clip-icon'}`} />
                   {tab.label}
                 </button>
               ))}
@@ -144,7 +144,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                     ? 'bg-clip-amber text-black' 
                     : user?.plan === 'pro'
                     ? 'bg-clip-cyan text-black'
-                    : 'bg-clip-surface text-clip-muted border border-white/[0.02]'
+                    : 'bg-clip-surface text-clip-cyan border border-clip-cyan'
                 }`}>
                   {user?.plan === 'creator' && <CrownIcon className="w-3 h-3" />}
                   {user?.plan === 'pro' && <Sparkles className="w-3 h-3" />}
@@ -158,7 +158,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
               {onLogout && (
                 <button
                   onClick={onLogout}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-clip-red hover:bg-clip-red/10 rounded-lg transition-all"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-bold text-clip-red hover:bg-clip-red/10 border border-clip-red/30 rounded-lg transition-all hover:border-clip-red/60 hover:shadow-[0_0_10px_rgba(255,68,68,0.15)]"
                 >
                   <LogOut className="w-4 h-4" />
                   Logout
@@ -259,7 +259,7 @@ export function SettingsPage({ user, onNavigate, onLogout }: SettingsPageProps) 
                         ? 'bg-clip-amber text-black' 
                         : user?.plan === 'pro'
                         ? 'bg-clip-cyan text-black'
-                        : 'bg-clip-surface text-clip-muted border border-white/[0.02]'
+                        : 'bg-clip-surface text-clip-cyan border border-clip-cyan'
                     }`}>
                       {user?.plan?.toUpperCase()}
                     </span>

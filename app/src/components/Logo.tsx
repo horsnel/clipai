@@ -58,7 +58,7 @@ export function LogoMark({
         {variant === 'gradient' && (
           <linearGradient id={`${id}-tri`} x1="30" y1="25" x2="80" y2="80" gradientUnits="userSpaceOnUse">
             <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#E0E0E0" stopOpacity="0.85" />
+            <stop offset="100%" stopColor="#F0F0F0" stopOpacity="0.85" />
           </linearGradient>
         )}
       </defs>

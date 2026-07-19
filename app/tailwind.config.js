@@ -55,10 +55,11 @@ module.exports = {
         'clip-border': '#2A2A2A',
         'clip-cyan': '#00E5FF',           // electric cyan (primary accent)
         'clip-amber': '#FF9500',           // bright orange (PRO badges, alerts)
-        'clip-red': '#FF3B3B',
+        'clip-red': '#FF4444',             // bright danger red (Logout, errors)
         'clip-live': '#39FF14',            // neon green (LIVE indicators only)
-        'clip-text': '#E0E0E0',            // brighter body text
-        'clip-muted': '#888888',           // brighter secondary text
+        'clip-text': '#F0F0F0',            // brighter body text — near-white for high contrast
+        'clip-muted': '#B0B0B0',           // brighter secondary text — was #888, now readable
+        'clip-icon': '#808080',            // inactive icon default — was #404040, now visible
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",

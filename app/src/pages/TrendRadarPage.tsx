@@ -234,7 +234,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               </span>
             </div>
             {isLoading && (
-              <div className="flex items-center gap-2 text-clip-muted text-xs">
+              <div className="flex items-center gap-2 text-clip-cyan text-xs font-medium">
                 <div className="w-3 h-3 border border-clip-cyan border-t-transparent rounded-full animate-spin" />
                 Fetching live data…
               </div>

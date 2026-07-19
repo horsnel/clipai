@@ -148,7 +148,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                 <span className="absolute top-2 right-2 text-[10px] font-extrabold px-1.5 py-0.5 bg-clip-amber text-black rounded flex-shrink-0 shadow-[0_0_10px_rgba(255,149,0,0.4)]">PRO</span>
               )}
               <div className="flex items-center gap-2 mb-2 pr-10">
-                <t.icon className={`w-5 h-5 flex-shrink-0 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-muted'}`} />
+                <t.icon className={`w-5 h-5 flex-shrink-0 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-icon'}`} />
                 <p className={`text-sm font-bold ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
               </div>
             </button>

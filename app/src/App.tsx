@@ -322,7 +322,7 @@ function AppContentInner({
           style: {
             background: '#121212',
             border: '1px solid rgba(255, 255, 255, 0.04)',
-            color: '#E0E0E0',
+            color: '#F0F0F0',
           },
         }}
       />

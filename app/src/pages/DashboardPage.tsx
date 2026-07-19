@@ -98,10 +98,10 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
 
         {/* Credits Balance — full-width stat card (Trending Now card removed) */}
         <div className="mb-6">
-          <div className={`card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all ${
+          <div className={`card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-clip-cyan/30 transition-all ${
             (user?.credits ?? 0) <= 5
-              ? 'border-clip-amber/30 bg-clip-amber/3'
-              : 'border-clip-cyan/40 bg-clip-cyan/5 shadow-[0_0_24px_rgba(0,229,255,0.06)]'
+              ? 'border-clip-amber/40 bg-clip-amber/5 shadow-[0_0_24px_rgba(255,149,0,0.10)]'
+              : 'border-clip-cyan/40 bg-clip-cyan/5 shadow-[0_0_24px_rgba(0,229,255,0.10)]'
           }`}>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-4 min-w-0">
@@ -113,7 +113,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
                 <div className="min-w-0">
                   <p className="text-clip-muted text-xs uppercase tracking-wider font-medium">Credits Balance</p>
                   <p className={`font-display font-bold text-3xl tabular-nums leading-tight mt-0.5 ${
-                    (user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-clip-text'
+                    (user?.credits ?? 0) <= 5 ? 'text-clip-amber' : 'text-white'
                   }`}>
                     {user?.credits ?? 0}
                   </p>
@@ -174,10 +174,10 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
               <button
                 key={card.page}
                 onClick={() => !card.locked && onNavigate(card.page)}
-                className={`relative text-left rounded-xl p-4 sm:p-5 bg-clip-surface/80 border border-white/[0.04] transition-all duration-300 group flex flex-col gap-3 min-h-[150px] sm:min-h-[168px] ${
+                className={`relative text-left rounded-xl p-4 sm:p-5 bg-clip-surface/80 border border-white/[0.10] transition-all duration-300 group flex flex-col gap-3 min-h-[150px] sm:min-h-[168px] ${
                   card.locked
                     ? 'opacity-60 cursor-default'
-                    : 'hover:-translate-y-1 hover:border-white/[0.12] cursor-pointer'
+                    : 'hover:-translate-y-1 hover:border-clip-cyan/50 hover:shadow-[0_0_16px_rgba(0,229,255,0.10)] cursor-pointer'
                 }`}
               >
                 {/* Badge — top right */}

@@ -310,7 +310,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                   ? 'border-clip-cyan bg-clip-cyan/10 shadow-[0_0_16px_rgba(0,229,255,0.15)]'
                   : 'border-white/[0.06] bg-clip-surface hover:border-clip-cyan/40'
               }`}>
-              <t.icon className={`w-5 h-5 mb-2 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-muted'}`} />
+              <t.icon className={`w-5 h-5 mb-2 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-icon'}`} />
               <div className="flex items-center gap-1">
                 <p className={`text-sm font-bold ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
               </div>

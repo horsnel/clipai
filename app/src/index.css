@@ -62,7 +62,7 @@
   }
   
   .card-glass {
-    @apply bg-clip-surface/90 backdrop-blur-sm border border-white/[0.06] rounded-2xl;
+    @apply bg-clip-surface/90 backdrop-blur-sm border border-white/[0.10] rounded-2xl;
   }
   
   .btn-primary {
@@ -157,5 +157,5 @@
 /* Selection */
 ::selection {
   background: rgba(0, 229, 255, 0.25);
-  color: #E0E0E0;
+  color: #F0F0F0;
 }
