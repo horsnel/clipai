@@ -2,7 +2,7 @@ import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import {
   Link2, Flame, Radio, BarChart2,
-  Trophy, Scissors, ChevronRight, Coins, ArrowRight, Sparkles,
+  Trophy, Scissors, Coins, ArrowRight, Sparkles,
 } from 'lucide-react';
 import { TopicStealWidget } from '@/components/TopicStealWidget';
 import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
@@ -22,7 +22,7 @@ interface DashboardPageProps {
 interface FeatureCard {
   page: Page;
   icon: React.ElementType;
-  iconColor: string;
+  /** Solid colored circle background for the icon (matches screenshot style). */
   iconBg: string;
   label: string;
   desc: string;
@@ -35,50 +35,45 @@ const FEATURE_CARDS: FeatureCard[] = [
   {
     page: 'forge',
     icon: Flame,
-    iconColor: 'text-clip-amber',
-    iconBg: 'bg-clip-amber/10',
+    iconBg: 'bg-clip-amber',
     label: 'Viral Forge',
-    desc: 'AI titles, captions, hooks & hashtags',
+    desc: 'Generate winning titles, captions, hooks and hashtags to boost views.',
     badge: 'HOT',
-    badgeColor: 'bg-clip-amber/10 text-clip-amber border-clip-amber/20',
+    badgeColor: 'bg-clip-amber/15 text-clip-amber border-clip-amber/30',
   },
   {
     page: 'trends',
     icon: Radio,
-    iconColor: 'text-green-600',
-    iconBg: 'bg-green-500/10',
+    iconBg: 'bg-green-500',
     label: 'Trend Radar',
-    desc: 'Live gaming trends updated every hour',
+    desc: 'Live gaming trends updated every hour so you never miss a wave.',
     badge: 'LIVE',
-    badgeColor: 'bg-green-500/10 text-green-600 border-green-500/20',
+    badgeColor: 'bg-green-500/15 text-green-500 border-green-500/30',
   },
   {
     page: 'growth',
     icon: BarChart2,
-    iconColor: 'text-blue-600',
-    iconBg: 'bg-blue-500/10',
+    iconBg: 'bg-blue-500',
     label: 'Growth Intel',
-    desc: 'Competitor spy, A/B titles & timing',
+    desc: 'Spy on competitors, A/B test titles and find the best post time.',
   },
   {
     page: 'rank',
     icon: Trophy,
-    iconColor: 'text-purple-600',
-    iconBg: 'bg-purple-500/10',
+    iconBg: 'bg-purple-500',
     label: 'Creator Rank',
-    desc: 'XP, streaks, ranks & badges',
+    desc: 'Earn XP, keep streaks, climb ranks and unlock exclusive badges.',
     badge: 'NEW',
-    badgeColor: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+    badgeColor: 'bg-purple-500/15 text-purple-500 border-purple-500/30',
   },
   {
     page: 'upload',
     icon: Scissors,
-    iconColor: 'text-clip-muted',
-    iconBg: 'bg-clip-surface',
+    iconBg: 'bg-clip-muted',
     label: 'Video Export',
-    desc: 'AI clip rendering & editing',
+    desc: 'AI clip rendering and editing coming soon to every creator.',
     badge: 'SOON',
-    badgeColor: 'bg-clip-surface text-clip-muted border-white/[0.02]',
+    badgeColor: 'bg-clip-surface text-clip-muted border-white/[0.06]',
     locked: true,
   },
 ];
@@ -165,43 +160,49 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
           <TrendingVideosSection />
         </div>
 
-        {/* ── Feature Grid ── */}
+        {/* ── AI Tools Grid ──
+            Screenshot-style: cards placed besides each other (2-col on mobile,
+            3-col on desktop), each card has a solid colored icon circle in the
+            top-left, a bold title underneath, and a light-gray description
+            below — text is clamped to 2 lines so it never overflows. */}
         <div className="mb-10">
           <div className="flex items-center justify-between mb-5 gap-4 flex-wrap">
             <h2 className="font-display font-semibold text-xl text-clip-text">AI Tools</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {FEATURE_CARDS.map(card => (
               <button
                 key={card.page}
-                onClick={() => onNavigate(card.page)}
-                className={`card-glass p-5 text-left hover:-translate-y-1 transition-all duration-300 group relative ${
+                onClick={() => !card.locked && onNavigate(card.page)}
+                className={`relative text-left rounded-xl p-4 sm:p-5 bg-clip-surface/80 border border-white/[0.04] transition-all duration-300 group flex flex-col gap-3 min-h-[150px] sm:min-h-[168px] ${
                   card.locked
-                    ? 'opacity-60 cursor-default hover:translate-y-0'
-                    : 'hover:border-white/[0.14] cursor-pointer'
+                    ? 'opacity-60 cursor-default'
+                    : 'hover:-translate-y-1 hover:border-white/[0.12] cursor-pointer'
                 }`}
               >
-                {/* Badge */}
+                {/* Badge — top right */}
                 {card.badge && (
-                  <span className={`absolute top-3 right-3 text-xs px-1.5 py-0.5 rounded border font-bold flex-shrink-0 z-10 ${card.badgeColor}`}>
+                  <span className={`absolute top-3 right-3 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border flex-shrink-0 z-10 ${card.badgeColor}`}>
                     {card.badge}
                   </span>
                 )}
 
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${card.iconBg}`}>
-                  <card.icon className={`w-5 h-5 ${card.iconColor}`} />
-                </div>
-                <div className="flex items-center mb-1 pr-10">
-                  <span className="font-display font-semibold text-clip-text group-hover:text-clip-cyan transition-colors">
-                    {card.label}
-                  </span>
+                {/* Solid colored icon circle — top left */}
+                <div className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${card.iconBg} ${
+                  card.locked ? 'opacity-70' : 'group-hover:scale-105 transition-transform'
+                }`}>
+                  <card.icon className="w-5 h-5 text-white" />
                 </div>
 
-                {!card.locked && (
-                  <div className="flex items-center gap-1 mt-3 text-clip-cyan text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                    Open <ChevronRight className="w-3 h-3" />
-                  </div>
-                )}
+                {/* Title */}
+                <h3 className="font-display font-bold text-sm sm:text-base text-clip-text leading-tight group-hover:text-clip-cyan transition-colors pr-8">
+                  {card.label}
+                </h3>
+
+                {/* Description — 2-line clamp, no overflow */}
+                <p className="text-xs sm:text-[13px] text-clip-muted leading-relaxed line-clamp-2">
+                  {card.desc}
+                </p>
               </button>
             ))}
           </div>

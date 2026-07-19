@@ -7,7 +7,7 @@ html {
 
 /* Custom focus styles */
 *:focus-visible {
-  outline: 2px solid #00C2D6;
+  outline: 2px solid #22D3EE;
   outline-offset: 2px;
 }
 
@@ -19,7 +19,7 @@ html {
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 0 24px rgba(0, 194, 214, 0.45), 0 0 48px rgba(0, 194, 214, 0.2);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.45), 0 0 48px rgba(34, 211, 238, 0.2);
 }
 
 .btn-secondary:hover:not(:disabled) {
@@ -38,7 +38,7 @@ html {
 
 /* Progress bar styling */
 [data-slot="progress-indicator"] {
-  background: linear-gradient(90deg, #00C2D6, #1F4F7E);
+  background: linear-gradient(90deg, #22D3EE, #1F4F7E);
 }
 
 /* Slider styling */
@@ -47,18 +47,18 @@ html {
 }
 
 [data-slot="slider-range"] {
-  background: linear-gradient(90deg, #00C2D6, #1F4F7E);
+  background: linear-gradient(90deg, #22D3EE, #1F4F7E);
 }
 
 [data-slot="slider-thumb"] {
-  background: #00C2D6;
+  background: #22D3EE;
   border: 2px solid #050507;
 }
 
 /* Input focus states — restored glow ring */
 .input-dark:focus {
-  border-color: rgba(0, 194, 214, 0.5);
-  box-shadow: 0 0 0 3px rgba(0, 194, 214, 0.18), 0 0 24px rgba(0, 194, 214, 0.12);
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18), 0 0 24px rgba(34, 211, 238, 0.12);
 }
 
 /* Animation utilities */
@@ -129,11 +129,11 @@ html {
 
 /* Loading spinner — restored glow */
 .spinner {
-  border: 2px solid rgba(0, 194, 214, 0.18);
-  border-top-color: #00C2D6;
+  border: 2px solid rgba(34, 211, 238, 0.18);
+  border-top-color: #22D3EE;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-  box-shadow: 0 0 12px rgba(0, 194, 214, 0.35);
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.35);
 }
 
 @keyframes spin {

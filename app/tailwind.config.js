@@ -52,9 +52,9 @@ module.exports = {
         'clip-dark': '#050507',
         'clip-surface': '#0B0B0F',
         'clip-border': '#131318',
-        'clip-cyan': '#00C2D6',
-        'clip-amber': '#C97F08',
-        'clip-red': '#D63A3A',
+        'clip-cyan': '#22D3EE',
+        'clip-amber': '#F59E0B',
+        'clip-red': '#FF3B3B',
         'clip-text': '#A8AEB8',
         'clip-muted': '#565B6A',
       },
@@ -72,9 +72,9 @@ module.exports = {
         'card': '0 18px 50px rgba(0, 0, 0, 0.45)',
         // Brand glow — restored. Built on the darkened cyan so the halo
         // reads as a soft teal bloom rather than a neon spike.
-        'glow-cyan': '0 0 24px rgba(0, 194, 214, 0.45)',
-        'glow-cyan-sm': '0 0 12px rgba(0, 194, 214, 0.35)',
-        'glow-amber': '0 0 24px rgba(201, 127, 8, 0.45)',
+        'glow-cyan': '0 0 24px rgba(34, 211, 238, 0.45)',
+        'glow-cyan-sm': '0 0 12px rgba(34, 211, 238, 0.35)',
+        'glow-amber': '0 0 24px rgba(245, 158, 11, 0.45)',
       },
       fontFamily: {
         'display': ['Sora', 'sans-serif'],
@@ -109,8 +109,8 @@ module.exports = {
         // Brand pulse-glow — restored. Slow soft pulsing glow used on the
         // LandingPage AI POWERED badge and other key CTAs.
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 12px rgba(0, 194, 214, 0.4), 0 0 24px rgba(0, 194, 214, 0.2)" },
-          "50%":      { boxShadow: "0 0 18px rgba(0, 194, 214, 0.6), 0 0 36px rgba(0, 194, 214, 0.3)" },
+          "0%, 100%": { boxShadow: "0 0 12px rgba(34, 211, 238, 0.4), 0 0 24px rgba(34, 211, 238, 0.2)" },
+          "50%":      { boxShadow: "0 0 18px rgba(34, 211, 238, 0.6), 0 0 36px rgba(34, 211, 238, 0.3)" },
         },
       },
       animation: {
