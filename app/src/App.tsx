@@ -268,8 +268,8 @@ function AppContentInner({
           <div
             className="absolute inset-y-0 w-1/3 rounded-full"
             style={{
-              background: 'linear-gradient(90deg, transparent 0%, #22D3EE 50%, transparent 100%)',
-              boxShadow: '0 0 12px rgba(34, 211, 238, 0.6)',
+              background: 'linear-gradient(90deg, transparent 0%, #00E5FF 50%, transparent 100%)',
+              boxShadow: '0 0 12px rgba(0, 229, 255, 0.6)',
               animation: 'clipai-boot-sweep 1.4s ease-in-out infinite',
             }}
           />
@@ -281,9 +281,9 @@ function AppContentInner({
             to { opacity: 1; transform: translateY(0); }
           }
           @keyframes clipai-boot-ring {
-            0%   { transform: rotate(0deg); opacity: 0.3; box-shadow: 0 0 12px rgba(34, 211, 238,0.4); }
-            50%  { opacity: 0.7; box-shadow: 0 0 24px rgba(34, 211, 238,0.6); }
-            100% { transform: rotate(360deg); opacity: 0.3; box-shadow: 0 0 12px rgba(34, 211, 238,0.4); }
+            0%   { transform: rotate(0deg); opacity: 0.3; box-shadow: 0 0 12px rgba(0, 229, 255,0.4); }
+            50%  { opacity: 0.7; box-shadow: 0 0 24px rgba(0, 229, 255,0.6); }
+            100% { transform: rotate(360deg); opacity: 0.3; box-shadow: 0 0 12px rgba(0, 229, 255,0.4); }
           }
           @keyframes clipai-boot-sweep {
             0% { transform: translateX(-100%); }
@@ -320,9 +320,9 @@ function AppContentInner({
         position="bottom-right"
         toastOptions={{
           style: {
-            background: '#0B0B0F',
+            background: '#121212',
             border: '1px solid rgba(255, 255, 255, 0.04)',
-            color: '#A8AEB8',
+            color: '#E0E0E0',
           },
         }}
       />

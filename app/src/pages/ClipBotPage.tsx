@@ -201,7 +201,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
               {msg.role === 'user' ? (
                 // User: minimal dark pill bubble, right-aligned
                 <div
-                  className="max-w-[80%] bg-[#0B0B0F] text-clip-text px-4 py-2.5 text-[15px] leading-relaxed"
+                  className="max-w-[80%] bg-[#121212] text-clip-text px-4 py-2.5 text-[15px] leading-relaxed"
                   style={{ borderRadius: '22px' }}
                 >
                   <FormattedMessage content={msg.content} />
@@ -256,7 +256,7 @@ export function ClipBotPage({ user, onNavigate }: ClipBotPageProps) {
           ) : (
             <form
               onSubmit={(e) => { e.preventDefault(); if (input.trim() && !isTyping) sendMessage(); }}
-              className="relative flex items-center bg-[#0B0B0F] border border-white/[0.02] rounded-[26px] pl-5 pr-2 py-2 transition-all duration-200 focus-within:border-clip-cyan/40 focus-within:ring-1 focus-within:ring-clip-cyan/20"
+              className="relative flex items-center bg-[#121212] border border-white/[0.02] rounded-[26px] pl-5 pr-2 py-2 transition-all duration-200 focus-within:border-clip-cyan/40 focus-within:ring-1 focus-within:ring-clip-cyan/20"
             >
               <input
                 ref={inputRef}

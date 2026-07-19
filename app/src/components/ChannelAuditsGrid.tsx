@@ -101,7 +101,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
         <div className="flex items-center gap-2">
           <button
             onClick={() => onNavigate('audit')}
-            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-clip-cyan/10 text-clip-cyan border border-clip-cyan/30 hover:bg-clip-cyan/20 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-clip-cyan/10 text-clip-cyan border border-clip-cyan hover:bg-clip-cyan hover:text-black transition-colors shadow-[0_0_10px_rgba(0,229,255,0.2)]"
           >
             <Plus className="w-3.5 h-3.5" />
             Add channel
@@ -127,7 +127,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
         // Empty state — prompt to add a channel
         <button
           onClick={() => onNavigate('audit')}
-          className="card-glass p-8 w-full text-left hover:border-clip-cyan/30 transition-colors group"
+          className="card-glass p-8 w-full text-left hover:border-clip-cyan transition-colors group"
         >
           <div className="flex items-center gap-5">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-clip-cyan/15 to-purple-500/15 flex items-center justify-center flex-shrink-0">
@@ -162,7 +162,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
           {audits.length < 8 && (
             <button
               onClick={() => onNavigate('audit')}
-              className="card-glass p-5 min-h-[180px] flex flex-col items-center justify-center gap-2 text-center hover:border-clip-cyan/30 hover:-translate-y-1 transition-all group"
+              className="card-glass p-5 min-h-[180px] flex flex-col items-center justify-center gap-2 text-center hover:border-clip-cyan hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(0,229,255,0.12)] transition-all group"
             >
               <div className="w-12 h-12 rounded-full bg-clip-cyan/10 flex items-center justify-center group-hover:bg-clip-cyan/20 transition-colors">
                 <Plus className="w-6 h-6 text-clip-cyan" />

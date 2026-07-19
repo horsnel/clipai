@@ -129,8 +129,8 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse" />
-              <span className="text-green-600 text-xs font-medium uppercase tracking-wider">Live</span>
+              <div className="w-2 h-2 rounded-full bg-clip-live animate-pulse shadow-glow-live" />
+              <span className="text-clip-live text-xs font-bold uppercase tracking-wider">Live</span>
             </div>
             <div className="flex items-center gap-2">
               <h1 className="font-display font-bold text-3xl sm:text-4xl text-clip-text">
@@ -156,18 +156,18 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <button
                 key={t.id}
                 onClick={() => setSelectedTrend(t)}
-                className="card-glass p-4 border-green-500/20 bg-green-500/5 relative overflow-hidden text-left hover:bg-green-500/10 transition-colors cursor-pointer focus:outline-none focus:bg-green-500/10 group"
+                className="card-glass p-4 border-clip-live/30 bg-clip-live/5 relative overflow-hidden text-left hover:bg-clip-live/10 transition-colors cursor-pointer focus:outline-none focus:bg-clip-live/10 group"
               >
-                <div className="absolute top-0 right-0 w-16 h-16 bg-green-500/5 rounded-full -translate-y-4 translate-x-4" />
+                <div className="absolute top-0 right-0 w-16 h-16 bg-clip-live/5 rounded-full -translate-y-4 translate-x-4" />
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-green-600 font-bold text-lg">#{i + 1}</span>
-                  <span className="text-green-600 text-xs px-2 py-0.5 rounded-full bg-green-500/10 font-medium">🔥 HOT</span>
+                  <span className="text-clip-live font-bold text-lg">#{i + 1}</span>
+                  <span className="text-clip-live text-xs px-2 py-0.5 rounded-full bg-clip-live/10 font-bold">🔥 HOT</span>
                   <Sparkles className="w-3.5 h-3.5 text-clip-cyan ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <p className="font-display font-semibold text-clip-text truncate">{t.name}</p>
                 <div className="flex items-center justify-between mt-2">
                   <span className="text-clip-muted text-xs capitalize">{t.category}</span>
-                  <span className="text-green-600 text-xs font-mono">+{t.change}%</span>
+                  <span className="text-clip-live text-xs font-mono">+{t.change}%</span>
                 </div>
               </button>
             ))}
@@ -180,10 +180,10 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
           <div className="flex gap-2 overflow-x-auto pb-1 flex-1 -mx-1 px-1">
             {GAMES.map(g => (
               <button key={g} onClick={() => setSelectedGame(g)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex-shrink-0 ${
+                className={`px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap transition-all flex-shrink-0 ${
                   selectedGame === g
-                    ? 'bg-clip-cyan text-black'
-                    : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.025]'
+                    ? 'bg-clip-cyan text-black shadow-[0_0_12px_rgba(0,229,255,0.35)]'
+                    : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.08]'
                 }`}>
                 {g}
               </button>
@@ -194,9 +194,9 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-shrink-0">
             {(['all', 'title', 'hashtag', 'sound', 'challenge'] as const).map(tab => (
               <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium uppercase tracking-wide transition-all whitespace-nowrap flex-shrink-0 ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab
-                    ? 'bg-clip-surface border border-clip-cyan/50 text-clip-cyan'
+                    ? 'bg-clip-surface border border-clip-cyan text-clip-cyan shadow-[0_0_12px_rgba(0,229,255,0.25)]'
                     : 'text-clip-muted hover:text-clip-text'
                 }`}>
                 {tab}
@@ -209,10 +209,10 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           {PLATFORMS.map(p => (
             <button key={p.id} onClick={() => setActivePlatform(p.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex-shrink-0 border ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 border ${
                 activePlatform === p.id
-                  ? p.color + ' border-transparent'
-                  : 'bg-clip-surface text-clip-muted hover:text-clip-text border-white/[0.025]'
+                  ? p.color + ' border-transparent shadow-[0_0_12px_rgba(0,229,255,0.25)]'
+                  : 'bg-clip-surface text-clip-muted hover:text-clip-text border-white/[0.08]'
               }`}>
               {p.label}
             </button>

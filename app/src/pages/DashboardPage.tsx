@@ -101,7 +101,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
           <div className={`card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-white/[0.10] transition-all ${
             (user?.credits ?? 0) <= 5
               ? 'border-clip-amber/30 bg-clip-amber/3'
-              : 'border-clip-cyan/20 bg-clip-cyan/3'
+              : 'border-clip-cyan/40 bg-clip-cyan/5 shadow-[0_0_24px_rgba(0,229,255,0.06)]'
           }`}>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-4 min-w-0">

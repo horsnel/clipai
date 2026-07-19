@@ -410,7 +410,7 @@ function HealthScoreRing({ score, label, accent }: { score: number; label: strin
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
-  const color = score >= 80 ? '#22c55e' : score >= 65 ? '#84cc16' : score >= 45 ? '#f59e0b' : score >= 25 ? '#f97316' : '#ef4444';
+  const color = score >= 80 ? '#22c55e' : score >= 65 ? '#84cc16' : score >= 45 ? '#FF9500' : score >= 25 ? '#f97316' : '#ef4444';
   return (
     <div className="flex flex-col items-center gap-2 flex-shrink-0">
       <div className="relative w-24 h-24">

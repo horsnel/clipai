@@ -48,7 +48,7 @@
   
   body {
     @apply bg-clip-dark text-clip-text font-body antialiased;
-    background-color: #050507;
+    background-color: #0A0A0A;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -62,34 +62,34 @@
   }
   
   .card-glass {
-    @apply bg-clip-surface/80 backdrop-blur-sm border border-white/[0.025] rounded-2xl;
+    @apply bg-clip-surface/90 backdrop-blur-sm border border-white/[0.06] rounded-2xl;
   }
   
   .btn-primary {
-    @apply bg-clip-cyan text-black font-semibold px-6 py-3 rounded-xl 
+    @apply bg-clip-cyan text-black font-bold px-6 py-3 rounded-xl 
            hover:brightness-110 hover:-translate-y-0.5 transition-all duration-200;
-    /* Restored glow halo — soft teal bloom on hover */
-    box-shadow: 0 0 0 rgba(34, 211, 238, 0);
+    /* Always-on cyan glow + stronger on hover */
+    box-shadow: 0 4px 20px rgba(0, 229, 255, 0.25);
   }
   .btn-primary:hover:not(:disabled) {
-    box-shadow: 0 0 24px rgba(34, 211, 238, 0.45), 0 0 48px rgba(34, 211, 238, 0.2);
+    box-shadow: 0 0 24px rgba(0, 229, 255, 0.55), 0 4px 32px rgba(0, 229, 255, 0.35);
   }
   
   .btn-secondary {
     @apply bg-clip-surface text-clip-text font-medium px-6 py-3 rounded-xl 
-           border border-white/[0.02] hover:bg-white/[0.025] hover:-translate-y-0.5 
+           border border-clip-cyan/40 text-clip-cyan hover:bg-clip-cyan/10 hover:-translate-y-0.5 
            transition-all duration-200;
   }
   
   .input-dark {
-    @apply bg-clip-surface border border-white/[0.02] rounded-xl px-4 py-3 
+    @apply bg-clip-surface border border-white/[0.08] rounded-xl px-4 py-3 
            text-clip-text placeholder:text-clip-muted/60
-           focus:outline-none focus:border-clip-cyan/50 focus:ring-1 focus:ring-clip-cyan/30
+           focus:outline-none focus:border-clip-cyan focus:ring-1 focus:ring-clip-cyan/50
            transition-all duration-200;
   }
-  /* Restored focus glow on input-dark */
+  /* Brighter focus glow on input-dark */
   .input-dark:focus {
-    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18), 0 0 24px rgba(34, 211, 238, 0.12);
+    box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.18), 0 0 24px rgba(0, 229, 255, 0.2);
   }
   
   .vignette {
@@ -142,20 +142,20 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #050507;
+  background: #0A0A0A;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #131318;
+  background: #2A2A2A;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #1C1C22;
+  background: #3A3A3A;
 }
 
 /* Selection */
 ::selection {
-  background: rgba(34, 211, 238, 0.25);
-  color: #A8AEB8;
+  background: rgba(0, 229, 255, 0.25);
+  color: #E0E0E0;
 }

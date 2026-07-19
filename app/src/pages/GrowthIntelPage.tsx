@@ -139,17 +139,17 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <button key={t.key} onClick={() => { if (!t.locked) setActiveTool(t.key); else onNavigate('pricing'); }}
               className={`p-4 rounded-xl border text-left transition-all relative ${
                 activeTool === t.key
-                  ? 'border-clip-cyan/50 bg-clip-cyan/3'
+                  ? 'border-clip-cyan bg-clip-cyan/10 shadow-[0_0_16px_rgba(0,229,255,0.15)]'
                   : t.locked
-                  ? 'border-white/[0.02] bg-clip-surface/50 opacity-60 cursor-pointer'
-                  : 'border-white/[0.025] bg-clip-surface hover:border-white/[0.025]'
+                  ? 'border-white/[0.04] bg-clip-surface/50 opacity-60 cursor-pointer'
+                  : 'border-white/[0.06] bg-clip-surface hover:border-clip-cyan/40'
               }`}>
               {t.locked && (
-                <span className="absolute top-2 right-2 text-xs px-1.5 py-0.5 bg-clip-amber/10 text-clip-amber rounded border border-clip-amber/20 flex-shrink-0">PRO</span>
+                <span className="absolute top-2 right-2 text-[10px] font-extrabold px-1.5 py-0.5 bg-clip-amber text-black rounded flex-shrink-0 shadow-[0_0_10px_rgba(255,149,0,0.4)]">PRO</span>
               )}
               <div className="flex items-center gap-2 mb-2 pr-10">
                 <t.icon className={`w-5 h-5 flex-shrink-0 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-muted'}`} />
-                <p className={`text-sm font-medium ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
+                <p className={`text-sm font-bold ${activeTool === t.key ? 'text-clip-text' : 'text-clip-muted'}`}>{t.label}</p>
               </div>
             </button>
           ))}
@@ -188,7 +188,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
 
             {spyResult && (
               <div className="space-y-4">
-                <div className="card-glass p-5 border-clip-cyan/20 bg-clip-cyan/3">
+                <div className="card-glass p-5 border-clip-cyan/30 bg-clip-cyan/5 shadow-[0_0_24px_rgba(0,229,255,0.08)]">
                   <div className="flex items-center gap-2 mb-4">
                     <Trophy className="w-4 h-4 text-clip-cyan" />
                     <h4 className="font-display font-semibold text-clip-text">{spyResult.channelName}</h4>
@@ -226,7 +226,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                   </div>
                 </div>
 
-                <div className="card-glass p-5 border-clip-amber/20 bg-clip-amber/3">
+                <div className="card-glass p-5 border-clip-amber/30 bg-clip-amber/5 shadow-[0_0_24px_rgba(255,149,0,0.08)]">
                   <div className="flex items-start gap-3">
                     <Zap className="w-5 h-5 text-clip-amber flex-shrink-0 mt-0.5" />
                     <div>
@@ -254,7 +254,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                     {PLATFORMS.map(p => (
                       <button key={p} onClick={() => setTimingPlatform(p)}
                         className={`w-full px-3 py-2 rounded-lg text-sm text-left transition-all ${
-                          timingPlatform === p ? 'bg-clip-cyan text-black font-medium' : 'bg-clip-surface text-clip-muted border border-white/[0.025] hover:text-clip-text'
+                          timingPlatform === p ? 'bg-clip-cyan text-black font-bold shadow-[0_0_10px_rgba(0,229,255,0.3)]' : 'bg-clip-surface text-clip-muted border border-white/[0.08] hover:text-clip-text'
                         }`}>{p}</button>
                     ))}
                   </div>

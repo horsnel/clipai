@@ -48,15 +48,17 @@ module.exports = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        // ClipAI Custom Colors — deep darkened palette (glow restored on darkened hues)
-        'clip-dark': '#050507',
-        'clip-surface': '#0B0B0F',
-        'clip-border': '#131318',
-        'clip-cyan': '#22D3EE',
-        'clip-amber': '#F59E0B',
+        // ClipAI Custom Colors — electric-bright palette
+        // Backgrounds lifted slightly off pure black, borders crisper so cards read as distinct surfaces.
+        'clip-dark': '#0A0A0A',
+        'clip-surface': '#121212',
+        'clip-border': '#2A2A2A',
+        'clip-cyan': '#00E5FF',           // electric cyan (primary accent)
+        'clip-amber': '#FF9500',           // bright orange (PRO badges, alerts)
         'clip-red': '#FF3B3B',
-        'clip-text': '#A8AEB8',
-        'clip-muted': '#565B6A',
+        'clip-live': '#39FF14',            // neon green (LIVE indicators only)
+        'clip-text': '#E0E0E0',            // brighter body text
+        'clip-muted': '#888888',           // brighter secondary text
       },
       borderRadius: {
         xl: "calc(var(--radius) + 4px)",
@@ -70,11 +72,11 @@ module.exports = {
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
         'card': '0 18px 50px rgba(0, 0, 0, 0.45)',
-        // Brand glow — restored. Built on the darkened cyan so the halo
-        // reads as a soft teal bloom rather than a neon spike.
-        'glow-cyan': '0 0 24px rgba(34, 211, 238, 0.45)',
-        'glow-cyan-sm': '0 0 12px rgba(34, 211, 238, 0.35)',
-        'glow-amber': '0 0 24px rgba(245, 158, 11, 0.45)',
+        // Brand glow — electric cyan halo, brighter & more luminous
+        'glow-cyan': '0 0 24px rgba(0, 229, 255, 0.5), 0 4px 20px rgba(0, 229, 255, 0.25)',
+        'glow-cyan-sm': '0 0 12px rgba(0, 229, 255, 0.4)',
+        'glow-amber': '0 0 24px rgba(255, 149, 0, 0.5)',
+        'glow-live': '0 0 12px rgba(57, 255, 20, 0.5)',
       },
       fontFamily: {
         'display': ['Sora', 'sans-serif'],
@@ -106,11 +108,10 @@ module.exports = {
           "0%": { width: "0%" },
           "100%": { width: "100%" },
         },
-        // Brand pulse-glow — restored. Slow soft pulsing glow used on the
-        // LandingPage AI POWERED badge and other key CTAs.
+        // Brand pulse-glow — bright electric cyan pulse on key CTAs
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 12px rgba(34, 211, 238, 0.4), 0 0 24px rgba(34, 211, 238, 0.2)" },
-          "50%":      { boxShadow: "0 0 18px rgba(34, 211, 238, 0.6), 0 0 36px rgba(34, 211, 238, 0.3)" },
+          "0%, 100%": { boxShadow: "0 0 12px rgba(0, 229, 255, 0.5), 0 0 24px rgba(0, 229, 255, 0.25)" },
+          "50%":      { boxShadow: "0 0 20px rgba(0, 229, 255, 0.7), 0 0 40px rgba(0, 229, 255, 0.35)" },
         },
       },
       animation: {
