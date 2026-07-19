@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { PlatformIcon } from '@/components/BrandIcons';
 import { platformTerms } from '@/lib/platformTerminology';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import type { ChannelAudit, AuditPlatform } from '../types';
 
 interface ChannelAuditModalProps {
@@ -68,15 +69,13 @@ export function ChannelAuditModal({ audit, onClose, onDelete, onViewFull }: Chan
   const terms = platformTerms(audit.platform);
   const hasRealStats = !audit.statistics.hiddenSubscriberCount;
 
-  // Esc to close
+  // Esc to close + lock parent body scroll while the modal is open.
+  useBodyScrollLock(true);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
-    // Lock body scroll
-    document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
     };
   }, [onClose]);
 
@@ -86,7 +85,7 @@ export function ChannelAuditModal({ audit, onClose, onDelete, onViewFull }: Chan
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto card-glass rounded-2xl border-white/[0.08] shadow-2xl"
+        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto overscroll-contain card-glass rounded-2xl border-white/[0.08] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ─── Header: banner + avatar ─── */}

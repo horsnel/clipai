@@ -25,6 +25,7 @@ import {
   X, ChevronRight, ChevronLeft, Sparkles, Flame, Radio,
   BarChart2, Trophy, Scissors, Bot, Search, ArrowRight, Check,
 } from 'lucide-react';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 interface ToolsGuideProps {
   onNavigate: (page: Page) => void;
@@ -135,15 +136,13 @@ export function ToolsGuide({ onNavigate }: ToolsGuideProps) {
     };
   }, [open, paused, step]);
 
-  // Lock body scroll when open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => { document.body.style.overflow = ''; };
-  }, [open]);
+  // Lock parent body scroll while the guide is open
+  useBodyScrollLock(open);
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+    try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
+  }, []);
 
   // Esc to close
   useEffect(() => {
@@ -151,12 +150,7 @@ export function ToolsGuide({ onNavigate }: ToolsGuideProps) {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open]);
-
-  const handleClose = useCallback(() => {
-    setOpen(false);
-    try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
-  }, []);
+  }, [open, handleClose]);
 
   const goTo = (i: number) => {
     setStep(((i % STEPS.length) + STEPS.length) % STEPS.length);

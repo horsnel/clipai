@@ -44,11 +44,16 @@
   
   html {
     scroll-behavior: smooth;
+    /* Prevent scroll-chaining: when a fixed overlay/modal scrolls to its limit,
+       the parent body should NOT start scrolling underneath. */
+    overscroll-behavior: none;
   }
   
   body {
     @apply bg-clip-dark text-clip-text font-body antialiased;
     background-color: #0A0A0A;
+    /* Same here — body should never chain scroll to html. */
+    overscroll-behavior: none;
   }
   
   h1, h2, h3, h4, h5, h6 {

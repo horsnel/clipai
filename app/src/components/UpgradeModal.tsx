@@ -3,6 +3,7 @@ import {
   X, Zap, Crown, Sparkles, Check, ArrowRight, Coins, AlertCircle,
 } from 'lucide-react';
 import type { Page } from '../App';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 export type UpgradeReason = 'no_credits' | 'plan_required';
@@ -58,17 +59,16 @@ const PLANS = [
 export function UpgradeModal({ state, onClose, onNavigate }: UpgradeModalProps) {
   const { open, reason, requiredCredits, currentCredits, requiredPlan, tool } = state;
 
-  // ESC + body scroll lock
+  // ESC + lock parent body scroll while the modal is open.
+  useBodyScrollLock(open);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
     };
   }, [open, onClose]);
 

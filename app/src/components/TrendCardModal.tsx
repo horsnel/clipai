@@ -6,6 +6,7 @@ import {
 import { toast } from 'sonner';
 import { apiClient } from '@/services/api';
 import { SkeletonList } from './Loading';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import type { TrendItem } from '../pages/TrendRadarPage';
 
 interface TrendCardModalProps {
@@ -34,17 +35,15 @@ export function TrendCardModal({ trend, onClose }: TrendCardModalProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  // Close on Escape key
+  // Close on Escape key + lock parent body scroll while modal is open.
+  useBodyScrollLock(true);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
-    // Lock body scroll while modal is open
-    document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
     };
   }, [onClose]);
 

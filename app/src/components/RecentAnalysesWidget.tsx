@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { listAnalyses } from '@/services/api';
 import { PlatformIcon } from './BrandIcons';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import type { AnalysisSummary } from '../types';
 
 interface RecentAnalysesWidgetProps {
@@ -56,14 +57,13 @@ export function RecentAnalysesWidget({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit]);
 
-  // Lock body scroll while the player modal is open
+  // Lock parent body scroll while the player modal is open + close on Esc.
+  useBodyScrollLock(!!playingId);
   useEffect(() => {
     if (playingId) {
-      document.body.style.overflow = 'hidden';
       const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setPlayingId(null); };
       window.addEventListener('keydown', onKey);
       return () => {
-        document.body.style.overflow = '';
         window.removeEventListener('keydown', onKey);
       };
     }

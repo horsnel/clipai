@@ -419,7 +419,7 @@ export async function deleteChannelAudit(url: string): Promise<{ success: boolea
 // POST /api/audit-insights — generates an extensive AI review of an audited
 // channel: best/worst performing videos, SWOT, recommendations, growth
 // opportunities, content gaps, etc. Reuses the cached audit data so it's free
-// (no credit charge). Insights are cached for 30min on the server.
+// (no credit charge). Insights are cached for 2h on the server.
 export async function getAuditInsights(
   url: string,
   platform?: string,
@@ -430,6 +430,30 @@ export async function getAuditInsights(
     platform,
     force,
   });
+}
+
+// ─── Daily Insight (AI brief synthesised from all tools) ─────────────────────
+// GET /api/daily-insight — returns today's AI-generated brief combining signals
+// from the user's recent audits, analyses, trending topics, and profile.
+// Cached for 20h server-side (per user per day). Free — no credit charge.
+// Falls back to a deterministic brief if the LLM is unavailable.
+export interface DailyInsightItem {
+  title: string;
+  body: string;
+  priority: 'high' | 'medium' | 'low';
+  action: string;
+}
+export interface DailyInsightResponse {
+  date: string;            // YYYY-MM-DD
+  headline: string;
+  focusArea: string;
+  insights: DailyInsightItem[];
+  generatedAt: string;
+  cached?: boolean;
+  fallback?: boolean;
+}
+export async function getDailyInsight(): Promise<DailyInsightResponse> {
+  return apiClient.get<DailyInsightResponse>('/daily-insight');
 }
 
 // ─── Video Editor Waitlist ─────────────────────────────────────────────────

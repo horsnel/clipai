@@ -10,6 +10,7 @@ import { TrendingVideosSection } from '@/components/TrendingVideosSection';
 import { TrendingViewsChart } from '@/components/TrendingViewsChart';
 import { ChannelAuditsGrid } from '@/components/ChannelAuditsGrid';
 import { ToolsGuide } from '@/components/ToolsGuide';
+import { DailyInsightCard } from '@/components/DailyInsightCard';
 import { setPendingAnalysisId } from '@/lib/navState';
 import type { AnalysisSummary } from '../types';
 
@@ -229,6 +230,9 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
           />
         </div>
       </div>
+
+      {/* Daily AI insight pop-up — shows once per day on dashboard load */}
+      <DailyInsightCard onNavigate={onNavigate} />
     </div>
   );
 }

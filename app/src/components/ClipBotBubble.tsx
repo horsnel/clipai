@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import { getClipBotHistory, apiClient } from '@/services/api';
 import { TypingDots } from './Loading';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 interface ClipBotBubbleProps {
   user: { name: string; email: string; plan: 'free' | 'starter' | 'pro' | 'creator' } | null;
@@ -139,6 +140,9 @@ export function ClipBotBubble({ user, onNavigate, forcedMode, hideBubble }: Clip
   useEffect(() => {
     if (mode !== 'bubble') setHasNewPing(false);
   }, [mode]);
+
+  // Lock parent body scroll while ClipBot is in semi or full mode (covers viewport).
+  useBodyScrollLock(mode !== 'bubble');
 
   // Esc closes semi → bubble; in full mode, Esc → semi (if not forced)
   useEffect(() => {

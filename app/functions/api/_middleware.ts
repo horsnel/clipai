@@ -41,6 +41,10 @@
  *   POST /analyse/audio-trend      (require_auth + 3 credits) — Phase 4 Audio Trend Sync
  *   POST /analyse/comments         (require_auth + 2 credits) — Phase 4 Predictive Comments Lite
  *   POST /analyse/shadow           (require_auth + 4 credits) — Phase 4 Shadow Editor (faceless script)
+ *   POST /audit-channel            (require_auth + 1 credit after first free) — Phase 5 channel audit
+ *   GET  /channel-audits           (require_auth) — list user's saved audits
+ *   POST /audit-insights           (require_auth, free) — extensive AI review of a channel
+ *   GET  /daily-insight            (require_auth, free) — daily AI brief synthesised from all tools
  */
 import { Hono } from 'hono';
 import { jwtVerify, decodeJwt } from 'jose';
@@ -4078,11 +4082,12 @@ app.post('/audit-channel', requireAuth, async (c) => {
 
   // Adaptive cache TTL: peek the existing cached value first. If we already
   // know the subscriber count from a previous audit, use the appropriate TTL.
-  // Default for first-time audits is 1h; if the fresh audit comes back with
-  // >1M subs, we re-write with 6h TTL (handled below after auditChannel runs).
+  // Default for first-time audits is 2h (was 1h — too aggressive, caused
+  // frequent re-scrapes that cost credits); if the fresh audit comes back
+  // with >1M subs, we re-write with 12h TTL (was 6h).
   const auditCacheKey = await hashKey('channel_audit_v1', url);
-  const BIG_ACCOUNT_TTL = 6 * 60 * 60;   // 6h for accounts with >1M followers
-  const DEFAULT_TTL = 60 * 60;            // 1h for everyone else
+  const BIG_ACCOUNT_TTL = 12 * 60 * 60;  // 12h for accounts with >1M followers
+  const DEFAULT_TTL = 2 * 60 * 60;       // 2h for everyone else
   const BIG_ACCOUNT_THRESHOLD = 1_000_000;
 
   // Peek cached value to decide TTL before we even fetch.
@@ -4214,7 +4219,7 @@ app.get('/channel-audits', requireAuth, async (c) => {
               const fresh = await auditChannel(env, refreshUrl, refreshPlatform);
               if (fresh && !fresh.error) {
                 const subs = Number(fresh?.statistics?.subscribers || 0);
-                const ttl = subs >= 1_000_000 ? 6 * 60 * 60 : 60 * 60;
+                const ttl = subs >= 1_000_000 ? 12 * 60 * 60 : 2 * 60 * 60;
                 await cacheWrite(env, key, fresh, ttl);
               }
             } catch (e: any) {
@@ -4301,9 +4306,9 @@ app.post('/audit-insights', requireAuth, async (c) => {
   } else {
     try {
       audit = await auditChannel(env, canonicalUrl, platformHint);
-      // Re-cache for 1h (don't bump to 6h even if it's a big account — we
+      // Re-cache for 2h (don't bump to 12h even if it's a big account — we
       // don't want to surprise the user with a long TTL on a forced refresh)
-      await cacheWrite(env, auditCacheKey, audit, 60 * 60);
+      await cacheWrite(env, auditCacheKey, audit, 2 * 60 * 60);
     } catch (e: any) {
       return json({ error: `Audit failed: ${e?.message || 'unknown error'}` }, 500);
     }
@@ -4316,13 +4321,17 @@ app.post('/audit-insights', requireAuth, async (c) => {
     }, 400);
   }
 
-  // Insights cache (30min) — keyed on the audit cache key + a version tag so
-  // we can bust the cache if we change the prompt.
+  // Insights cache (2h — insights are expensive to regenerate and don't change
+  // rapidly since they're derived from the 1h-6h cached audit data). We use
+  // stale-while-error so that if the LLM provider is down, we serve the last
+  // good insights rather than failing the request.
   const INSIGHTS_VERSION = 'v2-2026-07-18';
   const insightsKey = await hashKey('channel_insights', INSIGHTS_VERSION, canonicalUrl);
   if (!force) {
     const cached = await cacheRead<any>(env, insightsKey);
-    if (cached?.fresh && cached.data?.insights) {
+    if (cached?.data?.insights) {
+      // Serve fresh if fresh, otherwise serve stale (cached.fresh === false means
+      // the TTL expired but KV still has it within the 24h stale window).
       return json({
         insights: cached.data.insights,
         audit: { platform: audit.platform, channelName: audit.channelName, channelHandle: audit.channelHandle, url: canonicalUrl },
@@ -4336,8 +4345,8 @@ app.post('/audit-insights', requireAuth, async (c) => {
   try {
     const insights = await generateAuditInsights(env, audit);
     const generatedAt = new Date().toISOString();
-    // Cache for 30min
-    await cacheWrite(env, insightsKey, { insights, generatedAt }, 30 * 60);
+    // Cache for 2h (was 30min — too short, caused frequent regenerations)
+    await cacheWrite(env, insightsKey, { insights, generatedAt }, 2 * 60 * 60);
     return json({
       insights,
       audit: { platform: audit.platform, channelName: audit.channelName, channelHandle: audit.channelHandle, url: canonicalUrl },
@@ -6434,6 +6443,282 @@ app.post('/analyse/shadow', requireAuth, requireCredits(4), async (c) => {
     credits_remaining: newBalance,
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// GET /api/daily-insight — synthesises a "daily brief" from the user's recent
+// activity across all tools (channel audits, viral forge analyses, trend radar,
+// growth intel). Returns 3-5 actionable insights for the day.
+//
+// Storage (the "easiest way" — no new DB table needed):
+//   - KV cache for the insight payload, keyed on `daily_insight:${userId}:${YYYY-MM-DD}`
+//     20h TTL (so it survives the day but rolls over by tomorrow)
+//   - Frontend localStorage tracks "dismissed today" state (no API call needed)
+//
+// Aggregation strategy:
+//   1. Pull the user's most recent saved channel audits (up to 3)
+//   2. Pull the user's most recent viral forge analyses (up to 3)
+//   3. Pull trending topics from topic-steal dashboard (top 5)
+//   4. Read profile info (plan, credits, streak, xp)
+//   5. Build a compact JSON "signals" payload + send to LLM with a system
+//      prompt asking for a JSON response with: headline, insights[], focusArea
+//   6. Cache + return
+//
+// Free for the user (no credit charge — this reuses cached audit/analysis data).
+// Falls back to a deterministic "starter brief" if LLM is unavailable.
+// ════════════════════════════════════════════════════════════════════════════
+app.get('/daily-insight', requireAuth, async (c) => {
+  const env = c.env as Env;
+  const userId = c.get('userId') as string;
+
+  // Date key in user's timezone (WAT = UTC+1, the primary user base).
+  // We use the server's UTC date — close enough for "today" purposes.
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  const cacheKey = `daily_insight:${userId}:${dateStr}`;
+
+  // 1. Check KV cache first (20h TTL — covers the day, rolls over by tomorrow)
+  const cached = await cacheRead<any>(env, cacheKey);
+  if (cached?.data?.insights) {
+    return json({
+      date: dateStr,
+      ...cached.data,
+      cached: true,
+    });
+  }
+
+  // 2. Gather signals in parallel — all best-effort, none should block.
+  const [profile, recentAudits, recentAnalyses, trendingTopics] = await Promise.all([
+    fetchProfile(env, userId).catch(() => null),
+    listChannelAudits(env, userId).catch(() => []),
+    (async () => {
+      try {
+        const rows = await sbFetch<any[]>(
+          env,
+          `analyses?user_id=eq.${userId}&status=eq.completed&order=created_at.desc&limit=3` +
+          `&select=id,source_url,video_title,video_author,hook_score,created_at`,
+        );
+        return rows || [];
+      } catch { return []; }
+    })(),
+    (async () => {
+      try {
+        const rows = await sbFetch<any[]>(
+          env,
+          `topic_steal_dashboard?order=mention_count.desc,avg_heat.desc&limit=5`,
+        );
+        return rows || [];
+      } catch { return []; }
+    })(),
+  ]);
+
+  // 3. For each saved audit, hydrate the cached insights (cheap — reuses 2h cache)
+  const auditInsights = await Promise.all(
+    (recentAudits || []).slice(0, 3).map(async (entry: any) => {
+      try {
+        const auditKey = await hashKey('channel_audit_v1', entry.url);
+        const auditCached = await cacheRead<any>(env, auditKey);
+        const audit = auditCached?.data;
+        const insightsKey = await hashKey('channel_insights', 'v2-2026-07-18', entry.url);
+        const insightsCached = await cacheRead<any>(env, insightsKey);
+        return {
+          channelName: entry.channel_name || entry.channelName,
+          platform: entry.platform,
+          url: entry.url,
+          healthScore: insightsCached?.data?.insights?.healthScore,
+          healthLabel: insightsCached?.data?.insights?.healthLabel,
+          executiveSummary: insightsCached?.data?.insights?.executiveSummary,
+          topRecommendation: insightsCached?.data?.insights?.recommendations?.[0]?.title,
+          subscribers: audit?.statistics?.subscribers,
+          avgEngagement: audit?.metrics?.avgEngagementRate,
+        };
+      } catch { return null; }
+    }),
+  );
+  const validAuditInsights = auditInsights.filter(Boolean);
+
+  // 4. Build the signals payload for the LLM
+  const signals = {
+    date: dateStr,
+    user: {
+      name: profile?.full_name || 'Creator',
+      plan: profile?.plan || 'free',
+      credits: profile?.credits ?? 0,
+      streakDays: profile?.streak_days ?? 0,
+      xp: profile?.xp ?? 0,
+    },
+    recentAudits: validAuditInsights,
+    recentAnalyses: (recentAnalyses || []).map((a: any) => ({
+      title: a.video_title,
+      author: a.video_author,
+      hookScore: a.hook_score,
+      analyzedAt: a.created_at,
+    })),
+    trendingTopics: (trendingTopics || []).map((t: any) => ({
+      topic: t.topic || t.title,
+      game: t.game,
+      mentions: t.mention_count,
+      heat: t.avg_heat,
+    })),
+  };
+
+  // 5. Generate the daily brief via LLM
+  const systemPrompt = `You are ClipAI's daily insight engine. Given a user's recent activity signals, produce a concise, actionable "daily brief" that helps them grow as a content creator.
+
+Return ONLY valid JSON (no markdown, no prose) in this exact shape:
+{
+  "headline": "string — 4-8 word punchy hook for today, e.g. 'Double down on your winning hook'",
+  "focusArea": "string — one of: 'Content Strategy', 'Posting Cadence', 'Audience Growth', 'Engagement', 'Monetization', 'Trend Capitalization'",
+  "insights": [
+    {
+      "title": "string — 3-6 word actionable title",
+      "body": "string — 1-2 sentence specific recommendation referencing the user's actual data",
+      "priority": "high" | "medium" | "low",
+      "action": "string — a concrete next step, e.g. 'Audit 2 more channels in your niche' or 'Post a Short at 7pm WAT today'"
+    }
+  ]
+}
+
+Rules:
+- Generate 3-5 insights, ordered by priority (high first).
+- Be SPECIFIC — reference the user's actual channels, recent analyses, trending topics, or stats. Generic advice like "post consistently" is forbidden.
+- If the user has no recent audits/analyses, focus on onboarding actions: audit their first channel, run their first analysis, check today's trends.
+- If the user has credits < 5, suggest referring friends or upgrading.
+- Match the user's plan: free users get trend + audit suggestions; paid users get growth intel + competitor spy suggestions.
+- Keep the tone encouraging but direct — like a coach who knows their numbers.
+- If trending topics include a game the user has analyzed before, call it out explicitly.`;
+
+  const userPrompt = `Here are today's signals for this user:
+
+${JSON.stringify(signals, null, 2)}
+
+Generate today's daily brief.`;
+
+  try {
+    const brief = await llmJson<any>(env, userPrompt, systemPrompt, 1500);
+
+    // Validate / normalise the response shape
+    if (!brief || !brief.insights || !Array.isArray(brief.insights)) {
+      throw new Error('LLM returned invalid brief shape');
+    }
+    // Clamp to 5 insights, ensure each has the required fields
+    const cleanInsights = brief.insights.slice(0, 5).map((i: any) => ({
+      title: String(i.title || 'Untitled insight').slice(0, 120),
+      body: String(i.body || '').slice(0, 600),
+      priority: ['high', 'medium', 'low'].includes(i.priority) ? i.priority : 'medium',
+      action: String(i.action || '').slice(0, 300),
+    }));
+
+    const payload = {
+      headline: String(brief.headline || 'Today\'s brief').slice(0, 120),
+      focusArea: String(brief.focusArea || 'Content Strategy').slice(0, 60),
+      insights: cleanInsights,
+      generatedAt: new Date().toISOString(),
+    };
+
+    // Cache for 20h (rolls over by tomorrow even if user is up late)
+    await cacheWrite(env, cacheKey, payload, 20 * 60 * 60);
+
+    return json({
+      date: dateStr,
+      ...payload,
+      cached: false,
+    });
+  } catch (e: any) {
+    console.error('[daily-insight] LLM failed:', e?.message);
+
+    // Fallback: deterministic "starter brief" based on available signals
+    const fallback = buildFallbackBrief(signals);
+    // Cache the fallback for 1h so we don't keep retrying the LLM on every refresh
+    await cacheWrite(env, cacheKey, fallback, 60 * 60);
+
+    return json({
+      date: dateStr,
+      ...fallback,
+      cached: false,
+      fallback: true,
+    });
+  }
+});
+
+// ─── Fallback brief generator (used if LLM is unavailable) ───────────────────
+function buildFallbackBrief(signals: any): any {
+  const insights: any[] = [];
+  const hasAudits = signals.recentAudits?.length > 0;
+  const hasAnalyses = signals.recentAnalyses?.length > 0;
+  const hasTrends = signals.trendingTopics?.length > 0;
+  const creditsLow = (signals.user?.credits ?? 0) < 5;
+
+  if (!hasAudits) {
+    insights.push({
+      title: 'Audit your first channel',
+      body: 'Run a free channel audit to see your subscriber count, engagement rate, and AI-generated growth recommendations.',
+      priority: 'high',
+      action: 'Go to Channel Audit and paste your YouTube or TikTok URL',
+    });
+  } else {
+    const topAudit = signals.recentAudits[0];
+    insights.push({
+      title: `Check on ${topAudit.channelName}`,
+      body: topAudit.executiveSummary
+        ? `Last audit: ${topAudit.executiveSummary.slice(0, 180)}...`
+        : `Review your audit for ${topAudit.channelName} — health score: ${topAudit.healthScore ?? 'N/A'}.`,
+      priority: 'high',
+      action: 'Open the audit report and review today\'s recommendations',
+    });
+  }
+
+  if (!hasAnalyses) {
+    insights.push({
+      title: 'Analyse a viral video',
+      body: 'Paste a YouTube URL into Viral Forge to get 14 AI-powered outputs: hooks, titles, captions, hashtags, and more.',
+      priority: 'medium',
+      action: 'Find a recent viral video in your niche and analyse it',
+    });
+  } else {
+    const topAnalysis = signals.recentAnalyses[0];
+    insights.push({
+      title: 'Reuse your best hook',
+      body: `Your last analysis of "${topAnalysis.title}" had a hook score of ${topAnalysis.hookScore ?? '?'}/100. Adapt that hook structure for your next clip.`,
+      priority: 'medium',
+      action: 'Open Viral Forge → recent analyses → reuse the top hook',
+    });
+  }
+
+  if (hasTrends) {
+    const topTrend = signals.trendingTopics[0];
+    insights.push({
+      title: `Jump on "${topTrend.topic}"`,
+      body: `${topTrend.topic} is trending in ${topTrend.game || 'gaming'} with ${topTrend.mentions} mentions. Capitalise before it peaks.`,
+      priority: 'medium',
+      action: `Create a clip around "${topTrend.topic}" today`,
+    });
+  }
+
+  if (creditsLow) {
+    insights.push({
+      title: 'Top up your credits',
+      body: `You have ${signals.user?.credits ?? 0} credits left. Refer a friend to earn 5 bonus credits, or upgrade for monthly credits that roll over.`,
+      priority: 'low',
+      action: 'Open Settings → Referrals to share your code',
+    });
+  }
+
+  if (insights.length < 3) {
+    insights.push({
+      title: 'Build a posting streak',
+      body: `You're on a ${signals.user?.streakDays ?? 0}-day streak. Keep it going by posting or analysing content today.`,
+      priority: 'low',
+      action: 'Post at least one clip or run one analysis today',
+    });
+  }
+
+  return {
+    headline: hasAudits ? 'Review your channel health' : 'Kick off your first audit',
+    focusArea: hasAudits ? 'Content Strategy' : 'Audience Growth',
+    insights: insights.slice(0, 5),
+    generatedAt: new Date().toISOString(),
+  };
+}
 
 // ─── 404 fallback ────────────────────────────────────────────────────────────
 app.all('*', (c) => json({ error: 'Not found', path: c.req.path }, 404));

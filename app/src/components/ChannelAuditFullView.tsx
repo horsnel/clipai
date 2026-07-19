@@ -13,17 +13,20 @@
  *
  * Skeleton loading while insights generate (no ParticleLoader).
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ArrowLeft, ExternalLink, Users, Eye, Video, TrendingUp, Heart,
-  AlertCircle, RefreshCw, MessageCircle, Sparkles, Target, Lightbulb,
+  AlertCircle, MessageCircle, Sparkles, Target, Lightbulb,
   TrendingDown, Minus, ArrowUpRight, ArrowDownRight, CheckCircle2,
   AlertTriangle, Rocket, CircleDot, ListChecks,
+  Download, FileText, FileType, ChevronDown,
 } from 'lucide-react';
 import { PlatformIcon } from '@/components/BrandIcons';
 import { SkeletonShimmer, SkeletonList } from './Loading';
 import { getAuditInsights } from '@/services/api';
 import { platformTerms } from '@/lib/platformTerminology';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
+import { exportAuditCSV, exportAuditDOC, exportAuditPDF } from '@/lib/auditExport';
 import { toast } from 'sonner';
 import type { ChannelAudit, AuditPlatform, AuditInsights } from '../types';
 
@@ -87,7 +90,52 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
-  const [refreshing, setRefreshing] = useState(false);
+  const [, setRefreshing] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  // Close the export dropdown when clicking outside
+  useEffect(() => {
+    if (!exportOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', onClick);
+    return () => window.removeEventListener('mousedown', onClick);
+  }, [exportOpen]);
+
+  const handleExportCSV = () => {
+    try {
+      exportAuditCSV({ audit, insights, generatedAt: new Date().toISOString() });
+      toast.success('CSV downloaded');
+    } catch (e: any) {
+      toast.error(`Export failed: ${e?.message || 'unknown error'}`);
+    } finally {
+      setExportOpen(false);
+    }
+  };
+  const handleExportDoc = () => {
+    try {
+      exportAuditDOC({ audit, insights, generatedAt: new Date().toISOString() });
+      toast.success('Word document downloaded');
+    } catch (e: any) {
+      toast.error(`Export failed: ${e?.message || 'unknown error'}`);
+    } finally {
+      setExportOpen(false);
+    }
+  };
+  const handleExportPDF = () => {
+    try {
+      exportAuditPDF({ audit, insights, generatedAt: new Date().toISOString() });
+      toast.success('Opening print dialog — pick "Save as PDF" to save');
+    } catch (e: any) {
+      toast.error(`Export failed: ${e?.message || 'unknown error'}`);
+    } finally {
+      setExportOpen(false);
+    }
+  };
 
   const fetchInsights = useCallback(async (force = false) => {
     setLoading(true);
@@ -107,27 +155,29 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
     fetchInsights(false);
   }, [fetchInsights]);
 
-  // Esc to exit
+  // Esc to exit + lock parent body scroll while the overlay is open.
+  // We use position:fixed on body (instead of just overflow:hidden) so the
+  // parent CANNOT scroll underneath the overlay even on touch devices / Safari.
+  useBodyScrollLock(true);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onExit(); };
     window.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
-    // Scroll to top on mount
+    // Scroll to top of overlay on mount
     window.scrollTo(0, 0);
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
     };
   }, [onExit]);
 
-  const handleRefresh = () => {
+  // Retry from error state — uses cached audit data if available (no forced
+  // refresh, no credit spend). Re-runs the insights LLM call only.
+  const handleRetry = () => {
     setRefreshing(true);
-    fetchInsights(true);
-    toast.info('Regenerating insights with fresh AI analysis…');
+    fetchInsights(false);
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-clip-dark overflow-y-auto">
+    <div className="fixed inset-0 z-[100] bg-clip-dark overflow-y-auto overscroll-contain">
       {/* ─── Sticky top bar ─── */}
       <div className="sticky top-0 z-20 bg-clip-dark/95 backdrop-blur-md border-b border-white/[0.04]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
@@ -147,15 +197,53 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
               {config.label}
             </span>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={loading || refreshing}
-            aria-label="Refresh insights"
-            title="Refresh"
-            className="w-9 h-9 rounded-full border border-white/10 text-clip-muted hover:text-clip-cyan hover:border-clip-cyan/40 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="relative flex-shrink-0" ref={exportRef}>
+            <button
+              onClick={() => setExportOpen(o => !o)}
+              disabled={loading}
+              aria-label="Export report"
+              title="Export report"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-clip-cyan/40 text-clip-cyan hover:bg-clip-cyan/10 hover:border-clip-cyan disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-bold"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Export</span>
+              <ChevronDown className={`w-3 h-3 transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-clip-surface border border-white/[0.10] rounded-xl shadow-2xl overflow-hidden z-30">
+                <button
+                  onClick={handleExportCSV}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-clip-text hover:bg-clip-cyan/10 transition-colors"
+                >
+                  <FileText className="w-4 h-4 text-green-500 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">CSV</div>
+                    <div className="text-[10px] text-clip-muted">Spreadsheet</div>
+                  </div>
+                </button>
+                <button
+                  onClick={handleExportDoc}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-clip-text hover:bg-clip-cyan/10 transition-colors border-t border-white/[0.04]"
+                >
+                  <FileText className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Word Doc</div>
+                    <div className="text-[10px] text-clip-muted">.doc file</div>
+                  </div>
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-clip-text hover:bg-clip-cyan/10 transition-colors border-t border-white/[0.04]"
+                >
+                  <FileType className="w-4 h-4 text-clip-red flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">PDF</div>
+                    <div className="text-[10px] text-clip-muted">Print-ready</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -241,7 +329,7 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
             <div className="flex-1 min-w-0">
               <p className="text-sm text-clip-text font-medium">Couldn't generate insights</p>
               <p className="text-xs text-clip-muted mt-1">{error}</p>
-              <button onClick={handleRefresh} className="mt-2 text-xs text-clip-cyan hover:underline">
+              <button onClick={handleRetry} className="mt-2 text-xs text-clip-cyan hover:underline">
                 Try again
               </button>
             </div>
