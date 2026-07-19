@@ -69,10 +69,10 @@
     @apply bg-clip-cyan text-black font-semibold px-6 py-3 rounded-xl 
            hover:brightness-110 hover:-translate-y-0.5 transition-all duration-200;
     /* Restored glow halo — soft teal bloom on hover */
-    box-shadow: 0 0 0 rgba(14, 122, 136, 0);
+    box-shadow: 0 0 0 rgba(0, 194, 214, 0);
   }
   .btn-primary:hover:not(:disabled) {
-    box-shadow: 0 0 24px rgba(14, 122, 136, 0.45), 0 0 48px rgba(14, 122, 136, 0.2);
+    box-shadow: 0 0 24px rgba(0, 194, 214, 0.45), 0 0 48px rgba(0, 194, 214, 0.2);
   }
   
   .btn-secondary {
@@ -89,7 +89,7 @@
   }
   /* Restored focus glow on input-dark */
   .input-dark:focus {
-    box-shadow: 0 0 0 3px rgba(14, 122, 136, 0.18), 0 0 24px rgba(14, 122, 136, 0.12);
+    box-shadow: 0 0 0 3px rgba(0, 194, 214, 0.18), 0 0 24px rgba(0, 194, 214, 0.12);
   }
   
   .vignette {
@@ -156,6 +156,6 @@
 
 /* Selection */
 ::selection {
-  background: rgba(14, 122, 136, 0.25);
+  background: rgba(0, 194, 214, 0.25);
   color: #A8AEB8;
 }

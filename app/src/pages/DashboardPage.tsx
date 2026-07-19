@@ -7,6 +7,7 @@ import {
 import { TopicStealWidget } from '@/components/TopicStealWidget';
 import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
 import { TrendingVideosSection } from '@/components/TrendingVideosSection';
+import { TrendingViewsChart } from '@/components/TrendingViewsChart';
 import { ChannelAuditsGrid } from '@/components/ChannelAuditsGrid';
 import { ToolsGuide } from '@/components/ToolsGuide';
 import { setPendingAnalysisId } from '@/lib/navState';
@@ -153,6 +154,11 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
 
         {/* ── Channel Audits Grid (HERO — audited channels as avatar squares) ── */}
         <ChannelAuditsGrid onNavigate={onNavigate} />
+
+        {/* ── Trending Views Chart (graphic table of accumulated views) ── */}
+        <div className="mb-10">
+          <TrendingViewsChart />
+        </div>
 
         {/* ── Trending Gaming Videos ── */}
         <div className="mb-10">
