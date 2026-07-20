@@ -282,6 +282,78 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Dashboard Preview Section — shows the in-app phone dashboard with trending videos */}
+      <section className="py-20 lg:py-28 relative overflow-hidden">
+        {/* Background glows */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-clip-cyan/5 rounded-full blur-[120px]" />
+          <div className="absolute bottom-1/4 left-1/4 w-80 h-80 bg-clip-amber/5 rounded-full blur-[100px]" />
+        </div>
+
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 xl:px-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center max-w-6xl mx-auto">
+            {/* Phone mockup with the actual ClipAI dashboard */}
+            <div className="relative order-2 lg:order-1">
+              <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.04] max-w-sm mx-auto lg:mx-0 bg-clip-surface perspective-1000">
+                <img
+                  src="/dashboard-phone.jpg"
+                  alt="ClipAI dashboard showing trending videos and Viral Forge CTA"
+                  className="w-full h-auto"
+                  onError={handleImageError}
+                />
+                {/* Overlay gradient for legibility */}
+                <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/30 via-transparent to-transparent pointer-events-none" />
+
+                {/* Floating "Live" badge */}
+                <div className="absolute top-4 left-4 bg-clip-surface/90 backdrop-blur-sm text-clip-cyan text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1.5 border border-clip-cyan/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-clip-live animate-pulse" />
+                  LIVE DASHBOARD
+                </div>
+              </div>
+
+              {/* Glow effect under phone */}
+              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-2/3 h-16 bg-clip-cyan/20 blur-2xl rounded-full pointer-events-none" />
+            </div>
+
+            {/* Content */}
+            <div className="order-1 lg:order-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/10 border border-clip-cyan/20 px-3 py-1 rounded-full mb-4">
+                <Sparkles className="w-3.5 h-3.5" /> Inside the app
+              </span>
+              <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-6 leading-tight">
+                Your creator command center. <span className="gradient-text">Always one tap away.</span>
+              </h2>
+              <p className="text-clip-muted text-base sm:text-lg mb-8 leading-relaxed">
+                Open ClipAI and the dashboard loads instantly. Trending videos in your game, scored by HYPE. A one-tap shortcut to run Viral Forge on any clip. Everything you need to ship content faster, surfaced before you ask.
+              </p>
+
+              <div className="space-y-4 mb-8">
+                {[
+                  { icon: Flame, text: 'Trending Now — top clips in your game, last 24h, ranked by HYPE score' },
+                  { icon: Zap, text: 'One-tap Viral Forge — paste a URL, get 14 outputs in seconds' },
+                  { icon: TrendingUp, text: 'Personalized to your primary game, updated continuously' },
+                ].map((item) => (
+                  <div key={item.text} className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-clip-cyan/6 flex items-center justify-center flex-shrink-0">
+                      <item.icon className="w-5 h-5 text-clip-cyan" />
+                    </div>
+                    <span className="text-clip-text font-medium leading-relaxed">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              <Button
+                onClick={() => onNavigate('auth')}
+                className="btn-primary flex items-center gap-2"
+              >
+                Open the Dashboard
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Social Proof Section */}
       <section className="py-20 lg:py-28 bg-clip-surface/50 relative">
         <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12">
