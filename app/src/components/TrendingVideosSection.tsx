@@ -7,13 +7,14 @@
  */
 import { useState, useEffect } from 'react';
 import {
-  Copy, Check, ExternalLink, Flame,
+  Copy, Check, Flame,
   Play, AlertTriangle, Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getTrendingVideos } from '@/services/api';
 import { SkeletonVideoGrid } from './Loading';
 import { PlatformIcon } from './BrandIcons';
+import { VideoPlayerModal } from './VideoPlayerModal';
 import type { TrendingVideo } from '../types';
 import type { PlatformId } from './BrandIcons';
 
@@ -74,6 +75,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState<string | null>(null);
   const [copiedId, setCopiedId]   = useState<string | null>(null);
+  const [activeVideo, setActiveVideo] = useState<TrendingVideo | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -126,7 +128,7 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
               Trending Gaming Videos
             </h3>
             <p className="text-clip-muted text-xs mt-0.5 truncate">
-              One click copy: title · caption · hashtags
+              Click to play · One-click copy: title · caption · hashtags
             </p>
           </div>
         </div>
@@ -162,12 +164,12 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                   key={v.id}
                   className="group relative rounded-xl overflow-hidden border border-white/[0.02] bg-clip-surface/40 hover:border-white/[0.10] transition-all"
                 >
-                  {/* Thumbnail or platform fallback */}
-                  <a
-                    href={v.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block relative aspect-video overflow-hidden bg-clip-surface"
+                  {/* Thumbnail or platform fallback — opens in-app player */}
+                  <button
+                    type="button"
+                    onClick={() => setActiveVideo(v)}
+                    className="block relative aspect-video overflow-hidden bg-clip-surface w-full text-left cursor-pointer"
+                    aria-label={`Play ${v.title} in ClipAI`}
                   >
                     {hasThumbnail ? (
                       <img
@@ -185,17 +187,17 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                     )}
                     {/* Dark gradient overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/80 via-transparent to-transparent pointer-events-none" />
-                    {/* Play icon on hover */}
+                    {/* Play icon — always visible on hover, signals click-to-play (not link-to-YouTube) */}
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <div className="w-10 h-10 rounded-full bg-clip-cyan/90 flex items-center justify-center backdrop-blur-sm">
-                        <Play className="w-4 h-4 text-black ml-0.5" fill="currentColor" />
+                      <div className="w-12 h-12 rounded-full bg-clip-cyan/90 flex items-center justify-center backdrop-blur-sm shadow-glow-cyan">
+                        <Play className="w-5 h-5 text-black ml-0.5" fill="currentColor" />
                       </div>
                     </div>
                     {/* Platform badge */}
                     <span className={`absolute top-2 left-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${style.badgeClass}`}>
                       <PlatformIcon platform={style.platformId} className="w-3 h-3" /> {style.label}
                     </span>
-                    {/* Copy button — top right */}
+                    {/* Copy button — top right (doesn't open the player) */}
                     {hasPack && (
                       <button
                         onClick={(e) => {
@@ -219,13 +221,20 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                         {timeAgo(v.publishedAt)}
                       </span>
                     )}
-                  </a>
+                  </button>
 
-                  {/* Title + channel */}
+                  {/* Title + channel — clicking title also opens the in-app player */}
                   <div className="p-3">
-                    <p className="text-sm font-medium text-clip-text leading-snug line-clamp-2 mb-1.5">
-                      {v.copyPack?.title || v.title}
-                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setActiveVideo(v)}
+                      className="text-left w-full"
+                      aria-label={`Play ${v.title}`}
+                    >
+                      <p className="text-sm font-medium text-clip-text leading-snug line-clamp-2 mb-1.5 hover:text-clip-cyan transition-colors">
+                        {v.copyPack?.title || v.title}
+                      </p>
+                    </button>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
                         <span className="text-xs text-clip-muted truncate">{v.channel}</span>
@@ -236,16 +245,16 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
                           </span>
                         )}
                       </div>
-                      <a
-                        href={v.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-clip-muted hover:text-clip-cyan transition-colors flex-shrink-0"
-                        aria-label={`Open on ${style.label}`}
-                        title={`Open on ${style.label}`}
+                      {/* Play button — explicit affordance to open in-app player */}
+                      <button
+                        type="button"
+                        onClick={() => setActiveVideo(v)}
+                        className="text-[10px] font-bold uppercase tracking-wider text-clip-cyan hover:text-clip-text transition-colors flex-shrink-0 inline-flex items-center gap-1"
+                        title="Play in ClipAI"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
+                        <Play className="w-3 h-3" fill="currentColor" />
+                        Play
+                      </button>
                     </div>
 
                     {/* Hashtags preview */}
@@ -273,6 +282,15 @@ export function TrendingVideosSection({ game }: TrendingVideosSectionProps) {
           </div>
         )}
       </div>
+
+      {/* In-app YouTube player modal — replaces the old "open in new tab" behaviour */}
+      <VideoPlayerModal
+        open={!!activeVideo}
+        video={activeVideo}
+        onClose={() => setActiveVideo(null)}
+        onCopy={handleCopy}
+        copied={!!activeVideo && copiedId === activeVideo.id}
+      />
     </section>
   );
 }

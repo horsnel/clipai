@@ -3,8 +3,9 @@ import type { Page } from '../App';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Logo } from '@/components/Logo';
 import { 
-  Zap, Mail, Lock, User, ArrowRight, 
+  Mail, Lock, User, ArrowRight, 
   Chrome, Eye, EyeOff, Gift 
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -63,18 +64,13 @@ export function AuthPage({ onNavigate }: AuthPageProps) {
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        {/* Logo */}
+        {/* Logo — uses the actual ClipAI brand mark (not a generic Zap icon) */}
         <div className="text-center mb-8">
           <button
             onClick={() => onNavigate('landing')}
             className="inline-flex items-center gap-2 group mb-6"
           >
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-clip-cyan to-blue-600 flex items-center justify-center shadow-glow-cyan transition-shadow">
-              <Zap className="w-6 h-6 text-black" />
-            </div>
-            <span className="font-display font-bold text-2xl text-clip-text">
-              ClipAI
-            </span>
+            <Logo size="lg" showWord variant="gradient" className="group-hover:scale-105 transition-transform" />
           </button>
           <h1 className="font-display font-bold text-2xl sm:text-3xl text-clip-text mb-2">
             {isLogin ? 'Welcome back' : 'Create your account'}

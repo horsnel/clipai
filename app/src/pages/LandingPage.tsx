@@ -11,6 +11,31 @@ interface LandingPageProps {
   onNavigate: (page: Page, clips?: unknown[]) => void;
 }
 
+/**
+ * Branded fallback for any <img> that fails to load. Instead of showing the
+ * browser's broken-image icon, we swap the <img> for a gradient block with
+ * the ClipAI logo mark. This keeps the landing page looking polished even
+ * when the CDN / network fails for a specific asset.
+ *
+ * Usage: <img onError={handleImageError} ... />
+ */
+function handleImageError(e: React.SyntheticEvent<HTMLImageElement>) {
+  const img = e.currentTarget;
+  // Avoid infinite loop if the fallback itself somehow fails
+  if (img.dataset.fallbackApplied) return;
+  img.dataset.fallbackApplied = 'true';
+  // Hide the broken img and inject a branded placeholder in its place
+  img.style.display = 'none';
+  const parent = img.parentElement;
+  if (!parent) return;
+  parent.classList.add('bg-gradient-to-br', 'from-clip-cyan/15', 'via-clip-surface', 'to-blue-900/30');
+  parent.classList.add('flex', 'items-center', 'justify-center', 'min-h-[200px]');
+  const placeholder = document.createElement('div');
+  placeholder.className = 'flex flex-col items-center gap-2 opacity-50';
+  placeholder.innerHTML = '<svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="92" height="92" rx="24" fill="#00E5FF"/><path d="M 32 26 L 32 74 L 76 50 Z" fill="#0A0A0A"/></svg><span class="text-[10px] text-clip-muted uppercase tracking-wider">ClipAI</span>';
+  parent.appendChild(placeholder);
+}
+
 export function LandingPage({ onNavigate }: LandingPageProps) {
   const heroRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef<HTMLDivElement>(null);
@@ -128,11 +153,12 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             ref={phoneRef}
             className="relative mx-auto w-full max-w-sm sm:max-w-md lg:max-w-lg perspective-1000 preserve-3d"
           >
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.02]">
-              <img 
-                src="/hero-phone.jpg" 
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.02] bg-clip-surface">
+              <img
+                src="/hero-phone.jpg"
                 alt="ClipAI Phone Mockup"
                 className="w-full h-auto"
+                onError={handleImageError}
               />
               {/* Overlay gradient */}
               <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/60 via-transparent to-transparent" />
@@ -287,7 +313,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 <img
                   src="/avatar-tobi.jpg"
                   alt="Tobi"
-                  className="w-12 h-12 rounded-xl object-cover border border-white/[0.02] flex-shrink-0"
+                  className="w-12 h-12 rounded-xl object-cover border border-white/[0.02] flex-shrink-0 bg-clip-surface"
+                  onError={handleImageError}
                 />
                 <div className="min-w-0 flex-1">
                   <p className="font-display font-semibold text-clip-text">Tobi</p>
@@ -308,11 +335,12 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center max-w-6xl mx-auto">
             {/* Phone mockup */}
             <div className="relative">
-              <div className="relative rounded-3xl overflow-hidden shadow-card border border-white/[0.02] max-w-sm mx-auto lg:mx-0">
-                <img 
-                  src="/gameplay-thumb-1.jpg" 
+              <div className="relative rounded-3xl overflow-hidden shadow-card border border-white/[0.02] max-w-sm mx-auto lg:mx-0 bg-clip-surface">
+                <img
+                  src="/gameplay-thumb-1.jpg"
                   alt="Smart Cuts Preview"
                   className="w-full h-auto"
+                  onError={handleImageError}
                 />
                 <div className="absolute inset-0 bg-gradient-to-tr from-clip-dark/80 via-transparent to-clip-cyan/10" />
                 
