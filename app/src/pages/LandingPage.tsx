@@ -127,7 +127,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
           {/* Subheadline */}
           <p className="text-center text-clip-muted text-base sm:text-lg md:text-xl max-w-2xl mx-auto mb-8 px-4">
-            ClipAI streams any YouTube video to Gemini and returns titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more viral outputs: in seconds. No uploads. No rendering. No storage.
+            ClipAI streams any YouTube video through AI and returns titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more viral outputs: in seconds. No uploads. No rendering. No storage.
           </p>
 
           {/* CTAs */}
@@ -225,7 +225,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               One paste. <span className="gradient-text">14 viral strategies.</span>
             </h2>
             <p className="text-clip-muted text-base sm:text-lg">
-              Viral Forge turns any YouTube URL into titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more outputs: all from one Gemini call.
+              Viral Forge turns any YouTube URL into titles, hooks, captions, distribution packs, thumbnail concepts, and 9 more outputs: all from one AI call.
             </p>
           </div>
 
