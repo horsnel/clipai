@@ -319,6 +319,86 @@ export async function getTrendingVideos(game?: string): Promise<TrendingVideosRe
   return data;
 }
 
+// ─── Gaming Feed (Dashboard enrichment: news + dev tweets + reddit) ──────────
+// Backend caches the aggregate feed for 2h globally (KV). We also cache on the
+// client (localStorage) for 1h so the dashboard renders instantly on repeat
+// visits. The cache is keyed by `game` so different games don't collide.
+export interface GamingNewsItem {
+  title: string;
+  snippet: string;
+  url: string;
+  source: string;       // e.g. "ign.com"
+  date: string;         // ISO date if available
+}
+export interface DevTweetItem {
+  title: string;
+  snippet: string;
+  url: string;
+  author: string;       // e.g. "@valorant"
+  date: string;
+}
+export interface RedditPostItem {
+  title: string;
+  url: string;
+  subreddit: string;    // e.g. "r/valorant"
+  author: string;
+  publishedAt: string;
+}
+export interface GamingFeedResponse {
+  news: GamingNewsItem[];
+  devTweets: DevTweetItem[];
+  redditPosts: RedditPostItem[];
+  game: string;
+  generatedAt: string;
+}
+
+const GAMING_FEED_CLIENT_TTL_MS = 60 * 60 * 1000; // 1 hour
+const GAMING_FEED_CACHE_PREFIX = 'clipai:gf:';
+
+export async function getGamingFeed(game?: string): Promise<GamingFeedResponse> {
+  const params = new URLSearchParams();
+  if (game) params.set('game', game);
+  const cacheKey = `${GAMING_FEED_CACHE_PREFIX}${(game || 'gaming').toLowerCase()}`;
+
+  // 1. Try client cache first — instant render on repeat visits.
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { data: GamingFeedResponse; expiresAt: number };
+      if (Date.now() < parsed.expiresAt) {
+        return parsed.data;
+      }
+      localStorage.removeItem(cacheKey);
+    }
+  } catch {
+    // localStorage may be unavailable — fall through to network.
+  }
+
+  // 2. Network fetch — hits the 2h backend KV cache.
+  const data = await apiClient.get<GamingFeedResponse>(`/gaming-feed?${params.toString()}`);
+
+  // 3. Persist to client cache (best-effort).
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify({
+      data,
+      expiresAt: Date.now() + GAMING_FEED_CLIENT_TTL_MS,
+    }));
+  } catch {
+    // Quota exceeded — clear any other cached gaming-feed entries and try once more.
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith(GAMING_FEED_CACHE_PREFIX))
+        .forEach(k => localStorage.removeItem(k));
+      localStorage.setItem(cacheKey, JSON.stringify({
+        data,
+        expiresAt: Date.now() + GAMING_FEED_CLIENT_TTL_MS,
+      }));
+    } catch {}
+  }
+
+  return data;
+}
+
 // ─── Leaderboard ────────────────────────────────────────────────────────────
 export async function getLeaderboard(type: 'alltime' | 'weekly' = 'alltime') {
   return apiClient.get<{ players: any[]; currentUser: any | null }>(`/leaderboard?type=${type}`);

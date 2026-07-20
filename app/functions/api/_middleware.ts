@@ -2074,16 +2074,18 @@ async function googleTrends(env: Env, game: string, limit = 6): Promise<any[]> {
 // Serper.dev /search — used for TikTok and Twitter/X data without paying for
 // native APIs. We use site: queries (site:tiktok.com, site:x.com) to scope
 // Google's index to each platform. ~$0.001 per search vs $0.01 for SerpAPI.
-async function serperSearch(env: Env, query: string, num = 10): Promise<any[]> {
+async function serperSearch(env: Env, query: string, num = 10, tbs?: string): Promise<any[]> {
   if (!env.SERPER_API_KEY) return [];
   try {
+    const body: Record<string, any> = { q: query, gl: 'ng', hl: 'en', num };
+    if (tbs) body.tbs = tbs;
     const r = await fetch('https://google.serper.dev/search', {
       method: 'POST',
       headers: {
         'X-API-KEY': env.SERPER_API_KEY,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ q: query, gl: 'ng', hl: 'en', num }),
+      body: JSON.stringify(body),
     });
     if (!r.ok) return [];
     const data = (await r.json()) as any;
@@ -2147,6 +2149,214 @@ async function serpInstagram(env: Env, game: string, limit = 4): Promise<any[]> 
   });
 }
 
+// ─── Gaming News / Dev Tweets / Reddit (Dashboard enrichment) ────────────────
+// Three sources, fetched in parallel, cached 2h globally:
+//   1. NEWS  — official gaming journalism (IGN, Polygon, Eurogamer, Kotaku,
+//              GameSpot, Rock Paper Shotgun, PC Gamer) via Serper.dev web search
+//              scoped to the user's game. We exclude site:reddit.com and
+//              site:tiktok.com to keep it to articles, not social posts.
+//   2. TWEETS — official game-dev accounts via Serper.dev Twitter search.
+//               We hard-code the official @-handles per game so we always get
+//               the publisher's voice (not random gamers tweeting about it).
+//   3. REDDIT — top posts from r/gaming + the game's dedicated subreddit
+//               (reuses the existing redditTop function — RSS-based, keyless).
+
+// Official game → Twitter @-handles for the dev accounts we want to surface.
+// Sourced from each publisher's verified primary account. NULL = use generic
+// gaming search (no official dev account or game not in the map).
+const GAME_DEV_TWITTERS: Record<string, string[]> = {
+  valorant:        ['@valorant', '@playvalorant'],
+  'call of duty':  ['@callofduty'],
+  warzone:         ['@callofduty'],
+  cod:             ['@callofduty'],
+  fortnite:        ['@fortnitegame', '@fortnitestatus'],
+  apex:            ['@playapex'],
+  'apex legends':  ['@playapex'],
+  minecraft:       ['@minecraft', '@minecraftnet'],
+  roblox:          ['@roblox', '@robloxtc'],
+  'free fire':     ['@freefirebr', '@garenafreefire'],
+  'free fire max': ['@freefirebr', '@garenafreefire'],
+  pubg:            ['@pubg', '@pubghelp'],
+  'pubg mobile':   ['@pubgmobile', '@pubgm_sports'],
+  'mobile legends':['@mobilelegendsgame', '@mlbbdev'],
+  mlbb:            ['@mobilelegendsgame', '@mlbbdev'],
+  fifa:            ['@easportsfifa'],
+  'ea fc':         ['@easportsfc'],
+  'ea fc 25':      ['@easportsfc'],
+  'grand theft auto': ['@rockstargames'],
+  gta:             ['@rockstargames'],
+  'gta v':         ['@rockstargames'],
+  'gta 6':         ['@rockstargames'],
+  genshin:         ['@genshinimpact'],
+  'genshin impact':['@genshinimpact'],
+  'league of legends': ['@leagueoflegends', '@riotgames'],
+  lol:             ['@leagueoflegends', '@riotgames'],
+  'counter-strike':['@csgo', '@cs2dev'],
+  cs2:             ['@csgo', '@cs2dev'],
+  csgo:            ['@csgo', '@cs2dev'],
+  dota:            ['@dota2', '@wykrhm'],
+  'dota 2':        ['@dota2'],
+  overwatch:       ['@playoverwatch', '@overwatchbeta'],
+  rocket:          ['@rocketleague'],
+  'rocket league': ['@rocketleague'],
+  destiny:         ['@destinythegame', '@bungie'],
+  'destiny 2':     ['@destinythegame', '@bungie'],
+  warcraft:        ['@warcraft', '@blizzardent'],
+  'world of warcraft': ['@warcraft', '@blizzardent'],
+  wow:             ['@warcraft', '@blizzardent'],
+  hearthstone:     ['@playhearthstone'],
+};
+
+// Trusted gaming-news domains we surface in the NEWS section. Serper.dev gives
+// us the title + URL + snippet; we filter to these domains so the dashboard
+// only shows reputable journalism (no SEO spam).
+const GAMING_NEWS_DOMAINS = new Set([
+  // Major gaming journalism
+  'ign.com', 'www.ign.com',
+  'polygon.com', 'www.polygon.com',
+  'eurogamer.net', 'www.eurogamer.net',
+  'kotaku.com', 'www.kotaku.com',
+  'gamespot.com', 'www.gamespot.com',
+  'rockpapershotgun.com', 'www.rockpapershotgun.com',
+  'pcgamer.com', 'www.pcgamer.com',
+  'vg247.com', 'www.vg247.com',
+  'pushsquare.com', 'www.pushsquare.com',
+  'nintendolife.com', 'www.nintendolife.com',
+  'purexbox.com', 'www.purexbox.com',
+  'thegamer.com', 'www.thegamer.com',
+  'comicbook.com', 'www.comicbook.com',
+  'screenrant.com', 'www.screenrant.com',
+  'gamerant.com', 'www.gamerant.com',
+  'insider-gaming.com', 'www.insider-gaming.com',
+  // Esports / competitive
+  'dexerto.com', 'www.dexerto.com',
+  'esports.com', 'www.esports.com',
+  'dotesports.com', 'www.dotesports.com',
+  'win.gg', 'www.win.gg',
+  'vlr.gg', 'www.vlr.gg',                     // Valorant esports
+  'liquipedia.net', 'www.liquipedia.net',     // Esports wikis
+  'hltv.org', 'www.hltv.org',                  // CS esports
+  'op.gg', 'www.op.gg',                       // LoL stats
+  // Publisher / official game sites
+  'playvalorant.com', 'valorant.com',
+  'playoverwatch.com', 'overwatch.blizzard.com',
+  'worldofwarcraft.com', 'worldofwarcraft.blizzard.com',
+  'dota2.com', 'www.dota2.com',
+  'leagueoflegends.com', 'www.leagueoflegends.com',
+  'fortnite.com', 'www.fortnite.com',
+  'ea.com', 'www.ea.com',
+  'rockstargames.com', 'www.rockstargames.com',
+  'news.xbox.com', 'news.xbox.com',
+  'blog.playstation.com', 'blog.playstation.com',
+  'nintendo.com', 'www.nintendo.com',
+  // Tools / community coverage
+  'blitz.gg', 'www.blitz.gg',
+  'mobalytics.gg', 'www.mobalytics.gg',
+  'tracker.gg', 'www.tracker.gg',
+]);
+
+/** Fetch gaming news articles for a specific game via Serper.dev web search.
+ *  Filters to trusted domains only (IGN, Polygon, etc.) so we never surface
+ *  SEO spam. Returns at most `limit` items, most recent first.
+ *
+ *  Time filter strategy: try `tbs=qdr:w` (past week) first. If that yields
+ *  fewer than `limit` trusted-domain hits, retry without the time filter —
+ *  game-specific queries (e.g. "valorant patch notes news update") often
+ *  have no trusted-domain coverage in the past week, but plenty of evergreen
+ *  articles that are still worth surfacing on the dashboard. */
+async function fetchGamingNews(env: Env, game: string, limit = 8): Promise<any[]> {
+  const gameLabel = (game || 'gaming').toLowerCase();
+  const q = gameLabel === 'gaming' || gameLabel === 'all'
+    ? 'gaming news patch notes update'
+    : `${gameLabel} patch notes news update`;
+
+  const filterTrusted = (raw: any[]) => raw.filter((r: any) => {
+    if (!r.link) return false;
+    try {
+      const host = new URL(r.link).hostname.toLowerCase();
+      return GAMING_NEWS_DOMAINS.has(host);
+    } catch {
+      return false;
+    }
+  });
+
+  const mapToNews = (filtered: any[]) => filtered.slice(0, limit).map((r: any) => {
+    let host = '';
+    try { host = new URL(r.link).hostname.replace(/^www\./, ''); } catch {}
+    return {
+      title: r.title || 'Untitled',
+      snippet: r.snippet || '',
+      url: r.link,
+      source: host,
+      date: r.date || '',
+    };
+  });
+
+  // 1. Try past-week filter first — prefer fresh news.
+  const weekRaw = await serperSearch(env, q, limit * 4, 'qdr:w');
+  const weekFiltered = filterTrusted(weekRaw);
+  if (weekFiltered.length >= Math.min(limit, 3)) {
+    return mapToNews(weekFiltered);
+  }
+
+  // 2. Fallback: no time filter — evergreen articles from trusted domains.
+  const allRaw = await serperSearch(env, q, limit * 4);
+  const allFiltered = filterTrusted(allRaw);
+  // Merge & dedupe by URL (week-first, then evergreen fillers).
+  const seen = new Set<string>();
+  const merged = [...weekFiltered, ...allFiltered].filter((r: any) => {
+    if (seen.has(r.link)) return false;
+    seen.add(r.link);
+    return true;
+  });
+  return mapToNews(merged);
+}
+
+/** Fetch recent tweets from official game-dev accounts for a given game.
+ *  Uses Serper.dev's web search scoped to each dev account's Twitter URL path
+ *  (x.com/<handle>/status/). This is more reliable than the `from:` operator,
+ *  which Serper treats as a keyword search rather than a Twitter-native filter.
+ *  Returns at most `limit` items, most recent first. */
+async function fetchDevTweets(env: Env, game: string, limit = 6): Promise<any[]> {
+  const gameLabel = (game || 'gaming').toLowerCase();
+  const handles = GAME_DEV_TWITTERS[gameLabel];
+  if (!handles || handles.length === 0) return [];
+  // Build a query like: site:x.com/valorant/status OR site:x.com/playvalorant/status
+  // This scopes results to tweets FROM those specific accounts.
+  const siteClauses = handles
+    .map(h => `site:x.com/${h.replace('@', '')}/status`)
+    .join(' OR ');
+  const q = siteClauses;
+  const raw = await serperSearch(env, q, limit + 2);
+  return raw.slice(0, limit).map((t: any) => {
+    const url = t.link || '';
+    // Extract @username from URL: x.com/username/status/123
+    const authorMatch = url.match(/x\.com\/([^/?]+)\/status/i);
+    const author = authorMatch ? `@${authorMatch[1]}` : (handles[0] || '@dev');
+    return {
+      title: t.title || '',
+      snippet: t.snippet || '',
+      url,
+      author,
+      date: t.date || '',
+    };
+  });
+}
+
+/** Fetch top Reddit posts for a game (reuses the existing redditTop function
+ *  which uses the .rss endpoint — keyless, works from Cloudflare Workers). */
+async function fetchRedditPosts(env: Env, game: string, limit = 5): Promise<any[]> {
+  const items = await redditTop(env, game, limit);
+  return items.map((it: any) => ({
+    title: it.title || 'Reddit post',
+    url: it.url || '',
+    subreddit: it.subreddit || `r/${(game || 'gaming').toLowerCase()}`,
+    author: it.author || '',
+    publishedAt: it.publishedAt || '',
+  }));
+}
+
+
 // ─── Channel Audit helpers ───────────────────────────────────────────────────
 // Powers the "Free Channel Audit" flow: user pastes a YouTube/TikTok/X/IG
 // channel URL, we fetch real analytics where available and return a rich audit
@@ -2182,10 +2392,36 @@ function normaliseAuditInput(raw: string, platformHint?: string): { url: string;
   const s = (raw || '').trim();
   if (!s) return null;
 
-  // Already a URL? Just detect platform.
-  if (/^https?:\/\//i.test(s) || /^(youtube|tiktok|instagram|x|twitter|reddit)\.com\//i.test(s)) {
-    const platform = detectPlatform(s);
-    return platform ? { url: s, platform } : null;
+  // ─── Canonicalise URL-form input ──────────────────────────────────────────
+  // Previously we returned the URL as-is, which meant "https://www.youtube.com/@MrBeast"
+  // and "https://youtube.com/@MrBeast" and "youtube.com/@MrBeast" all produced DIFFERENT
+  // cache keys. The user could audit the same channel via three different URL strings
+  // and never hit the cache. This is the root cause of the "audit is not caching" bug.
+  //
+  // Now: parse the URL, strip "www.", lowercase the host, and re-emit a canonical URL.
+  // This guarantees the same channel always produces the same cache key.
+  if (/^https?:\/\//i.test(s) || /^(?:www\.)?(youtube|tiktok|instagram|x|twitter|reddit)\.com\//i.test(s)) {
+    const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+    try {
+      const u = new URL(withProto);
+      u.hostname = u.hostname.toLowerCase().replace(/^www\./, '');
+      // All supported platforms force HTTPS redirects — normalise http → https
+      // so the same channel always produces the same cache key regardless of
+      // which protocol the user typed.
+      u.protocol = 'https:';
+      // Drop tracking query params (utm_*, fbclid, gclid, ref, etc.) — these
+      // vary per visit but reference the same channel, so they shouldn't
+      // fragment the cache.
+      const trackingParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term',
+                              'utm_content', 'fbclid', 'gclid', 'ref', 'igshid', 'si'];
+      trackingParams.forEach(p => u.searchParams.delete(p));
+      let path = u.pathname.replace(/\/+$/, '') || '/';
+      const canonical = `${u.protocol}//${u.hostname}${path}${u.search}`;
+      const platform = detectPlatform(canonical);
+      return platform ? { url: canonical, platform } : null;
+    } catch {
+      // Fall through to bare-username handling
+    }
   }
 
   // Strip leading @ for bare username handling
@@ -4040,6 +4276,40 @@ Rules:
   return json(data);
 });
 
+// ─── Gaming Feed (Dashboard enrichment: news + dev tweets + reddit) ──────────
+// Aggregates three sources in parallel, cached 2h globally:
+//   1. NEWS  — articles from trusted gaming journalism (IGN, Polygon, etc.)
+//   2. TWEETS — recent posts from official game-dev Twitter accounts
+//   3. REDDIT — top posts from the game's subreddit
+//
+// No auth required (free, public data). The dashboard calls this on mount to
+// show a "What's happening in <your game>" feed alongside the trending videos.
+// Falls back gracefully: if any source returns empty, the others still render.
+app.get('/gaming-feed', async (c) => {
+  const env = c.env as Env;
+  const game = (c.req.query('game') || 'gaming').trim().toLowerCase();
+  const gameLabel = game || 'gaming';
+
+  const cacheKey = `gaming_feed_v1:${gameLabel}`;
+  const data = await withCache(env, cacheKey, 2 * 60 * 60, async () => {
+    const [news, devTweets, redditPosts] = await Promise.all([
+      fetchGamingNews(env, gameLabel, 8),
+      fetchDevTweets(env, gameLabel, 6),
+      fetchRedditPosts(env, gameLabel, 5),
+    ]);
+    return {
+      news,
+      devTweets,
+      redditPosts,
+      game: gameLabel,
+      generatedAt: new Date().toISOString(),
+    };
+  });
+
+  return json(data);
+});
+
+
 // ─── Channel Audit (free, auth required) ─────────────────────────────────────
 // POST /api/audit-channel — runs a fresh audit for a single URL, caches the
 // result with adaptive TTL (1h default; 6h for accounts with >1M followers —
@@ -4085,7 +4355,12 @@ app.post('/audit-channel', requireAuth, async (c) => {
   // Default for first-time audits is 2h (was 1h — too aggressive, caused
   // frequent re-scrapes that cost credits); if the fresh audit comes back
   // with >1M subs, we re-write with 12h TTL (was 6h).
-  const auditCacheKey = await hashKey('channel_audit_v1', url);
+  //
+  // Cache key bumped v1 → v2 to invalidate any previously-cached entries that
+  // were keyed on non-canonical URLs (before the URL normalisation fix). This
+  // ensures every user gets a fresh cache built on the canonical URL going
+  // forward, so the same channel always hits the same cache entry.
+  const auditCacheKey = await hashKey('channel_audit_v2', url);
   const BIG_ACCOUNT_TTL = 12 * 60 * 60;  // 12h for accounts with >1M followers
   const DEFAULT_TTL = 2 * 60 * 60;       // 2h for everyone else
   const BIG_ACCOUNT_THRESHOLD = 1_000_000;
@@ -4201,7 +4476,7 @@ app.get('/channel-audits', requireAuth, async (c) => {
   const fullAudits = await Promise.all(
     audits.map(async (entry: any) => {
       try {
-        const key = await hashKey('channel_audit_v1', entry.url);
+        const key = await hashKey('channel_audit_v2', entry.url);
         const cached = await cacheRead<any>(env, key);
         if (cached?.data) {
           return { ...cached.data, url: entry.url };
@@ -4298,7 +4573,7 @@ app.post('/audit-insights', requireAuth, async (c) => {
   // Pull the cached audit (1h-6h TTL) — this is the same KV cache the audit
   // endpoint wrote to. If the cache is cold, we run a fresh audit (this DOES
   // spend scraper credits upstream, but no user-side credit charge).
-  const auditCacheKey = await hashKey('channel_audit_v1', canonicalUrl);
+  const auditCacheKey = await hashKey('channel_audit_v2', canonicalUrl);
   let audit: any;
   const peeked = await cacheRead<any>(env, auditCacheKey);
   if (peeked?.data && (peeked.fresh || !force)) {
@@ -4321,11 +4596,20 @@ app.post('/audit-insights', requireAuth, async (c) => {
     }, 400);
   }
 
-  // Insights cache (2h — insights are expensive to regenerate and don't change
-  // rapidly since they're derived from the 1h-6h cached audit data). We use
-  // stale-while-error so that if the LLM provider is down, we serve the last
-  // good insights rather than failing the request.
-  const INSIGHTS_VERSION = 'v2-2026-07-18';
+  // Insights cache (2h fresh, 24h stale-while-error) — keyed on the audit
+  // cache key + a version tag so we can bust the cache if we change the prompt.
+  //
+  // Why 2h: insights are expensive to regenerate (LLM call + audit data
+  // processing). A 30min TTL meant the user saw the loading skeleton every
+  // time they reopened the audit view, which felt like "the audit is not
+  // caching". 2h matches the audit-data TTL, so insights stay alive as long
+  // as the underlying audit data does.
+  //
+  // Stale-while-error: if the LLM fails AND we have stale insights (up to 24h
+  // old), we serve the stale insights rather than erroring out. KV's
+  // STALE_WINDOW (24h past TTL) keeps them around for this purpose.
+  const INSIGHTS_VERSION = 'v3-2026-07-19';
+  const INSIGHTS_TTL = 2 * 60 * 60;        // 2h fresh
   const insightsKey = await hashKey('channel_insights', INSIGHTS_VERSION, canonicalUrl);
   if (!force) {
     const cached = await cacheRead<any>(env, insightsKey);
@@ -4345,8 +4629,8 @@ app.post('/audit-insights', requireAuth, async (c) => {
   try {
     const insights = await generateAuditInsights(env, audit);
     const generatedAt = new Date().toISOString();
-    // Cache for 2h (was 30min — too short, caused frequent regenerations)
-    await cacheWrite(env, insightsKey, { insights, generatedAt }, 2 * 60 * 60);
+    // Cache for 2h (KV keeps the entry 24h past TTL for stale-while-error)
+    await cacheWrite(env, insightsKey, { insights, generatedAt }, INSIGHTS_TTL);
     return json({
       insights,
       audit: { platform: audit.platform, channelName: audit.channelName, channelHandle: audit.channelHandle, url: canonicalUrl },
@@ -4355,6 +4639,18 @@ app.post('/audit-insights', requireAuth, async (c) => {
     });
   } catch (e: any) {
     console.error('[audit-insights] LLM failed:', e);
+    // Stale-while-error: serve old insights if we have any (up to 24h past TTL)
+    const stale = await cacheReadStale<any>(env, insightsKey);
+    if (stale?.insights) {
+      console.warn('[audit-insights] serving stale insights after LLM failure');
+      return json({
+        insights: stale.insights,
+        audit: { platform: audit.platform, channelName: audit.channelName, channelHandle: audit.channelHandle, url: canonicalUrl },
+        cached: true,
+        stale: true,
+        generatedAt: stale.generatedAt,
+      });
+    }
     return json({
       error: `Failed to generate insights: ${e?.message || 'unknown error'}`,
       audit: { platform: audit.platform, channelName: audit.channelName, channelHandle: audit.channelHandle, url: canonicalUrl },
@@ -6515,10 +6811,10 @@ app.get('/daily-insight', requireAuth, async (c) => {
   const auditInsights = await Promise.all(
     (recentAudits || []).slice(0, 3).map(async (entry: any) => {
       try {
-        const auditKey = await hashKey('channel_audit_v1', entry.url);
+        const auditKey = await hashKey('channel_audit_v2', entry.url);
         const auditCached = await cacheRead<any>(env, auditKey);
         const audit = auditCached?.data;
-        const insightsKey = await hashKey('channel_insights', 'v2-2026-07-18', entry.url);
+        const insightsKey = await hashKey('channel_insights', 'v3-2026-07-19', entry.url);
         const insightsCached = await cacheRead<any>(env, insightsKey);
         return {
           channelName: entry.channel_name || entry.channelName,

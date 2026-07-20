@@ -9,6 +9,7 @@ import { RecentAnalysesWidget } from '@/components/RecentAnalysesWidget';
 import { TrendingVideosSection } from '@/components/TrendingVideosSection';
 import { TrendingViewsChart } from '@/components/TrendingViewsChart';
 import { ChannelAuditsGrid } from '@/components/ChannelAuditsGrid';
+import { GamingFeedWidget } from '@/components/GamingFeedWidget';
 import { ToolsGuide } from '@/components/ToolsGuide';
 import { DailyInsightCard } from '@/components/DailyInsightCard';
 import { setPendingAnalysisId } from '@/lib/navState';
@@ -80,6 +81,20 @@ const FEATURE_CARDS: FeatureCard[] = [
 ];
 
 export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: DashboardPageProps) {
+  // Read the user's primary game from onboarding localStorage so the gaming
+  // feed widget can show news/tweets/reddit for THEIR game (not generic "gaming").
+  // Falls back to "gaming" if onboarding wasn't completed yet.
+  const primaryGame = (() => {
+    try {
+      const raw = localStorage.getItem(`clipai_onboarding_${user?.email ?? 'anon'}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.primaryGame) return parsed.primaryGame;
+      }
+    } catch {}
+    return undefined;
+  })();
+
   return (
     <div className="min-h-screen pt-28 pb-12 px-4 sm:px-6 lg:px-8 xl:px-12">
       <div className="max-w-7xl mx-auto">
@@ -158,7 +173,12 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
 
         {/* ── Trending Gaming Videos ── */}
         <div className="mb-10">
-          <TrendingVideosSection />
+          <TrendingVideosSection game={primaryGame} />
+        </div>
+
+        {/* ── Gaming Feed: official news + dev tweets + reddit (enrichment) ── */}
+        <div className="mb-10">
+          <GamingFeedWidget game={primaryGame} />
         </div>
 
         {/* ── AI Tools Grid ──
