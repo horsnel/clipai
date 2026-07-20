@@ -38,26 +38,14 @@ function handleImageError(e: React.SyntheticEvent<HTMLImageElement>) {
 
 export function LandingPage({ onNavigate }: LandingPageProps) {
   const heroRef = useRef<HTMLDivElement>(null);
-  const phoneRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLHeadingElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Animate hero elements on load
     const animateHero = () => {
-      const phone = phoneRef.current;
       const headline = headlineRef.current;
       const cards = cardsRef.current;
-
-      if (phone) {
-        phone.style.opacity = '0';
-        phone.style.transform = 'translateY(80px) scale(0.92) rotateX(18deg)';
-        setTimeout(() => {
-          phone.style.transition = 'all 1s cubic bezier(0.33, 1, 0.68, 1)';
-          phone.style.opacity = '1';
-          phone.style.transform = 'translateY(0) scale(1) rotateX(0deg)';
-        }, 100);
-      }
 
       if (headline) {
         const words = headline.querySelectorAll('.word');
@@ -148,32 +136,6 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             </button>
           </div>
 
-          {/* Phone Mockup */}
-          <div 
-            ref={phoneRef}
-            className="relative mx-auto w-full max-w-sm sm:max-w-md lg:max-w-lg perspective-1000 preserve-3d"
-          >
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.02] bg-clip-surface">
-              <img
-                src="/hero-phone.jpg"
-                alt="ClipAI Phone Mockup"
-                className="w-full h-auto"
-                onError={handleImageError}
-              />
-              {/* Overlay gradient */}
-              <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/60 via-transparent to-transparent" />
-              
-              {/* Floating badge */}
-              <div className="absolute top-4 right-4 bg-clip-cyan text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-glow-cyan animate-pulse-glow">
-                <Sparkles className="w-3.5 h-3.5" />
-                AI POWERED
-              </div>
-            </div>
-
-            {/* Decorative elements */}
-            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-3/4 h-8 bg-clip-cyan/20 blur-xl rounded-full" />
-          </div>
-
           {/* Bottom Feature Cards */}
           <div 
             ref={cardsRef}
@@ -210,6 +172,34 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Hero showcase — new portrait image right after hero */}
+      <section className="py-16 lg:py-20 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-clip-cyan/4 rounded-full blur-[130px]" />
+        </div>
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 xl:px-12">
+          <div className="relative max-w-md mx-auto">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.04] bg-clip-surface">
+              <img
+                src="/hero-new.jpg"
+                alt="ClipAI in action — creator workflow on mobile"
+                className="w-full h-auto"
+                onError={handleImageError}
+              />
+              {/* Subtle overlay gradient for legibility */}
+              <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/40 via-transparent to-transparent pointer-events-none" />
+              {/* Badge */}
+              <div className="absolute top-4 right-4 bg-clip-amber text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-glow-amber animate-pulse-glow">
+                <Flame className="w-3.5 h-3.5" />
+                VIRAL
+              </div>
+            </div>
+            {/* Glow under */}
+            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-10 bg-clip-amber/15 blur-2xl rounded-full pointer-events-none" />
           </div>
         </div>
       </section>
@@ -374,8 +364,9 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             </div>
           </div>
 
-          {/* Testimonial */}
-          <div className="max-w-3xl mx-auto">
+          {/* Testimonials — 2 creator cards */}
+          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Existing Tobi testimonial */}
             <div className="card-glass p-8 lg:p-10 relative">
               <div className="absolute -top-4 left-8 text-6xl text-clip-cyan/20 font-serif">"</div>
               <blockquote className="text-clip-text text-lg lg:text-xl leading-relaxed mb-6 relative z-10">
@@ -394,6 +385,29 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </div>
                 <div className="flex-shrink-0 w-full sm:w-auto sm:ml-auto">
                   <span className="hype-badge-gold inline-block">98 HYPE</span>
+                </div>
+              </div>
+            </div>
+
+            {/* New creator testimonial — uses avatar-new.jpg */}
+            <div className="card-glass p-8 lg:p-10 relative">
+              <div className="absolute -top-4 left-8 text-6xl text-clip-amber/20 font-serif">"</div>
+              <blockquote className="text-clip-text text-lg lg:text-xl leading-relaxed mb-6 relative z-10">
+                I was grinding for months with no traction. One Deep Analysis told me my hook was buried at 0:18 — moved it to 0:02 and the next clip did 220K in 48 hours. ClipAI just gets the algorithm.
+              </blockquote>
+              <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+                <img
+                  src="/avatar-new.jpg"
+                  alt="Maya"
+                  className="w-12 h-12 rounded-xl object-cover border border-white/[0.02] flex-shrink-0 bg-clip-surface"
+                  onError={handleImageError}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-display font-semibold text-clip-text">Maya</p>
+                  <p className="text-clip-muted text-sm break-words">Valorant Creator · 145K followers</p>
+                </div>
+                <div className="flex-shrink-0 w-full sm:w-auto sm:ml-auto">
+                  <span className="hype-badge inline-block">91 HYPE</span>
                 </div>
               </div>
             </div>
@@ -463,6 +477,79 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Wide gameplay showcase — new landscape image before CTA */}
+      <section className="py-20 lg:py-28 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/2 right-1/3 w-96 h-96 bg-clip-amber/4 rounded-full blur-[120px]" />
+          <div className="absolute bottom-1/4 left-1/4 w-80 h-80 bg-clip-cyan/4 rounded-full blur-[100px]" />
+        </div>
+
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 xl:px-12">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-10">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/10 border border-clip-cyan/20 px-3 py-1 rounded-full mb-4">
+                <Gamepad2 className="w-3.5 h-3.5" /> Built for the clutch
+              </span>
+              <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-4 leading-tight">
+                Every play. <span className="gradient-text">Every angle.</span> Every output.
+              </h2>
+              <p className="text-clip-muted text-base sm:text-lg max-w-2xl mx-auto">
+                Drop a clip from any shooter, MOBA, or sandbox. ClipAI recognises the game, the moment, and the meta — then ships 14 viral strategies tuned to that exact play.
+              </p>
+            </div>
+
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.04] bg-clip-surface">
+              <img
+                src="/gameplay-new.jpg"
+                alt="Clutch gameplay moment analyzed by ClipAI"
+                className="w-full h-auto"
+                onError={handleImageError}
+              />
+              {/* Cinematic gradient overlays */}
+              <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/80 via-clip-dark/10 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-r from-clip-dark/40 via-transparent to-clip-dark/40 pointer-events-none" />
+
+              {/* Floating analysis chips */}
+              <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+                <span className="bg-clip-surface/90 backdrop-blur-sm text-clip-cyan text-xs font-bold px-3 py-1.5 rounded-full border border-clip-cyan/30 flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3" /> HOOK SCORE 94
+                </span>
+                <span className="bg-clip-surface/90 backdrop-blur-sm text-clip-amber text-xs font-bold px-3 py-1.5 rounded-full border border-clip-amber/30 flex items-center gap-1.5">
+                  <Flame className="w-3 h-3" /> TRENDING +340%
+                </span>
+              </div>
+
+              {/* Bottom caption strip */}
+              <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6">
+                <div className="bg-clip-dark/85 backdrop-blur-md rounded-2xl p-4 sm:p-5 border border-white/[0.04]">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-clip-cyan to-clip-violet flex items-center justify-center flex-shrink-0">
+                        <Zap className="w-5 h-5 text-black" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-display font-semibold text-clip-text text-sm sm:text-base truncate">Viral Forge analysis ready</p>
+                        <p className="text-clip-muted text-xs truncate">14 outputs · 1.2s · game detected: Valorant</p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => onNavigate('auth')}
+                      className="btn-primary flex items-center gap-2 flex-shrink-0"
+                    >
+                      Try It Free
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Glow under */}
+            <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-2/3 h-12 bg-clip-cyan/15 blur-3xl rounded-full pointer-events-none" />
           </div>
         </div>
       </section>
