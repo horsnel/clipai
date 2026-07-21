@@ -185,8 +185,8 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <div className="relative max-w-md mx-auto">
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.04] bg-clip-surface">
               <img
-                src="/marketing-hero.png"
-                alt="ClipAI in action — creator workflow on mobile"
+                src="/marketing-phone.png"
+                alt="ClipAI mobile app — creator workflow in action"
                 className="w-full h-auto"
                 onError={handleImageError}
               />
@@ -217,7 +217,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <div className="relative max-w-[320px] mx-auto lg:mx-0">
                 <div className="relative rounded-[2.2rem] overflow-hidden shadow-2xl border border-white/[0.06] bg-clip-dark">
                   <img
-                    src="/marketing-phone.png"
+                    src="/marketing-hero.png"
                     alt="ClipAI mobile app — creator dashboard in action"
                     className="w-full h-auto"
                     onError={handleImageError}
