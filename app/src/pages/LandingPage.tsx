@@ -119,7 +119,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </p>
 
           {/* CTAs */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <Button
               onClick={() => onNavigate('auth')}
               className="btn-primary text-base px-8 py-4 flex items-center gap-2"
@@ -134,6 +134,27 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <Play className="w-5 h-5" />
               See How It Works
             </button>
+          </div>
+
+          {/* Hero image — directly under "See How It Works" CTA */}
+          <div className="relative max-w-md mx-auto mb-10 mt-4">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.04] bg-clip-surface">
+              <img
+                src="/marketing-phone.png"
+                alt="ClipAI mobile app — creator workflow in action"
+                className="w-full h-auto"
+                onError={handleImageError}
+              />
+              {/* Subtle overlay gradient for legibility */}
+              <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/40 via-transparent to-transparent pointer-events-none" />
+              {/* Badge */}
+              <div className="absolute top-4 right-4 bg-clip-amber text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-glow-amber animate-pulse-glow">
+                <Flame className="w-3.5 h-3.5" />
+                VIRAL
+              </div>
+            </div>
+            {/* Glow under */}
+            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-10 bg-clip-amber/15 blur-2xl rounded-full pointer-events-none" />
           </div>
 
           {/* Bottom Feature Cards */}
@@ -172,34 +193,6 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Hero showcase — new portrait image right after hero */}
-      <section className="py-16 lg:py-20 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-clip-cyan/4 rounded-full blur-[130px]" />
-        </div>
-        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 xl:px-12">
-          <div className="relative max-w-md mx-auto">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.04] bg-clip-surface">
-              <img
-                src="/marketing-phone.png"
-                alt="ClipAI mobile app — creator workflow in action"
-                className="w-full h-auto"
-                onError={handleImageError}
-              />
-              {/* Subtle overlay gradient for legibility */}
-              <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/40 via-transparent to-transparent pointer-events-none" />
-              {/* Badge */}
-              <div className="absolute top-4 right-4 bg-clip-amber text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-glow-amber animate-pulse-glow">
-                <Flame className="w-3.5 h-3.5" />
-                VIRAL
-              </div>
-            </div>
-            {/* Glow under */}
-            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-10 bg-clip-amber/15 blur-2xl rounded-full pointer-events-none" />
           </div>
         </div>
       </section>
