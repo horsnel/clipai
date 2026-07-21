@@ -32,7 +32,7 @@ function handleImageError(e: React.SyntheticEvent<HTMLImageElement>) {
   parent.classList.add('flex', 'items-center', 'justify-center', 'min-h-[200px]');
   const placeholder = document.createElement('div');
   placeholder.className = 'flex flex-col items-center gap-2 opacity-50';
-  placeholder.innerHTML = '<svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="92" height="92" rx="24" fill="#22F0FF"/><path d="M 32 26 L 32 74 L 76 50 Z" fill="#0A0A0A"/></svg><span class="text-[10px] text-clip-muted uppercase tracking-wider">ClipAI</span>';
+  placeholder.innerHTML = '<svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="92" height="92" rx="24" fill="#00FFFF"/><path d="M 32 26 L 32 74 L 76 50 Z" fill="#0A0A0A"/></svg><span class="text-[10px] text-clip-muted uppercase tracking-wider">ClipAI</span>';
   parent.appendChild(placeholder);
 }
 

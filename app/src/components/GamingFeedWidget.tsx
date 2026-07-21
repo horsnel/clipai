@@ -265,7 +265,7 @@ export function GamingFeedWidget({ game }: GamingFeedWidgetProps) {
       {/* Footer hint */}
       {!loading && !error && feed && (
         <p className="text-[10px] text-clip-muted/60 mt-3 text-center">
-          Aggregated from {feed.news.length + feed.devTweets.length + feed.redditPosts.length} sources · Cached for 2h
+          Aggregated from {feed.news.length + feed.devTweets.length + feed.redditPosts.length} sources
         </p>
       )}
     </section>

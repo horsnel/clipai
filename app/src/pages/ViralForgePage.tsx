@@ -307,7 +307,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             <button key={t.key} onClick={() => { setActiveTool(t.key); setTitles([]); setCaptions([]); setHashtags([]); setHooks([]); }}
               className={`p-4 rounded-xl border text-left transition-all ${
                 activeTool === t.key
-                  ? 'border-clip-cyan bg-clip-cyan/10 shadow-[0_0_16px_rgba(34, 240, 255,0.15)]'
+                  ? 'border-clip-cyan bg-clip-cyan/10 shadow-[0_0_16px_rgba(0, 255, 255,0.15)]'
                   : 'border-white/[0.06] bg-clip-surface hover:border-clip-cyan/40'
               }`}>
               <t.icon className={`w-5 h-5 mb-2 ${activeTool === t.key ? 'text-clip-cyan' : 'text-clip-icon'}`} />
@@ -346,7 +346,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                       {GAMES.map(g => (
                         <button key={g} onClick={() => setSelectedGame(g)}
                           className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                            selectedGame === g ? 'bg-clip-cyan text-black font-bold shadow-[0_0_10px_rgba(34, 240, 255,0.3)]' : 'bg-clip-surface text-clip-muted border border-white/[0.08] hover:text-clip-text'
+                            selectedGame === g ? 'bg-clip-cyan text-black font-bold shadow-[0_0_10px_rgba(0, 255, 255,0.3)]' : 'bg-clip-surface text-clip-muted border border-white/[0.08] hover:text-clip-text'
                           }`}>{g}</button>
                       ))}
                     </div>
@@ -379,7 +379,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
                       {GAMES.map(g => (
                         <button key={g} onClick={() => setSelectedGame(g)}
                           className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                            selectedGame === g ? 'bg-clip-cyan text-black font-bold shadow-[0_0_10px_rgba(34, 240, 255,0.3)]' : 'bg-clip-surface text-clip-muted border border-white/[0.08] hover:text-clip-text'
+                            selectedGame === g ? 'bg-clip-cyan text-black font-bold shadow-[0_0_10px_rgba(0, 255, 255,0.3)]' : 'bg-clip-surface text-clip-muted border border-white/[0.08] hover:text-clip-text'
                           }`}>{g}</button>
                       ))}
                     </div>

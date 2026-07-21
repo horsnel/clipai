@@ -119,7 +119,7 @@ export function DailyInsightCard({ onNavigate }: DailyInsightCardProps) {
       aria-label="Today's AI insight"
     >
       <div
-        className="relative w-full max-w-lg card-glass rounded-2xl overflow-hidden border-clip-cyan/30 shadow-[0_0_40px_rgba(34, 240, 255,0.15)]"
+        className="relative w-full max-w-lg card-glass rounded-2xl overflow-hidden border-clip-cyan/30 shadow-[0_0_40px_rgba(0, 255, 255,0.15)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top accent bar */}

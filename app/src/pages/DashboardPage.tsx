@@ -117,7 +117,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
           <div className={`card-glass p-5 sm:p-6 relative overflow-hidden group hover:border-clip-cyan/30 transition-all ${
             (user?.credits ?? 0) <= 5
               ? 'border-clip-amber/40 bg-clip-amber/5 shadow-[0_0_24px_rgba(255,149,0,0.10)]'
-              : 'border-clip-cyan/40 bg-clip-cyan/5 shadow-[0_0_24px_rgba(34, 240, 255,0.10)]'
+              : 'border-clip-cyan/40 bg-clip-cyan/5 shadow-[0_0_24px_rgba(0, 255, 255,0.10)]'
           }`}>
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-4 min-w-0">
@@ -198,7 +198,7 @@ export function DashboardPage({ user, onNavigate, onLogout: _onLogout }: Dashboa
                 className={`relative text-left rounded-xl p-4 sm:p-5 bg-clip-surface/80 border border-white/[0.10] transition-all duration-300 group flex flex-col gap-3 min-h-[150px] sm:min-h-[168px] ${
                   card.locked
                     ? 'opacity-60 cursor-default'
-                    : 'hover:-translate-y-1 hover:border-clip-cyan/50 hover:shadow-[0_0_16px_rgba(34, 240, 255,0.10)] cursor-pointer'
+                    : 'hover:-translate-y-1 hover:border-clip-cyan/50 hover:shadow-[0_0_16px_rgba(0, 255, 255,0.10)] cursor-pointer'
                 }`}
               >
                 {/* Badge — top right */}

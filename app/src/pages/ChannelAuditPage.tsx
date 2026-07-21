@@ -305,7 +305,7 @@ function AuditResultRow({ entry, onRemove, onRetry }: {
           <div
             className="absolute inset-0"
             style={{
-              background: 'linear-gradient(110deg, transparent 30%, rgba(34, 240, 255, 0.10) 50%, transparent 80%)',
+              background: 'linear-gradient(110deg, transparent 30%, rgba(0, 255, 255, 0.10) 50%, transparent 80%)',
               backgroundSize: '200% 100%',
               animation: 'clipai-shimmer 2.4s ease-in-out infinite',
             }}

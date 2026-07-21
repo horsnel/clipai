@@ -80,6 +80,9 @@ interface Env {
   REDDIT_CLIENT_SECRET?: string;    // paired with REDDIT_CLIENT_ID. App-only OAuth → oauth.reddit.com (60 req/min)
   LAMATOK_API_KEY?: string;         // (deprecated) LamaTok RapidAPI — kept for backward compat
   KONBINI_API_KEY?: string;         // (deprecated) KonbiniAPI RapidAPI — kept for backward compat
+  // Twitch (optional — powers Twitch clips in /trending-videos when configured)
+  TWITCH_CLIENT_ID?: string;
+  TWITCH_CLIENT_SECRET?: string;
   // Paystack
   PAYSTACK_SECRET_KEY: string;
   // Worker
@@ -848,7 +851,7 @@ const inflight: Map<string, Promise<any>> =
   (globalThis as any).__clipaiInflight ?? new Map();
 (globalThis as any).__clipaiInflight = inflight;
 
-const STALE_WINDOW = 24 * 60 * 60; // 24h stale fallback window (KV TTL)
+const STALE_WINDOW = 7 * 24 * 60 * 60; // 7d stale fallback window (KV TTL) — keeps cached audits alive between visits
 
 async function cacheRead<T>(env: Env, key: string): Promise<{ data: T; fresh: boolean } | null> {
   // L1
@@ -1144,6 +1147,12 @@ app.get('/health', async (c) => {
     detail: (env.REDDIT_CLIENT_ID && env.REDDIT_CLIENT_SECRET)
       ? 'Reddit audits via oauth.reddit.com (60 req/min)'
       : 'Reddit audits fall back to www.reddit.com (rate-limited) → Pullpush → RSS',
+  };
+  checks.twitch = {
+    status: (env.TWITCH_CLIENT_ID && env.TWITCH_CLIENT_SECRET) ? 'ok' : 'unbound',
+    detail: (env.TWITCH_CLIENT_ID && env.TWITCH_CLIENT_SECRET)
+      ? 'Twitch clips enabled in /trending-videos (Helix API, app token cached 30d)'
+      : 'Twitch clips disabled — set TWITCH_CLIENT_ID + TWITCH_CLIENT_SECRET to enable',
   };
 
   // Paystack
@@ -1794,6 +1803,114 @@ async function ytTrending(env: Env, game: string, max = 10): Promise<any[]> {
   }
 }
 
+// ─── Twitch clips ────────────────────────────────────────────────────────────
+// Twitch API requires an app access token (OAuth client_credentials). We fetch
+// it once, cache it in KV for 30 days (Twitch tokens last 60 days, but we
+// refresh early to be safe), then use it to call the /clips endpoint.
+//
+// Game name → Twitch game_id lookup uses /games?name=... (cached separately).
+// The /clips endpoint returns up to 100 clips sorted by views in the last day.
+
+const TWITCH_TOKEN_KEY = 'twitch_app_token';
+const TWITCH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days (Twitch tokens last 60d)
+const TWITCH_GAME_KEY_PREFIX = 'twitch_game_id:';
+
+async function getTwitchAppToken(env: Env): Promise<string | null> {
+  if (!env.TWITCH_CLIENT_ID || !env.TWITCH_CLIENT_SECRET) return null;
+  // Check cache first
+  const cached = await cacheRead<string>(env, TWITCH_TOKEN_KEY);
+  if (cached?.data && cached.fresh) return cached.data;
+  // Fetch a fresh token
+  try {
+    const r = await fetch(
+      `https://id.twitch.tv/oauth2/token?client_id=${env.TWITCH_CLIENT_ID}&client_secret=${env.TWITCH_CLIENT_SECRET}&grant_type=client_credentials`,
+      { method: 'POST' },
+    );
+    if (!r.ok) {
+      console.warn('[twitch] token fetch failed:', r.status, await r.text().catch(() => ''));
+      return null;
+    }
+    const data = (await r.json()) as any;
+    const token = data?.access_token;
+    if (typeof token !== 'string' || !token) return null;
+    await cacheWrite(env, TWITCH_TOKEN_KEY, token, TWITCH_TOKEN_TTL);
+    return token;
+  } catch (e: any) {
+    console.warn('[twitch] token fetch threw:', e?.message);
+    return null;
+  }
+}
+
+// Map our internal game label (lowercase, e.g. "valorant") → Twitch game_id.
+// Cached in KV for 7 days (game IDs don't change).
+async function getTwitchGameId(env: Env, token: string, game: string): Promise<string | null> {
+  if (!env.TWITCH_CLIENT_ID) return null;
+  const normalized = (game || 'gaming').toLowerCase().trim();
+  const cacheKey = TWITCH_GAME_KEY_PREFIX + normalized;
+  const cached = await cacheRead<string>(env, cacheKey);
+  if (cached?.data) return cached.data; // fresh OR stale — game IDs don't change
+  try {
+    const r = await fetch(
+      `https://api.twitch.tv/helix/games?name=${encodeURIComponent(game)}`,
+      {
+        headers: {
+          'Client-Id': env.TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${token}`,
+        },
+      },
+    );
+    if (!r.ok) {
+      console.warn('[twitch] game lookup failed:', r.status);
+      return null;
+    }
+    const data = (await r.json()) as any;
+    const gameId = data?.data?.[0]?.id;
+    if (typeof gameId !== 'string' || !gameId) return null;
+    await cacheWrite(env, cacheKey, gameId, 7 * 24 * 60 * 60);
+    return gameId;
+  } catch (e: any) {
+    console.warn('[twitch] game lookup threw:', e?.message);
+    return null;
+  }
+}
+
+// Fetch top Twitch clips for a game in the last 24h.
+// Returns at most `max` clips sorted by view_count (descending).
+async function fetchTwitchClips(env: Env, game: string, max = 4): Promise<any[]> {
+  if (!env.TWITCH_CLIENT_ID || !env.TWITCH_CLIENT_SECRET) return [];
+  const token = await getTwitchAppToken(env);
+  if (!token) return [];
+  const gameId = await getTwitchGameId(env, token, game);
+  if (!gameId) return [];
+  // Twitch clips endpoint — started_at / ended_at required (ISO 8601).
+  // We pull the last 24h. Max 100 clips per page; we take the first `max`.
+  const startedAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  try {
+    const r = await fetch(
+      `https://api.twitch.tv/helix/clips?game_id=${gameId}&first=${Math.min(max, 100)}&started_at=${startedAt}`,
+      {
+        headers: {
+          'Client-Id': env.TWITCH_CLIENT_ID,
+          'Authorization': `Bearer ${token}`,
+        },
+      },
+    );
+    if (!r.ok) {
+      console.warn('[twitch] clips fetch failed:', r.status);
+      return [];
+    }
+    const data = (await r.json()) as any;
+    const clips = Array.isArray(data?.data) ? data.data : [];
+    // Sort by view_count descending (Twitch usually returns this way already)
+    return clips
+      .sort((a: any, b: any) => (Number(b.view_count) || 0) - (Number(a.view_count) || 0))
+      .slice(0, max);
+  } catch (e: any) {
+    console.warn('[twitch] clips fetch threw:', e?.message);
+    return [];
+  }
+}
+
 async function redditTop(env: Env, game: string, limit = 8): Promise<any[]> {
   // Reddit's `.json` endpoint blocks datacenter IPs with 403. The `.rss`
   // (Atom) feed is more permissive and works keyless from Cloudflare Workers.
@@ -2165,6 +2282,10 @@ async function serpInstagram(env: Env, game: string, limit = 4): Promise<any[]> 
 // Sourced from each publisher's verified primary account. NULL = use generic
 // gaming search (no official dev account or game not in the map).
 const GAME_DEV_TWITTERS: Record<string, string[]> = {
+  // Fallback when no specific game is selected — surfaces general gaming news
+  // accounts so the dashboard feed isn't empty for users who skipped onboarding.
+  gaming:          ['@ign', '@gameinformer', '@gamespot'],
+  all:             ['@ign', '@gameinformer', '@gamespot'],
   valorant:        ['@valorant', '@playvalorant'],
   'call of duty':  ['@callofduty'],
   warzone:         ['@callofduty'],
@@ -2213,6 +2334,7 @@ const GAME_DEV_TWITTERS: Record<string, string[]> = {
 const GAMING_NEWS_DOMAINS = new Set([
   // Major gaming journalism
   'ign.com', 'www.ign.com',
+  'gameinformer.com', 'www.gameinformer.com',
   'polygon.com', 'www.polygon.com',
   'eurogamer.net', 'www.eurogamer.net',
   'kotaku.com', 'www.kotaku.com',
@@ -2266,8 +2388,12 @@ const GAMING_NEWS_DOMAINS = new Set([
  *  articles that are still worth surfacing on the dashboard. */
 async function fetchGamingNews(env: Env, game: string, limit = 8): Promise<any[]> {
   const gameLabel = (game || 'gaming').toLowerCase();
+  // Generic "gaming" search returns almost nothing from trusted domains because
+  // the query is too broad and Serper surfaces generic listicles that aren't in
+  // GAMING_NEWS_DOMAINS. Use a more specific query for the no-game case that
+  // surfaces actual recent news.
   const q = gameLabel === 'gaming' || gameLabel === 'all'
-    ? 'gaming news patch notes update'
+    ? 'gaming news this week update'
     : `${gameLabel} patch notes news update`;
 
   const filterTrusted = (raw: any[]) => raw.filter((r: any) => {
@@ -2309,6 +2435,21 @@ async function fetchGamingNews(env: Env, game: string, limit = 8): Promise<any[]
     seen.add(r.link);
     return true;
   });
+  // For the generic "gaming" case, if we still have < 3 results, fall back to
+  // a broader query without the "this week" suffix — surfaces more IGN/Polygon
+  // evergreen coverage.
+  if (merged.length < 3 && (gameLabel === 'gaming' || gameLabel === 'all')) {
+    try {
+      const broadRaw = await serperSearch(env, 'best gaming news IGN Polygon', limit * 4);
+      const broadFiltered = filterTrusted(broadRaw);
+      for (const r of broadFiltered) {
+        if (seen.has(r.link)) continue;
+        seen.add(r.link);
+        merged.push(r);
+        if (merged.length >= limit) break;
+      }
+    } catch {}
+  }
   return mapToNews(merged);
 }
 
@@ -4135,12 +4276,14 @@ app.get('/trending-videos', async (c) => {
 
   const cacheKey = `trending_videos_v3:${gameLabel.toLowerCase()}`;
   const data = await withCache(env, cacheKey, 6 * 60 * 60, async () => {
-    // Fetch from all 4 platforms in parallel
-    const [ytItems, ttItems, xItems, igItems] = await Promise.all([
+    // Fetch from all 5 platforms in parallel (Twitch added — uses Twitch API
+    // when TWITCH_CLIENT_ID + TWITCH_CLIENT_SECRET are configured, no-op otherwise)
+    const [ytItems, ttItems, xItems, igItems, twitchClips] = await Promise.all([
       ytTrending(env, game || 'gaming', 4),
       serpTiktok(env, game || 'gaming', 3),
       serpTwitter(env, game || 'gaming', 2),
       serpInstagram(env, game || 'gaming', 2),
+      fetchTwitchClips(env, game || 'gaming', 3),
     ]);
 
     // ── Map YouTube → video objects (with viewCount) ──
@@ -4210,7 +4353,29 @@ app.get('/trending-videos', async (c) => {
       };
     }).filter((v: any) => v.url);
 
-    const videos = [...ytVideos, ...ttVideos, ...xVideos, ...igVideos];
+    // ── Map Twitch clips → video objects ──
+    // Twitch clip payload has: id, title, url, broadcaster_name, thumbnail_url,
+    // view_count, created_at, duration.
+    const twitchVideos = twitchClips.map((clip: any) => {
+      const clipId = clip.id || '';
+      const url = clip.url || (clipId ? `https://clips.twitch.tv/${clipId}` : '');
+      // thumbnail_url is a templated URL with %{width}/%{height} — replace with 480x270
+      const thumb = typeof clip.thumbnail_url === 'string'
+        ? clip.thumbnail_url.replace('%{width}', '480').replace('%{height}', '270')
+        : '';
+      return {
+        id: `tw_${clipId}`,
+        title: clip.title || 'Twitch clip',
+        channel: clip.broadcaster_name || 'Twitch streamer',
+        thumbnail: thumb,
+        url,
+        platform: 'twitch',
+        publishedAt: clip.created_at || '',
+        viewCount: Number(clip.view_count) || 0,
+      };
+    }).filter((v: any) => v.id && v.url);
+
+    const videos = [...ytVideos, ...ttVideos, ...xVideos, ...igVideos, ...twitchVideos];
 
     if (!videos.length) {
       return { videos: [], generatedAt: new Date().toISOString(), game: gameLabel };
@@ -4222,7 +4387,7 @@ app.get('/trending-videos', async (c) => {
     ).join('\n');
 
     const system = 'You are a viral gaming content strategist for African creators. Return ONLY valid JSON.';
-    const prompt = `For each of these ${videos.length} trending gaming videos across multiple platforms (YouTube, TikTok, X/Twitter, Instagram Reels), generate a ready-to-post copy pack.
+    const prompt = `For each of these ${videos.length} trending gaming videos across multiple platforms (YouTube, TikTok, X/Twitter, Instagram Reels, Twitch), generate a ready-to-post copy pack.
 
 Videos:
 ${videoList}
@@ -4248,6 +4413,7 @@ Rules:
 - For TikTok packs, include #tiktokgaming.
 - For X packs, include #gamingtwitter.
 - For Instagram packs, include #instagramreels and #reelsgaming.
+- For Twitch packs, include #twitchclips and #twitchgaming.
 - Titles should feel authentic, not corporate. Optimise for clicks on the respective platform.
 - Captions should reference the gaming moment / Nigerian-African creator culture where natural.
 - Return ONLY the JSON, no markdown fences.`;
@@ -4290,23 +4456,55 @@ app.get('/gaming-feed', async (c) => {
   const game = (c.req.query('game') || 'gaming').trim().toLowerCase();
   const gameLabel = game || 'gaming';
 
-  const cacheKey = `gaming_feed_v1:${gameLabel}`;
-  const data = await withCache(env, cacheKey, 2 * 60 * 60, async () => {
+  // ─── Stale-while-revalidate ────────────────────────────────────────────────
+  // Cache TTL is 1h (fresh), but the dashboard should NEVER make the user wait
+  // for news to load — so when the cache is stale (between 1h and 7d old), we
+  // return the stale data immediately and trigger a background refresh via
+  // executionCtx.waitUntil(). The next dashboard refresh will have fresh data.
+  //
+  // This makes the feed feel like it's "always updating" — users see new
+  // articles appear within ~2 page loads instead of having to wait for the
+  // full 1h TTL to expire AND a fresh fetch to complete.
+  const cacheKey = `gaming_feed_v2:${gameLabel}`;
+  const FRESH_TTL = 60 * 60;             // 1h fresh
+  const doRefresh = async () => {
     const [news, devTweets, redditPosts] = await Promise.all([
       fetchGamingNews(env, gameLabel, 8),
       fetchDevTweets(env, gameLabel, 6),
       fetchRedditPosts(env, gameLabel, 5),
     ]);
-    return {
+    const data = {
       news,
       devTweets,
       redditPosts,
       game: gameLabel,
       generatedAt: new Date().toISOString(),
     };
-  });
+    try {
+      await cacheWrite(env, cacheKey, data, FRESH_TTL);
+    } catch (e: any) {
+      console.warn('[gaming-feed] cacheWrite failed:', e?.message);
+    }
+    return data;
+  };
 
-  return json(data);
+  const cached = await cacheRead<any>(env, cacheKey);
+  if (cached?.fresh) {
+    // Fresh hit — return immediately
+    return json(cached.data);
+  }
+  if (cached?.data) {
+    // Stale — return immediately, refresh in background
+    try {
+      c.executionCtx.waitUntil(doRefresh());
+    } catch {
+      // Test environments without executionCtx — fire-and-forget
+      doRefresh();
+    }
+    return json(cached.data);
+  }
+  // Cold cache — block on first fetch
+  return json(await doRefresh());
 });
 
 
@@ -4473,6 +4671,20 @@ app.get('/channel-audits', requireAuth, async (c) => {
   const env = c.env as Env;
   const userId = c.get('userId') as string;
   const audits = await listChannelAudits(env, userId);
+  // ─── Cold-cache recovery ─────────────────────────────────────────────────
+  // KV entries (audit data + 24h stale window) expire ~26h after the last
+  // refresh. If the user hasn't visited the dashboard in that window, EVERY
+  // saved audit returns zeroed-out stats — which the user perceives as
+  // "the audit is not caching anymore".
+  //
+  // Fix: when the cache is cold, do a SYNCHRONOUS refresh for the first audit
+  // (so the user sees at least one populated card on THIS load), and use
+  // executionCtx.waitUntil() for the rest (so they get populated on the next
+  // refresh without delaying this response). Previously the background IIFE
+  // had no waitUntil, so the Cloudflare runtime killed it the moment the
+  // response was returned — the refresh never completed.
+  const SYNCHRONOUS_REFRESH_LIMIT = 1;
+  let refreshIndex = 0;
   const fullAudits = await Promise.all(
     audits.map(async (entry: any) => {
       try {
@@ -4481,27 +4693,43 @@ app.get('/channel-audits', requireAuth, async (c) => {
         if (cached?.data) {
           return { ...cached.data, url: entry.url };
         }
-        // Cache is completely cold (no fresh OR stale entry). Fire a
-        // background refresh so the next dashboard refresh will have the
-        // full audit data. We don't await this — return metadata immediately
-        // so the listing stays fast.
-        try {
-          const refreshUrl = entry.url;
-          const refreshPlatform = entry.platform;
-          // Use ctx.waitUntil pattern: kick off the promise but don't block.
-          (async () => {
-            try {
-              const fresh = await auditChannel(env, refreshUrl, refreshPlatform);
-              if (fresh && !fresh.error) {
-                const subs = Number(fresh?.statistics?.subscribers || 0);
-                const ttl = subs >= 1_000_000 ? 12 * 60 * 60 : 2 * 60 * 60;
-                await cacheWrite(env, key, fresh, ttl);
-              }
-            } catch (e: any) {
-              console.warn('[channel-audits] background refresh failed:', e?.message);
+        // Cache is completely cold (no fresh OR stale entry). Refresh this
+        // audit so the user sees real data instead of zeros.
+        const refreshUrl = entry.url;
+        const refreshPlatform = entry.platform;
+        const doRefresh = async () => {
+          try {
+            const fresh = await auditChannel(env, refreshUrl, refreshPlatform);
+            if (fresh && !fresh.error) {
+              const subs = Number(fresh?.statistics?.subscribers || 0);
+              const ttl = subs >= 1_000_000 ? 12 * 60 * 60 : 2 * 60 * 60;
+              await cacheWrite(env, key, fresh, ttl);
             }
-          })();
-        } catch {}
+            return fresh;
+          } catch (e: any) {
+            console.warn('[channel-audits] background refresh failed:', e?.message);
+            return null;
+          }
+        };
+        // First cold audit: block the response so this card shows real data
+        // on this load. Subsequent cold audits: fire-and-forget via waitUntil.
+        if (refreshIndex < SYNCHRONOUS_REFRESH_LIMIT) {
+          refreshIndex++;
+          const fresh = await doRefresh();
+          if (fresh && !fresh.error) {
+            return { ...fresh, url: entry.url };
+          }
+        } else {
+          // Fire-and-forget — but properly registered with the runtime so it
+          // actually completes after the response is sent.
+          try {
+            c.executionCtx.waitUntil(doRefresh());
+          } catch {
+            // executionCtx might not be available in some test contexts —
+            // fall back to fire-and-forget (best effort).
+            doRefresh();
+          }
+        }
       } catch {}
       // Fallback to entry metadata only
       return {

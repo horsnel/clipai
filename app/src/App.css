@@ -7,7 +7,7 @@ html {
 
 /* Custom focus styles */
 *:focus-visible {
-  outline: 2px solid #22F0FF;
+  outline: 2px solid #00FFFF;
   outline-offset: 2px;
 }
 
@@ -19,13 +19,13 @@ html {
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 0 24px rgba(34, 240, 255, 0.45), 0 0 48px rgba(34, 240, 255, 0.2);
+  box-shadow: 0 0 24px rgba(0, 255, 255, 0.45), 0 0 48px rgba(0, 255, 255, 0.2);
 }
 
 .btn-secondary:hover:not(:disabled) {
   transform: translateY(-2px);
-  border-color: rgba(34, 240, 255, 0.4);
-  box-shadow: 0 0 12px rgba(34, 240, 255, 0.15);
+  border-color: rgba(0, 255, 255, 0.4);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.15);
 }
 
 /* Card hover effects — brighter border + subtle cyan glow on hover */
@@ -34,13 +34,13 @@ html {
 }
 
 .card-glass:hover {
-  border-color: rgba(34, 240, 255, 0.18);
-  box-shadow: 0 0 16px rgba(34, 240, 255, 0.06);
+  border-color: rgba(0, 255, 255, 0.18);
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.06);
 }
 
 /* Progress bar styling */
 [data-slot="progress-indicator"] {
-  background: linear-gradient(90deg, #22F0FF, #1F4F7E);
+  background: linear-gradient(90deg, #00FFFF, #1F4F7E);
 }
 
 /* Slider styling */
@@ -49,18 +49,18 @@ html {
 }
 
 [data-slot="slider-range"] {
-  background: linear-gradient(90deg, #22F0FF, #1F4F7E);
+  background: linear-gradient(90deg, #00FFFF, #1F4F7E);
 }
 
 [data-slot="slider-thumb"] {
-  background: #22F0FF;
+  background: #00FFFF;
   border: 2px solid #0A0A0A;
 }
 
 /* Input focus states — brighter glow ring */
 .input-dark:focus {
-  border-color: #22F0FF;
-  box-shadow: 0 0 0 3px rgba(34, 240, 255, 0.18), 0 0 24px rgba(34, 240, 255, 0.2);
+  border-color: #00FFFF;
+  box-shadow: 0 0 0 3px rgba(0, 255, 255, 0.18), 0 0 24px rgba(0, 255, 255, 0.2);
 }
 
 /* Animation utilities */
@@ -131,11 +131,11 @@ html {
 
 /* Loading spinner — restored glow */
 .spinner {
-  border: 2px solid rgba(34, 240, 255, 0.18);
-  border-top-color: #22F0FF;
+  border: 2px solid rgba(0, 255, 255, 0.18);
+  border-top-color: #00FFFF;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
-  box-shadow: 0 0 12px rgba(34, 240, 255, 0.35);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.35);
 }
 
 @keyframes spin {

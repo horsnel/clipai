@@ -55,7 +55,7 @@ module.exports = {
         'clip-dark': '#0A0A0A',
         'clip-surface': '#121212',
         'clip-border': '#2A2A2A',
-        'clip-cyan': '#22F0FF',           // brighter neon teal-cyan — bumped L 45%→56%
+        'clip-cyan': '#00FFFF',           // pure electric cyan — maximum brightness, neon-sign vibes
         'clip-teal': '#5CEDE9',           // brighter teal — bumped saturation+lightness
         'clip-blue': '#62B8F0',           // brighter sky blue — bumped saturation+lightness
         'clip-violet': '#C266F5',         // brighter magenta-violet — bumped L 58%→68%
@@ -80,9 +80,9 @@ module.exports = {
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
         'card': '0 18px 50px rgba(0, 0, 0, 0.45)',
-        // Brand glow — brighter neon teal-cyan halo (#22F0FF = 34,240,255). Max luminosity for pop.
-        'glow-cyan': '0 0 24px rgba(34, 240, 255, 0.65), 0 4px 20px rgba(34, 240, 255, 0.35)',
-        'glow-cyan-sm': '0 0 12px rgba(34, 240, 255, 0.55)',
+        // Brand glow — pure electric cyan halo (#00FFFF = 0,255,255). 3-layer neon glow.
+        'glow-cyan': '0 0 20px rgba(0, 255, 255, 0.6), 0 0 60px rgba(0, 255, 255, 0.35), 0 0 100px rgba(0, 255, 255, 0.18)',
+        'glow-cyan-sm': '0 0 12px rgba(0, 255, 255, 0.6), 0 0 30px rgba(0, 255, 255, 0.3)',
         'glow-amber': '0 0 24px rgba(255, 149, 0, 0.6)',
         'glow-violet': '0 0 24px rgba(194, 102, 245, 0.6), 0 4px 20px rgba(194, 102, 245, 0.3)',
         'glow-live': '0 0 12px rgba(57, 255, 20, 0.5)',
@@ -117,10 +117,10 @@ module.exports = {
           "0%": { width: "0%" },
           "100%": { width: "100%" },
         },
-        // Brand pulse-glow — brighter neon teal-cyan pulse (#22F0FF = 34,240,255)
+        // Brand pulse-glow — pure electric cyan pulse (#00FFFF = 0,255,255)
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 12px rgba(34, 240, 255, 0.65), 0 0 24px rgba(34, 240, 255, 0.35)" },
-          "50%":      { boxShadow: "0 0 20px rgba(34, 240, 255, 0.85), 0 0 40px rgba(34, 240, 255, 0.45)" },
+          "0%, 100%": { boxShadow: "0 0 20px rgba(0, 255, 255, 0.6), 0 0 60px rgba(0, 255, 255, 0.3), 0 0 100px rgba(0, 255, 255, 0.15)" },
+          "50%":      { boxShadow: "0 0 30px rgba(0, 255, 255, 0.8), 0 0 80px rgba(0, 255, 255, 0.45), 0 0 140px rgba(0, 255, 255, 0.25)" },
         },
       },
       animation: {
