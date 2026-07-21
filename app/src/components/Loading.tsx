@@ -6,7 +6,7 @@
  *   2. <SkeletonShimmer />  — skeleton card with branded pulse
  *   3. <ProgressBar />      — slim top-of-screen progress bar (NProgress style)
  *
- * Brand: cyan (#07D2DF) + violet (#AD52D4) on near-black (#08080A).
+ * Brand: cyan (#22F0FF) + violet (#C266F5) on near-black (#08080A).
  */
 
 import { useEffect, useState, useRef } from 'react';
@@ -110,10 +110,10 @@ export function ParticleLoader({
               top: `${p.startY}%`,
               width: `${p.size}px`,
               height: `${p.size}px`,
-              background: p.hue === 'cyan' ? '#07D2DF' : '#AD52D4',
+              background: p.hue === 'cyan' ? '#22F0FF' : '#C266F5',
               boxShadow: p.hue === 'cyan'
-                ? '0 0 8px rgba(7, 210, 223, 0.8), 0 0 16px rgba(7, 210, 223, 0.4)'
-                : '0 0 8px rgba(173, 82, 212, 0.8), 0 0 16px rgba(173, 82, 212, 0.4)',
+                ? '0 0 8px rgba(34, 240, 255, 0.8), 0 0 16px rgba(34, 240, 255, 0.4)'
+                : '0 0 8px rgba(194, 102, 245, 0.8), 0 0 16px rgba(194, 102, 245, 0.4)',
               animation: `clipai-particle-in ${p.duration}ms ease-in ${p.delay}ms infinite`,
             }}
           />
@@ -125,7 +125,7 @@ export function ParticleLoader({
             className="w-6 h-6 rounded-full bg-clip-cyan"
             style={{
               animation: 'clipai-core-pulse 1.5s ease-in-out infinite',
-              boxShadow: '0 0 24px rgba(7, 210, 223, 0.7), 0 0 48px rgba(7, 210, 223, 0.35)',
+              boxShadow: '0 0 24px rgba(34, 240, 255, 0.7), 0 0 48px rgba(34, 240, 255, 0.35)',
             }}
           />
         </div>
@@ -197,7 +197,7 @@ export function SkeletonShimmer({
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'linear-gradient(110deg, transparent 30%, rgba(7, 210, 223, 0.06) 50%, rgba(173, 82, 212,0.06) 60%, transparent 80%)',
+          background: 'linear-gradient(110deg, transparent 30%, rgba(34, 240, 255, 0.06) 50%, rgba(194, 102, 245,0.06) 60%, transparent 80%)',
           backgroundSize: '200% 100%',
           animation: 'clipai-shimmer 2.4s ease-in-out infinite',
         }}
@@ -257,7 +257,7 @@ export function SkeletonGrid({ count = 4 }: { count?: number }) {
             <div
               className="absolute inset-0"
               style={{
-                background: 'linear-gradient(110deg, transparent 30%, rgba(7, 210, 223, 0.06) 50%, rgba(173, 82, 212,0.06) 60%, transparent 80%)',
+                background: 'linear-gradient(110deg, transparent 30%, rgba(34, 240, 255, 0.06) 50%, rgba(194, 102, 245,0.06) 60%, transparent 80%)',
                 backgroundSize: '200% 100%',
                 animation: 'clipai-shimmer 2.4s ease-in-out infinite',
               }}
@@ -304,7 +304,7 @@ export function SkeletonVideoGrid({ count = 6 }: { count?: number }) {
             <div
               className="absolute inset-0"
               style={{
-                background: 'linear-gradient(110deg, transparent 30%, rgba(7, 210, 223, 0.06) 50%, rgba(173, 82, 212,0.06) 60%, transparent 80%)',
+                background: 'linear-gradient(110deg, transparent 30%, rgba(34, 240, 255, 0.06) 50%, rgba(194, 102, 245,0.06) 60%, transparent 80%)',
                 backgroundSize: '200% 100%',
                 animation: 'clipai-shimmer 2.4s ease-in-out infinite',
               }}
@@ -341,7 +341,7 @@ export function SkeletonTable({ count = 5 }: { count?: number }) {
             <div
               className="absolute inset-0"
               style={{
-                background: 'linear-gradient(110deg, transparent 30%, rgba(7, 210, 223, 0.06) 50%, transparent 80%)',
+                background: 'linear-gradient(110deg, transparent 30%, rgba(34, 240, 255, 0.06) 50%, transparent 80%)',
                 backgroundSize: '200% 100%',
                 animation: 'clipai-shimmer 2.4s ease-in-out infinite',
               }}
@@ -396,8 +396,8 @@ export function ProgressBar({ active }: { active: boolean }) {
         className="h-full transition-all duration-300 ease-out"
         style={{
           width: `${width}%`,
-          background: 'linear-gradient(90deg, #07D2DF 0%, #AD52D4 100%)',
-          boxShadow: '0 0 8px #07D2DF',
+          background: 'linear-gradient(90deg, #22F0FF 0%, #C266F5 100%)',
+          boxShadow: '0 0 8px #22F0FF',
         }}
       />
     </div>

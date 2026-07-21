@@ -52,8 +52,8 @@ export function LogoMark({
         {variant === 'gradient' && (
           <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
             {/* Vivid teal-cyan → magenta-violet — matches the punchy reference image palette */}
-            <stop offset="0%" stopColor="#07D2DF" />
-            <stop offset="100%" stopColor="#AD52D4" />
+            <stop offset="0%" stopColor="#22F0FF" />
+            <stop offset="100%" stopColor="#C266F5" />
           </linearGradient>
         )}
         {variant === 'gradient' && (
@@ -67,7 +67,7 @@ export function LogoMark({
       {/* Rounded square container */}
       <rect
         x="4" y="4" width="92" height="92" rx="24" ry="24"
-        fill={variant === 'gradient' ? `url(#${id}-bg)` : variant === 'flat' ? '#07D2DF' : 'currentColor'}
+        fill={variant === 'gradient' ? `url(#${id}-bg)` : variant === 'flat' ? '#22F0FF' : 'currentColor'}
       />
 
       {/* Inner shadow / depth ring (gradient variant only) */}

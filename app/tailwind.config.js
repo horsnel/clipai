@@ -55,14 +55,14 @@ module.exports = {
         'clip-dark': '#0A0A0A',
         'clip-surface': '#121212',
         'clip-border': '#2A2A2A',
-        'clip-cyan': '#07D2DF',           // vivid teal-cyan — matches reference image (was #00E5FF)
-        'clip-teal': '#3FC7C3',           // bright teal — secondary cyan, for duo-tone gradients
-        'clip-blue': '#479AC8',           // bright sky blue — tertiary cool accent
-        'clip-violet': '#AD52D4',         // vivid magenta-violet — gradient end-stop, matches reference
-        'clip-purple': '#6648AC',          // deep saturated purple — alt gradient stop
+        'clip-cyan': '#22F0FF',           // brighter neon teal-cyan — bumped L 45%→56%
+        'clip-teal': '#5CEDE9',           // brighter teal — bumped saturation+lightness
+        'clip-blue': '#62B8F0',           // brighter sky blue — bumped saturation+lightness
+        'clip-violet': '#C266F5',         // brighter magenta-violet — bumped L 58%→68%
+        'clip-purple': '#8262D6',          // brighter deep purple — bumped L 48%→61%
         'clip-amber': '#FF9500',           // bright orange (PRO badges, alerts)
-        'clip-amber-rich': '#CE8A31',     // richer sunset amber — matches reference image
-        'clip-red': '#FF4444',             // bright danger red (Logout, errors)
+        'clip-amber-rich': '#FFB347',     // brighter sunset amber — matches reference, bumped
+        'clip-red': '#FF6B6B',             // brighter danger red — bumped L 63%→71%
         'clip-live': '#39FF14',            // neon green (LIVE indicators only)
         'clip-text': '#F0F0F0',            // brighter body text — near-white for high contrast
         'clip-muted': '#B0B0B0',           // brighter secondary text — was #888, now readable
@@ -80,11 +80,11 @@ module.exports = {
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
         'card': '0 18px 50px rgba(0, 0, 0, 0.45)',
-        // Brand glow — vivid teal-cyan halo (#07D2DF = 7,210,223). Stronger luminosity for pop.
-        'glow-cyan': '0 0 24px rgba(7, 210, 223, 0.6), 0 4px 20px rgba(7, 210, 223, 0.3)',
-        'glow-cyan-sm': '0 0 12px rgba(7, 210, 223, 0.5)',
-        'glow-amber': '0 0 24px rgba(255, 149, 0, 0.55)',
-        'glow-violet': '0 0 24px rgba(173, 82, 212, 0.55), 0 4px 20px rgba(173, 82, 212, 0.25)',
+        // Brand glow — brighter neon teal-cyan halo (#22F0FF = 34,240,255). Max luminosity for pop.
+        'glow-cyan': '0 0 24px rgba(34, 240, 255, 0.65), 0 4px 20px rgba(34, 240, 255, 0.35)',
+        'glow-cyan-sm': '0 0 12px rgba(34, 240, 255, 0.55)',
+        'glow-amber': '0 0 24px rgba(255, 149, 0, 0.6)',
+        'glow-violet': '0 0 24px rgba(194, 102, 245, 0.6), 0 4px 20px rgba(194, 102, 245, 0.3)',
         'glow-live': '0 0 12px rgba(57, 255, 20, 0.5)',
       },
       fontFamily: {
@@ -117,10 +117,10 @@ module.exports = {
           "0%": { width: "0%" },
           "100%": { width: "100%" },
         },
-        // Brand pulse-glow — vivid teal-cyan pulse on key CTAs (#07D2DF = 7,210,223)
+        // Brand pulse-glow — brighter neon teal-cyan pulse (#22F0FF = 34,240,255)
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 12px rgba(7, 210, 223, 0.6), 0 0 24px rgba(7, 210, 223, 0.3)" },
-          "50%":      { boxShadow: "0 0 20px rgba(7, 210, 223, 0.8), 0 0 40px rgba(7, 210, 223, 0.4)" },
+          "0%, 100%": { boxShadow: "0 0 12px rgba(34, 240, 255, 0.65), 0 0 24px rgba(34, 240, 255, 0.35)" },
+          "50%":      { boxShadow: "0 0 20px rgba(34, 240, 255, 0.85), 0 0 40px rgba(34, 240, 255, 0.45)" },
         },
       },
       animation: {

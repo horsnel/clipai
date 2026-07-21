@@ -12,29 +12,29 @@
     --card-foreground: 228 14% 70%;
     --popover: 240 10% 4%;
     --popover-foreground: 228 14% 70%;
-    /* Primary = clip-cyan #07D2DF → HSL(184°, 94%, 45%) — vivid teal-cyan, matches reference images */
-    --primary: 184 94% 45%;
+    /* Primary = clip-cyan #22F0FF → HSL(184°, 100%, 56%) — brighter neon teal-cyan */
+    --primary: 184 100% 56%;
     --primary-foreground: 0 0% 0%;
     --secondary: 240 10% 6%;
     --secondary-foreground: 228 14% 70%;
     --muted: 240 10% 6%;
     --muted-foreground: 225 6% 38%;
-    --accent: 184 94% 45%;
+    --accent: 184 100% 56%;
     --accent-foreground: 0 0% 0%;
     --destructive: 0 70% 48%;
     --destructive-foreground: 0 0% 90%;
     --border: 240 10% 8%;
     --input: 240 10% 8%;
-    --ring: 184 94% 45%;
+    --ring: 184 100% 56%;
     --radius: 0.625rem;
     --sidebar-background: 240 10% 4%;
     --sidebar-foreground: 228 14% 70%;
-    --sidebar-primary: 184 94% 45%;
+    --sidebar-primary: 184 100% 56%;
     --sidebar-primary-foreground: 0 0% 0%;
     --sidebar-accent: 240 10% 6%;
     --sidebar-accent-foreground: 228 14% 70%;
     --sidebar-border: 240 10% 8%;
-    --sidebar-ring: 184 94% 45%;
+    --sidebar-ring: 184 100% 56%;
   }
 }
 
@@ -75,11 +75,11 @@
   .btn-primary {
     @apply bg-clip-cyan text-black font-bold px-6 py-3 rounded-xl 
            hover:brightness-110 hover:-translate-y-0.5 transition-all duration-200;
-    /* Always-on vivid teal-cyan glow + stronger on hover (#07D2DF = 7,210,223) */
-    box-shadow: 0 4px 20px rgba(7, 210, 223, 0.3);
+    /* Always-on brighter neon teal-cyan glow + stronger on hover (#22F0FF = 34,240,255) */
+    box-shadow: 0 4px 20px rgba(34, 240, 255, 0.35);
   }
   .btn-primary:hover:not(:disabled) {
-    box-shadow: 0 0 24px rgba(7, 210, 223, 0.6), 0 4px 32px rgba(7, 210, 223, 0.4);
+    box-shadow: 0 0 24px rgba(34, 240, 255, 0.7), 0 4px 32px rgba(34, 240, 255, 0.45);
   }
   
   .btn-secondary {
@@ -94,9 +94,9 @@
            focus:outline-none focus:border-clip-cyan focus:ring-1 focus:ring-clip-cyan/50
            transition-all duration-200;
   }
-  /* Brighter focus glow on input-dark (#07D2DF = 7,210,223) */
+  /* Brighter focus glow on input-dark (#22F0FF = 34,240,255) */
   .input-dark:focus {
-    box-shadow: 0 0 0 3px rgba(7, 210, 223, 0.22), 0 0 24px rgba(7, 210, 223, 0.25);
+    box-shadow: 0 0 0 3px rgba(34, 240, 255, 0.28), 0 0 24px rgba(34, 240, 255, 0.35);
   }
   
   .vignette {
@@ -164,6 +164,6 @@
 
 /* Selection */
 ::selection {
-  background: rgba(7, 210, 223, 0.25);
+  background: rgba(34, 240, 255, 0.3);
   color: #F0F0F0;
 }

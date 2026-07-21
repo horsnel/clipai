@@ -182,7 +182,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <button key={g} onClick={() => setSelectedGame(g)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap transition-all flex-shrink-0 ${
                   selectedGame === g
-                    ? 'bg-clip-cyan text-black shadow-[0_0_12px_rgba(7, 210, 223,0.35)]'
+                    ? 'bg-clip-cyan text-black shadow-[0_0_12px_rgba(34, 240, 255,0.35)]'
                     : 'bg-clip-surface text-clip-muted hover:text-clip-text border border-white/[0.08]'
                 }`}>
                 {g}
@@ -196,7 +196,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
               <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab
-                    ? 'bg-clip-surface border border-clip-cyan text-clip-cyan shadow-[0_0_12px_rgba(7, 210, 223,0.25)]'
+                    ? 'bg-clip-surface border border-clip-cyan text-clip-cyan shadow-[0_0_12px_rgba(34, 240, 255,0.25)]'
                     : 'text-clip-muted hover:text-clip-text'
                 }`}>
                 {tab}
@@ -211,7 +211,7 @@ export function TrendRadarPage({ user, onNavigate }: TrendRadarPageProps) {
             <button key={p.id} onClick={() => setActivePlatform(p.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 border ${
                 activePlatform === p.id
-                  ? p.color + ' border-transparent shadow-[0_0_12px_rgba(7, 210, 223,0.25)]'
+                  ? p.color + ' border-transparent shadow-[0_0_12px_rgba(34, 240, 255,0.25)]'
                   : 'bg-clip-surface text-clip-muted hover:text-clip-text border-white/[0.08]'
               }`}>
               {p.label}

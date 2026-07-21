@@ -345,7 +345,7 @@ export function AnalysisCards({ analysis, videoTitle, videoAuthor, videoId, vide
             {a.thumbnail_concepts.map((t, i) => (
               <div key={i} className="rounded-lg bg-clip-surface/50 p-3 border border-white/[0.02]">
                 <p className="text-sm font-bold text-clip-text mb-1"
-                  style={{ color: t.color === 'yellow' ? '#FBBF24' : t.color === 'red' ? '#F87171' : t.color === 'cyan' ? '#07D2DF' : undefined }}>
+                  style={{ color: t.color === 'yellow' ? '#FBBF24' : t.color === 'red' ? '#F87171' : t.color === 'cyan' ? '#22F0FF' : undefined }}>
                   {t.text}
                 </p>
                 <p className="text-[10px] text-clip-muted font-mono">{t.position} · {t.font_weight} · {t.color}</p>
