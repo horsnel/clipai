@@ -101,7 +101,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
         <div className="flex items-center gap-2">
           <button
             onClick={() => onNavigate('audit')}
-            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-clip-cyan/10 text-clip-cyan border border-clip-cyan hover:bg-clip-cyan hover:text-black transition-colors shadow-[0_0_10px_rgba(0,229,255,0.2)]"
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-clip-cyan/10 text-clip-cyan border border-clip-cyan hover:bg-clip-cyan hover:text-black transition-colors shadow-[0_0_10px_rgba(7, 210, 223,0.2)]"
           >
             <Plus className="w-3.5 h-3.5" />
             Add channel
@@ -162,7 +162,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
           {audits.length < 8 && (
             <button
               onClick={() => onNavigate('audit')}
-              className="card-glass p-5 min-h-[180px] flex flex-col items-center justify-center gap-2 text-center hover:border-clip-cyan hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(0,229,255,0.12)] transition-all group"
+              className="card-glass p-5 min-h-[180px] flex flex-col items-center justify-center gap-2 text-center hover:border-clip-cyan hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(7, 210, 223,0.12)] transition-all group"
             >
               <div className="w-12 h-12 rounded-full bg-clip-cyan/10 flex items-center justify-center group-hover:bg-clip-cyan/20 transition-colors">
                 <Plus className="w-6 h-6 text-clip-cyan" />

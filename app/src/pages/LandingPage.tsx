@@ -32,7 +32,7 @@ function handleImageError(e: React.SyntheticEvent<HTMLImageElement>) {
   parent.classList.add('flex', 'items-center', 'justify-center', 'min-h-[200px]');
   const placeholder = document.createElement('div');
   placeholder.className = 'flex flex-col items-center gap-2 opacity-50';
-  placeholder.innerHTML = '<svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="92" height="92" rx="24" fill="#00E5FF"/><path d="M 32 26 L 32 74 L 76 50 Z" fill="#0A0A0A"/></svg><span class="text-[10px] text-clip-muted uppercase tracking-wider">ClipAI</span>';
+  placeholder.innerHTML = '<svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="92" height="92" rx="24" fill="#07D2DF"/><path d="M 32 26 L 32 74 L 76 50 Z" fill="#0A0A0A"/></svg><span class="text-[10px] text-clip-muted uppercase tracking-wider">ClipAI</span>';
   parent.appendChild(placeholder);
 }
 
@@ -200,6 +200,66 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             </div>
             {/* Glow under */}
             <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-10 bg-clip-amber/15 blur-2xl rounded-full pointer-events-none" />
+          </div>
+        </div>
+      </section>
+
+      {/* Creator phone showcase — new portrait screenshot, full-bleed dark teal */}
+      <section className="py-16 lg:py-20 relative overflow-hidden bg-clip-surface/30">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-clip-cyan/6 rounded-full blur-[120px]" />
+          <div className="absolute bottom-1/4 left-1/4 w-80 h-80 bg-clip-violet/6 rounded-full blur-[100px]" />
+        </div>
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 xl:px-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center max-w-6xl mx-auto">
+            {/* Phone screenshot image */}
+            <div className="relative order-2 lg:order-1">
+              <div className="relative max-w-[320px] mx-auto lg:mx-0">
+                <div className="relative rounded-[2.2rem] overflow-hidden shadow-2xl border border-white/[0.06] bg-clip-dark">
+                  <img
+                    src="/creator-phone.png"
+                    alt="ClipAI mobile app — creator dashboard in action"
+                    className="w-full h-auto"
+                    onError={handleImageError}
+                  />
+                  {/* Subtle scanline overlay for screen feel */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/30 via-transparent to-transparent pointer-events-none" />
+                  {/* Notch indicator */}
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-1.5 bg-black/60 rounded-full" />
+                </div>
+                {/* Vivid dual-color glow */}
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-12 bg-gradient-to-r from-clip-cyan/30 via-clip-blue/30 to-clip-violet/30 blur-2xl rounded-full pointer-events-none" />
+                {/* Side accent */}
+                <div className="absolute -right-3 top-1/4 w-1.5 h-12 bg-gradient-to-b from-clip-cyan to-clip-violet rounded-full opacity-70" />
+              </div>
+            </div>
+
+            {/* Copy */}
+            <div className="order-1 lg:order-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-clip-violet bg-clip-violet/10 border border-clip-violet/30 px-3 py-1 rounded-full mb-4">
+                <Sparkles className="w-3.5 h-3.5" /> Real creator workflow
+              </span>
+              <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-6 leading-tight">
+                Built mobile-first. <span className="gradient-text">Lives in your pocket.</span>
+              </h2>
+              <p className="text-clip-muted text-base sm:text-lg mb-8 leading-relaxed">
+                Every ClipAI feature — Viral Forge, Trend Radar, ClipBot coach, Channel Audit — is one tap away on your phone. Capture a clip on the bus, get 14 outputs before you get home.
+              </p>
+              <div className="space-y-4">
+                {[
+                  { icon: Zap, text: 'Mobile-optimised UI — every screen tuned for one-handed use' },
+                  { icon: Flame, text: 'Instant paste-from-clipboard — no uploads, no rendering' },
+                  { icon: TrendingUp, text: 'Push notifications when your game\'s meta shifts' },
+                ].map((item) => (
+                  <div key={item.text} className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-clip-cyan/15 to-clip-violet/15 flex items-center justify-center flex-shrink-0">
+                      <item.icon className="w-5 h-5 text-clip-cyan" />
+                    </div>
+                    <span className="text-clip-text font-medium leading-relaxed">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -550,6 +610,98 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
             {/* Glow under */}
             <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-2/3 h-12 bg-clip-cyan/15 blur-3xl rounded-full pointer-events-none" />
+          </div>
+        </div>
+      </section>
+
+      {/* Dual gameplay showcase — two new landscape images side by side */}
+      <section className="py-20 lg:py-28 relative overflow-hidden">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-clip-amber/5 rounded-full blur-[120px]" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-clip-violet/5 rounded-full blur-[120px]" />
+        </div>
+
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 xl:px-12">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-clip-cyan bg-clip-cyan/10 border border-clip-cyan/30 px-3 py-1 rounded-full mb-4">
+              <Gamepad2 className="w-3.5 h-3.5" /> Multi-game intelligence
+            </span>
+            <h2 className="font-display font-bold text-3xl sm:text-4xl lg:text-5xl text-clip-text mb-4 leading-tight">
+              One tool. <span className="gradient-text">Every game.</span>
+            </h2>
+            <p className="text-clip-muted text-base sm:text-lg">
+              Whether you're clipping a 1v5 in Valorant or a build battle in Fortnite, ClipAI recognises the moment, the meta, and the music — then ships captions that hit.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+            {/* Sunset gameplay card — uses gameplay-sunset.jpg (amber/teal tones) */}
+            <div className="relative group">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/[0.04] bg-clip-surface aspect-video">
+                <img
+                  src="/gameplay-sunset.jpg"
+                  alt="Sunset gameplay moment — amber and teal tones"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  onError={handleImageError}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/80 via-transparent to-transparent" />
+                <div className="absolute top-3 left-3 flex gap-2">
+                  <span className="bg-clip-amber/90 text-black text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                    <Flame className="w-2.5 h-2.5" /> HOOK 96
+                  </span>
+                  <span className="bg-clip-dark/80 backdrop-blur-sm text-clip-amber-rich text-[10px] font-bold px-2 py-1 rounded-full border border-clip-amber/30">
+                    SUNSET TONES
+                  </span>
+                </div>
+                <div className="absolute bottom-3 left-3 right-3">
+                  <p className="font-display font-bold text-clip-text text-sm sm:text-base">Apex Legends · Ranked Clutch</p>
+                  <p className="text-clip-muted text-xs">14 outputs generated · 1.1s</p>
+                </div>
+              </div>
+              {/* Amber glow underneath */}
+              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-2/3 h-8 bg-clip-amber/25 blur-2xl rounded-full pointer-events-none" />
+            </div>
+
+            {/* Violet gameplay card — uses gameplay-violet.jpg (blue/violet tones) */}
+            <div className="relative group">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/[0.04] bg-clip-surface aspect-video">
+                <img
+                  src="/gameplay-violet.jpg"
+                  alt="Violet gameplay moment — blue and magenta tones"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  onError={handleImageError}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-clip-dark/80 via-transparent to-transparent" />
+                <div className="absolute top-3 left-3 flex gap-2">
+                  <span className="bg-clip-violet/90 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5" /> HOOK 94
+                  </span>
+                  <span className="bg-clip-dark/80 backdrop-blur-sm text-clip-violet text-[10px] font-bold px-2 py-1 rounded-full border border-clip-violet/30">
+                    NEON VIBE
+                  </span>
+                </div>
+                <div className="absolute bottom-3 left-3 right-3">
+                  <p className="font-display font-bold text-clip-text text-sm sm:text-base">Valorant · Tournament Ace</p>
+                  <p className="text-clip-muted text-xs">14 outputs generated · 1.2s</p>
+                </div>
+              </div>
+              {/* Violet glow underneath */}
+              <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-2/3 h-8 bg-clip-violet/25 blur-2xl rounded-full pointer-events-none" />
+            </div>
+          </div>
+
+          {/* Stat row below the two cards */}
+          <div className="max-w-3xl mx-auto mt-12 grid grid-cols-3 gap-4">
+            {[
+              { stat: '50+', label: 'games supported' },
+              { stat: '1.2s', label: 'avg analysis time' },
+              { stat: '14', label: 'outputs per clip' },
+            ].map((s) => (
+              <div key={s.label} className="text-center">
+                <p className="font-display font-bold text-3xl sm:text-4xl gradient-text">{s.stat}</p>
+                <p className="text-clip-muted text-xs sm:text-sm uppercase tracking-wider mt-1">{s.label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>

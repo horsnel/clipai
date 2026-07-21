@@ -142,7 +142,7 @@ const PLAN_AMOUNT_KOBO: Record<string, number> = {
 const RANK_TIERS = [
   { name: 'Rookie',         min_xp: 0,     color: '#9CA3AF' },
   { name: 'Clipper',        min_xp: 500,   color: '#3B82F6' },
-  { name: 'Highlight Reel', min_xp: 2000,  color: '#8B5CF6' },
+  { name: 'Highlight Reel', min_xp: 2000,  color: '#AD52D4' },
   { name: 'Legend',         min_xp: 5000,  color: '#FF9500' },
   { name: 'GOD TIER',       min_xp: 10000, color: '#EF4444' },
 ];

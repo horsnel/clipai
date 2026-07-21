@@ -228,7 +228,7 @@ export function exportAuditPDF({ audit, insights, generatedAt }: ExportPayload):
 
 // ─── shared HTML report builder ──────────────────────────────────────────────
 function buildReportHTML(audit: ChannelAudit, insights: AuditInsights | null, dateStr: string, forPrint = false): string {
-  const accent = '#00E5FF';
+  const accent = '#07D2DF';
   const dark = '#0A0A0A';
   const surface = '#121212';
   const text = '#F0F0F0';

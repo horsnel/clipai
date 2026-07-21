@@ -139,7 +139,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
             <button key={t.key} onClick={() => { if (!t.locked) setActiveTool(t.key); else onNavigate('pricing'); }}
               className={`p-4 rounded-xl border text-left transition-all relative ${
                 activeTool === t.key
-                  ? 'border-clip-cyan bg-clip-cyan/10 shadow-[0_0_16px_rgba(0,229,255,0.15)]'
+                  ? 'border-clip-cyan bg-clip-cyan/10 shadow-[0_0_16px_rgba(7, 210, 223,0.15)]'
                   : t.locked
                   ? 'border-white/[0.04] bg-clip-surface/50 opacity-60 cursor-pointer'
                   : 'border-white/[0.06] bg-clip-surface hover:border-clip-cyan/40'
@@ -188,7 +188,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
 
             {spyResult && (
               <div className="space-y-4">
-                <div className="card-glass p-5 border-clip-cyan/30 bg-clip-cyan/5 shadow-[0_0_24px_rgba(0,229,255,0.08)]">
+                <div className="card-glass p-5 border-clip-cyan/30 bg-clip-cyan/5 shadow-[0_0_24px_rgba(7, 210, 223,0.08)]">
                   <div className="flex items-center gap-2 mb-4">
                     <Trophy className="w-4 h-4 text-clip-cyan" />
                     <h4 className="font-display font-semibold text-clip-text">{spyResult.channelName}</h4>
@@ -254,7 +254,7 @@ export function GrowthIntelPage({ user, onNavigate }: GrowthIntelPageProps) {
                     {PLATFORMS.map(p => (
                       <button key={p} onClick={() => setTimingPlatform(p)}
                         className={`w-full px-3 py-2 rounded-lg text-sm text-left transition-all ${
-                          timingPlatform === p ? 'bg-clip-cyan text-black font-bold shadow-[0_0_10px_rgba(0,229,255,0.3)]' : 'bg-clip-surface text-clip-muted border border-white/[0.08] hover:text-clip-text'
+                          timingPlatform === p ? 'bg-clip-cyan text-black font-bold shadow-[0_0_10px_rgba(7, 210, 223,0.3)]' : 'bg-clip-surface text-clip-muted border border-white/[0.08] hover:text-clip-text'
                         }`}>{p}</button>
                     ))}
                   </div>
