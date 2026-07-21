@@ -185,7 +185,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <div className="relative max-w-md mx-auto">
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.04] bg-clip-surface">
               <img
-                src="/hero-new.jpg"
+                src="/marketing-hero.png"
                 alt="ClipAI in action — creator workflow on mobile"
                 className="w-full h-auto"
                 onError={handleImageError}
@@ -217,7 +217,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               <div className="relative max-w-[320px] mx-auto lg:mx-0">
                 <div className="relative rounded-[2.2rem] overflow-hidden shadow-2xl border border-white/[0.06] bg-clip-dark">
                   <img
-                    src="/creator-phone.png"
+                    src="/marketing-phone.png"
                     alt="ClipAI mobile app — creator dashboard in action"
                     className="w-full h-auto"
                     onError={handleImageError}
@@ -346,7 +346,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             <div className="relative order-2 lg:order-1">
               <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.04] max-w-sm mx-auto lg:mx-0 bg-clip-surface perspective-1000">
                 <img
-                  src="/dashboard-phone.jpg"
+                  src="/marketing-leaderboard.png"
                   alt="ClipAI dashboard showing trending videos and Viral Forge CTA"
                   className="w-full h-auto"
                   onError={handleImageError}
@@ -483,7 +483,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             <div className="relative">
               <div className="relative rounded-3xl overflow-hidden shadow-card border border-white/[0.02] max-w-sm mx-auto lg:mx-0 bg-clip-surface">
                 <img
-                  src="/gameplay-thumb-1.jpg"
+                  src="/marketing-ai.png"
                   alt="Smart Cuts Preview"
                   className="w-full h-auto"
                   onError={handleImageError}
@@ -564,7 +564,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white/[0.04] bg-clip-surface">
               <img
-                src="/gameplay-new.jpg"
+                src="/marketing-social.png"
                 alt="Clutch gameplay moment analyzed by ClipAI"
                 className="w-full h-auto"
                 onError={handleImageError}
