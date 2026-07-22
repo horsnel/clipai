@@ -692,7 +692,7 @@ export function ViralForgePage({ user, onNavigate }: ViralForgePageProps) {
             <div className="card-glass p-8 text-center">
               <Trophy className="w-10 h-10 mx-auto mb-3 text-clip-muted opacity-30" />
               <p className="text-clip-muted text-sm">
-                No community votes yet this week. Generate captions above and vote to claim the #1 spot.
+                No community votes yet this week. Generate captions above and vote to claim the top spot.
               </p>
             </div>
           ) : (

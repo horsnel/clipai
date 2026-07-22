@@ -16,7 +16,7 @@
 import { useState, useEffect } from 'react';
 import {
   Newspaper, Twitter, MessageSquare,
-  AlertTriangle, TrendingUp, Hash,
+  AlertTriangle, TrendingUp,
 } from 'lucide-react';
 import { getGamingFeed } from '@/services/api';
 import type { GamingFeedResponse, GamingNewsItem, DevTweetItem, RedditPostItem } from '@/services/api';
@@ -176,8 +176,7 @@ function RedditColumn({ items, loading }: { items: RedditPostItem[]; loading: bo
                   {r.title}
                 </p>
                 <div className="flex items-center justify-between gap-2 mt-1.5">
-                  <span className="text-[10px] text-orange-400/80 font-medium truncate inline-flex items-center gap-0.5">
-                    <Hash className="w-2.5 h-2.5" />
+                  <span className="text-[10px] text-orange-400/80 font-medium truncate">
                     {r.subreddit.replace(/^r\//, '')}
                   </span>
                   {r.publishedAt && (
@@ -243,9 +242,6 @@ export function GamingFeedWidget({ game }: GamingFeedWidgetProps) {
             </p>
           </div>
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-clip-cyan/10 text-clip-cyan border border-clip-cyan/20 flex-shrink-0">
-          Updated 2h
-        </span>
       </div>
 
       {/* Body */}
@@ -260,13 +256,6 @@ export function GamingFeedWidget({ game }: GamingFeedWidgetProps) {
           <TweetsColumn items={feed?.devTweets ?? []} loading={loading} />
           <RedditColumn items={feed?.redditPosts ?? []} loading={loading} />
         </div>
-      )}
-
-      {/* Footer hint */}
-      {!loading && !error && feed && (
-        <p className="text-[10px] text-clip-muted/60 mt-3 text-center">
-          Aggregated from {feed.news.length + feed.devTweets.length + feed.redditPosts.length} sources
-        </p>
       )}
     </section>
   );

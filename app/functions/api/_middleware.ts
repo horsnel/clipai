@@ -1151,8 +1151,8 @@ app.get('/health', async (c) => {
   checks.twitch = {
     status: (env.TWITCH_CLIENT_ID && env.TWITCH_CLIENT_SECRET) ? 'ok' : 'unbound',
     detail: (env.TWITCH_CLIENT_ID && env.TWITCH_CLIENT_SECRET)
-      ? 'Twitch clips enabled in /trending-videos (Helix API, app token cached 30d)'
-      : 'Twitch clips disabled — set TWITCH_CLIENT_ID + TWITCH_CLIENT_SECRET to enable',
+      ? 'Twitch clips via Helix API (app token cached 30d, game_id cached 7d)'
+      : 'Twitch clips disabled — register any Twitch account at dev.twitch.tv and run: wrangler pages secret put TWITCH_CLIENT_ID + TWITCH_CLIENT_SECRET. (Twitch does NOT offer a keyless public API.)',
   };
 
   // Paystack
@@ -1804,12 +1804,24 @@ async function ytTrending(env: Env, game: string, max = 10): Promise<any[]> {
 }
 
 // ─── Twitch clips ────────────────────────────────────────────────────────────
-// Twitch API requires an app access token (OAuth client_credentials). We fetch
-// it once, cache it in KV for 30 days (Twitch tokens last 60 days, but we
-// refresh early to be safe), then use it to call the /clips endpoint.
+// Twitch clips via the official Helix API.
 //
-// Game name → Twitch game_id lookup uses /games?name=... (cached separately).
-// The /clips endpoint returns up to 100 clips sorted by views in the last day.
+// REQUIRES: TWITCH_CLIENT_ID + TWITCH_CLIENT_SECRET (registered Twitch app at
+// dev.twitch.tv). We OAuth a client_credentials token (cached 30d), look up
+// the game_id (cached 7d), then call /helix/clips.
+//
+// WHY NO FALLBACK: Twitch's public website uses GraphQL persisted queries,
+// but those hashes change with every Twitch web build (and break constantly).
+// Scraping twitch.tv/directory/game/<game>/clips returns no clip data — the
+// page is fully client-rendered. So there is no zero-config way to fetch
+// Twitch clips. If secrets are not set, /trending-videos silently falls back
+// to the other 4 platforms (YouTube + TikTok + X + Instagram). To enable
+// Twitch, register an app at dev.twitch.tv and run:
+//   wrangler pages secret put TWITCH_CLIENT_ID
+//   wrangler pages secret put TWITCH_CLIENT_SECRET
+//
+// (You can use ANY Twitch account to register the dev app — it does NOT need
+// to be a streamer/affiliated account. A brand-new throwaway works.)
 
 const TWITCH_TOKEN_KEY = 'twitch_app_token';
 const TWITCH_TOKEN_TTL = 30 * 24 * 60 * 60; // 30 days (Twitch tokens last 60d)
@@ -1876,6 +1888,8 @@ async function getTwitchGameId(env: Env, token: string, game: string): Promise<s
 
 // Fetch top Twitch clips for a game in the last 24h.
 // Returns at most `max` clips sorted by view_count (descending).
+// Returns [] (empty) when Twitch is not configured — caller falls back to
+// the other 4 platforms silently.
 async function fetchTwitchClips(env: Env, game: string, max = 4): Promise<any[]> {
   if (!env.TWITCH_CLIENT_ID || !env.TWITCH_CLIENT_SECRET) return [];
   const token = await getTwitchAppToken(env);
@@ -2367,6 +2381,7 @@ const GAMING_NEWS_DOMAINS = new Set([
   'leagueoflegends.com', 'www.leagueoflegends.com',
   'fortnite.com', 'www.fortnite.com',
   'ea.com', 'www.ea.com',
+  'callofduty.com', 'www.callofduty.com',
   'rockstargames.com', 'www.rockstargames.com',
   'news.xbox.com', 'news.xbox.com',
   'blog.playstation.com', 'blog.playstation.com',
@@ -2388,13 +2403,43 @@ const GAMING_NEWS_DOMAINS = new Set([
  *  articles that are still worth surfacing on the dashboard. */
 async function fetchGamingNews(env: Env, game: string, limit = 8): Promise<any[]> {
   const gameLabel = (game || 'gaming').toLowerCase();
+  // Per-game search-query aliases. Some games need a more specific query to get
+  // past generic listicles and surface actual patch-notes/news coverage from
+  // trusted domains. Games not in this map fall back to the generic template.
+  const GAME_SEARCH_QUERIES: Record<string, string> = {
+    'call of duty': 'Call of Duty Warzone patch notes season update',
+    'warzone':      'Call of Duty Warzone patch notes season update',
+    'cod':          'Call of Duty Warzone patch notes season update',
+    'modern warfare': 'Call of Duty Modern Warfare patch notes update',
+    'valorant':     'Valorant patch notes update',
+    'apex':         'Apex Legends patch notes update',
+    'apex legends': 'Apex Legends patch notes update',
+    'fortnite':     'Fortnite patch notes update',
+    'minecraft':    'Minecraft patch notes snapshot update',
+    'roblox':       'Roblox update news',
+    'overwatch':    'Overwatch 2 patch notes update',
+    'league of legends': 'League of Legends patch notes update',
+    'lol':          'League of Legends patch notes update',
+    'dota 2':       'Dota 2 patch notes update',
+    'dota':         'Dota 2 patch notes update',
+    'cs2':          'Counter-Strike 2 CS2 patch notes update',
+    'csgo':         'Counter-Strike patch notes update',
+    'gta':          'GTA 5 GTA Online update news',
+    'gta 5':        'GTA 5 GTA Online update news',
+    'gta online':   'GTA Online update news',
+    'pubg':         'PUBG patch notes update',
+    'rocket league': 'Rocket League patch notes update',
+    'elden ring':   'Elden Ring patch notes news',
+    'wow':          'World of Warcraft WoW patch notes update',
+    'world of warcraft': 'World of Warcraft patch notes update',
+  };
   // Generic "gaming" search returns almost nothing from trusted domains because
   // the query is too broad and Serper surfaces generic listicles that aren't in
   // GAMING_NEWS_DOMAINS. Use a more specific query for the no-game case that
   // surfaces actual recent news.
   const q = gameLabel === 'gaming' || gameLabel === 'all'
     ? 'gaming news this week update'
-    : `${gameLabel} patch notes news update`;
+    : (GAME_SEARCH_QUERIES[gameLabel] || `${gameLabel} patch notes news update`);
 
   const filterTrusted = (raw: any[]) => raw.filter((r: any) => {
     if (!r.link) return false;
@@ -4465,7 +4510,7 @@ app.get('/gaming-feed', async (c) => {
   // This makes the feed feel like it's "always updating" — users see new
   // articles appear within ~2 page loads instead of having to wait for the
   // full 1h TTL to expire AND a fresh fetch to complete.
-  const cacheKey = `gaming_feed_v2:${gameLabel}`;
+  const cacheKey = `gaming_feed_v3:${gameLabel}`;
   const FRESH_TTL = 60 * 60;             // 1h fresh
   const doRefresh = async () => {
     const [news, devTweets, redditPosts] = await Promise.all([

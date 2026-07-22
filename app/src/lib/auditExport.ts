@@ -330,7 +330,7 @@ function buildReportHTML(audit: ChannelAudit, insights: AuditInsights | null, da
         ${insights.bestPerformingVideos.map((v, i) => `
           <div style="padding:14px;background:${surface};border:1px solid ${border};border-left:3px solid #4ADE80;margin-bottom:12px;">
             <div style="display:flex;gap:8px;align-items:baseline;margin-bottom:6px;">
-              <span style="color:#4ADE80;font-weight:700;font-size:13px;">#${i + 1}</span>
+              <span style="color:#4ADE80;font-weight:700;font-size:13px;">${i + 1}.</span>
               <span style="color:${text};font-weight:600;font-size:14px;flex:1;">${escapeHTML(v.title)}</span>
             </div>
             <div style="color:${muted};font-size:12px;margin-bottom:8px;">${formatNum(v.views)} views · ${formatNum(v.likes)} likes · ${formatNum(v.comments)} comments</div>
