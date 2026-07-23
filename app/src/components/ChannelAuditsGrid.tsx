@@ -148,8 +148,9 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
           </div>
         </button>
       ) : (
-        // Grid of square cards
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        // Grid of square cards — 2 on mobile, 3 on tablet, 3 on desktop.
+        // (Was 4 on desktop — too cramped for the 2-col mini-stat grid inside each card.)
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {audits.map((audit) => (
             <ChannelAuditCard
               key={audit.url}
@@ -162,7 +163,7 @@ export function ChannelAuditsGrid({ onNavigate, refreshNonce }: ChannelAuditsGri
           {audits.length < 8 && (
             <button
               onClick={() => onNavigate('audit')}
-              className="card-glass p-5 min-h-[180px] flex flex-col items-center justify-center gap-2 text-center hover:border-clip-cyan hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(0, 255, 255,0.12)] transition-all group"
+              className="card-glass p-5 min-h-[248px] flex flex-col items-center justify-center gap-2 text-center hover:border-clip-cyan hover:-translate-y-1 hover:shadow-[0_0_20px_rgba(0, 255, 255,0.12)] transition-all group"
             >
               <div className="w-12 h-12 rounded-full bg-clip-cyan/10 flex items-center justify-center group-hover:bg-clip-cyan/20 transition-colors">
                 <Plus className="w-6 h-6 text-clip-cyan" />

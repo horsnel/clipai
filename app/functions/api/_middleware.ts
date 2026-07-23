@@ -4319,8 +4319,19 @@ app.get('/trending-videos', async (c) => {
   const game = (c.req.query('game') || '').trim();
   const gameLabel = game || 'gaming';
 
-  const cacheKey = `trending_videos_v3:${gameLabel.toLowerCase()}`;
-  const data = await withCache(env, cacheKey, 6 * 60 * 60, async () => {
+  // ─── Stale-while-revalidate (same pattern as /gaming-feed) ─────────────────
+  // Cache TTL is 1h (fresh). When the cache is stale (between 1h and 7d old),
+  // return the stale data immediately and trigger a background refresh via
+  // executionCtx.waitUntil(). This makes the dashboard feel like it's always
+  // updating — users see new videos appear within ~2 page loads instead of
+  // waiting for the full 6h TTL to expire AND a fresh fetch to complete.
+  //
+  // Cache key bumped v3 → v4 to invalidate the old 6h-TTL entries that were
+  // holding the same 8 videos all day.
+  const cacheKey = `trending_videos_v4:${gameLabel.toLowerCase()}`;
+  const FRESH_TTL = 60 * 60; // 1h fresh
+
+  const doRefresh = async () => {
     // Fetch from all 5 platforms in parallel (Twitch added — uses Twitch API
     // when TWITCH_CLIENT_ID + TWITCH_CLIENT_SECRET are configured, no-op otherwise)
     const [ytItems, ttItems, xItems, igItems, twitchClips] = await Promise.all([
@@ -4423,7 +4434,9 @@ app.get('/trending-videos', async (c) => {
     const videos = [...ytVideos, ...ttVideos, ...xVideos, ...igVideos, ...twitchVideos];
 
     if (!videos.length) {
-      return { videos: [], generatedAt: new Date().toISOString(), game: gameLabel };
+      const empty = { videos: [], generatedAt: new Date().toISOString(), game: gameLabel };
+      try { await cacheWrite(env, cacheKey, empty, FRESH_TTL); } catch {}
+      return empty;
     }
 
     // ONE LLM call → copy pack for each video (much cheaper than N separate calls)
@@ -4481,10 +4494,31 @@ Rules:
       };
     });
 
-    return { videos, generatedAt: new Date().toISOString(), game: gameLabel };
-  });
+    const data = { videos, generatedAt: new Date().toISOString(), game: gameLabel };
+    try {
+      await cacheWrite(env, cacheKey, data, FRESH_TTL);
+    } catch (e: any) {
+      console.warn('[trending-videos] cacheWrite failed:', e?.message);
+    }
+    return data;
+  };
 
-  return json(data);
+  // 1. Fresh cache hit — return immediately
+  const cached = await cacheRead<any>(env, cacheKey);
+  if (cached?.fresh) {
+    return json(cached.data);
+  }
+  // 2. Stale cache — return immediately, refresh in background
+  if (cached?.data) {
+    try {
+      c.executionCtx.waitUntil(doRefresh());
+    } catch {
+      doRefresh();  // test environments without executionCtx
+    }
+    return json(cached.data);
+  }
+  // 3. Cold cache — block on first fetch
+  return json(await doRefresh());
 });
 
 // ─── Gaming Feed (Dashboard enrichment: news + dev tweets + reddit) ──────────
@@ -7014,15 +7048,349 @@ app.post('/analyse/shadow', requireAuth, requireCredits(4), async (c) => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// GET /api/daily-insight — synthesises a "daily brief" from the user's recent
-// activity across all tools (channel audits, viral forge analyses, trend radar,
-// growth intel). Returns 3-5 actionable insights for the day.
+// MORNING BACKGROUND AUDIT PIPELINE
+// ════════════════════════════════════════════════════════════════════════════
+// Called once per day (recommended: 6:00 AM WAT = 5:00 AM UTC) by an external
+// cron (cron-job.org / UptimeRobot) hitting /api/cron/morning-audit?secret=...
 //
-// Storage (the "easiest way" — no new DB table needed):
-//   - KV cache for the insight payload, keyed on `daily_insight:${userId}:${YYYY-MM-DD}`
-//     20h TTL (so it survives the day but rolls over by tomorrow)
-//   - Frontend localStorage tracks "dismissed today" state (no API call needed)
+// For EVERY user with saved channel audits, the pipeline:
+//   1. Re-runs auditChannel for each saved URL (fresh stats, fresh recent videos)
+//   2. Reads generateAuditInsights for each channel (cached LLM analysis)
+//   3. Gathers "best performer in the same niche" — another user's audited
+//      channel on the same platform with the closest subscriber range
+//   4. Builds a comprehensive per-channel signals payload including:
+//        - Health score + executive summary + top recommendation
+//        - Best-performing videos (with replicationTip)
+//        - Worst-performing videos (with fixTip)
+//        - Recent video list
+//        - Niche-best-channel comparison
+//   5. Sends ALL channels' signals in one LLM call per user that produces a
+//      "morning brief" JSON with:
+//        - Per-channel improvement suggestions (best tricks to level up)
+//        - Niche comparison insights (what the top channel does better)
+//        - Viral mirroring recipe (how to replicate past virals + similar
+//          channels' recent virals)
+//        - Flop recovery recipe (concrete next-video plan after underperformance)
+//   6. Stores the brief in KV at morning_brief:${userId}:${YYYY-MM-DD}
+//      with a 36h TTL (survives the day, rolls over by tomorrow)
 //
+// The /daily-insight endpoint then reads from this stored brief first (if
+// present), falling back to on-demand generation if the pipeline hasn't run
+// yet today. This means the daily popup actually surfaces the deep audit
+// data the user wanted, not just generic LLM advice.
+//
+// Cost: ~1 LLM call per user per day. For 1k users, that's ~$20/day — totally
+// acceptable for a "premium-feeling" feature. If costs grow, we can add a
+// "morning brief only for users active in last 7d" filter.
+
+const MORNING_BRIEF_TTL = 36 * 60 * 60; // 36h — survives the day, rolls over tomorrow
+const MORNING_BRIEF_VERSION = 'v1-2026-07-24';
+
+app.get('/cron/morning-audit', async (c) => {
+  const env = c.env as Env;
+  const secret = c.req.query('secret');
+  if (!env.WORKER_SECRET || secret !== env.WORKER_SECRET) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+  const startedAt = Date.now();
+  const dateStr = new Date().toISOString().slice(0, 10);
+
+  // 1. Find all users with at least one saved audit. We use a PostgREST filter
+  //    on channel_audits — but we want unique user_ids, not all rows. PostgREST
+  //    doesn't support SELECT DISTINCT, so we read all rows (with a sane limit)
+  //    and dedupe in JS. The 8-channel-per-user cap bounds the worst case.
+  const allAuditRows = await sbFetch<any[]>(
+    env,
+    'channel_audits?select=user_id,url,platform,channel_name&order=last_refreshed_at.desc&limit=2000',
+  ).catch(() => null);
+
+  if (!allAuditRows || allAuditRows.length === 0) {
+    return json({ usersProcessed: 0, channelsProcessed: 0, durationMs: Date.now() - startedAt, message: 'no audits found' });
+  }
+
+  // Dedupe user_ids
+  const userIds = Array.from(new Set(allAuditRows.map((r: any) => r.user_id).filter(Boolean)));
+  // Build a per-user audit list so we don't re-fetch the user's audits later.
+  const auditsByUser = new Map<string, Array<{ url: string; platform: string; channel_name?: string }>>();
+  for (const row of allAuditRows) {
+    if (!row.user_id || !row.url) continue;
+    const arr = auditsByUser.get(row.user_id) || [];
+    arr.push({ url: row.url, platform: row.platform, channel_name: row.channel_name });
+    auditsByUser.set(row.user_id, arr);
+  }
+
+  let usersProcessed = 0;
+  let channelsProcessed = 0;
+  let llmFailures = 0;
+
+  // Process each user sequentially (avoid bursting the LLM rate limit by going
+  // parallel across hundreds of users at once). Each user is fully independent.
+  for (const userId of userIds) {
+    try {
+      const userAudits = auditsByUser.get(userId) || [];
+      if (!userAudits.length) continue;
+
+      // 2. For each saved channel, re-run the audit (fresh stats) + gather insights.
+      //    Process channels in parallel per user (3-4 calls in-flight at once is fine).
+      const perChannelSignals = await Promise.all(
+        userAudits.slice(0, 8).map(async (entry) => {
+          try {
+            // Re-run the audit (uses cached stats if fresh — won't double-spend credits)
+            const auditCacheKey = await hashKey('channel_audit_v2', entry.url);
+            const peeked = await cacheRead<any>(env, auditCacheKey);
+            let audit: any;
+            if (peeked?.fresh && peeked.data) {
+              audit = peeked.data;
+            } else {
+              try {
+                audit = await auditChannel(env, entry.url, entry.platform);
+                if (audit && !audit.error) {
+                  await cacheWrite(env, auditCacheKey, audit, 2 * 60 * 60);
+                }
+              } catch (e: any) {
+                // fall back to stale cache if possible
+                audit = (await cacheReadStale<any>(env, auditCacheKey)) || { error: e?.message };
+              }
+            }
+            if (audit?.error || !audit) return null;
+
+            // Read cached insights for this channel (LLM-generated review)
+            const INSIGHTS_VERSION = 'v3-2026-07-19';
+            const insightsKey = await hashKey('channel_insights', INSIGHTS_VERSION, entry.url);
+            let insights: any = null;
+            const insightsCached = await cacheRead<any>(env, insightsKey);
+            if (insightsCached?.data?.insights) {
+              insights = insightsCached.data.insights;
+            } else {
+              // Generate on-demand if missing (this is the expensive path —
+              // usually morning-audit runs after the user has already opened
+              // the audit view at least once, so insights will be cached)
+              try {
+                insights = await generateAuditInsights(env, audit);
+                await cacheWrite(env, insightsKey, { insights, generatedAt: new Date().toISOString() }, 2 * 60 * 60);
+              } catch (e: any) {
+                console.warn(`[morning-audit] generateAuditInsights failed for ${entry.url}:`, e?.message);
+              }
+            }
+
+            // Find a comparable "best-in-niche" channel — another user's audited
+            // channel on the same platform with the closest subscriber count
+            // (but higher — that's the "best" they should aspire to).
+            let nicheBest: any = null;
+            try {
+              const samePlatformRows = allAuditRows.filter(
+                (r: any) => r.user_id !== userId && r.platform === entry.platform,
+              );
+              // Pick the first 5 candidates — we'll resolve their cached stats
+              // to find the closest "bigger" channel.
+              for (const cand of samePlatformRows.slice(0, 5)) {
+                const candCacheKey = await hashKey('channel_audit_v2', cand.url);
+                const candCached = await cacheRead<any>(env, candCacheKey);
+                if (candCached?.data && !candCached.data.error) {
+                  const candSubs = candCached.data.statistics?.subscribers || 0;
+                  const mySubs = audit.statistics?.subscribers || 0;
+                  // Same ballpark: within 10x of my subs (avoids "MrBeast vs you" uselessness)
+                  if (candSubs > mySubs && candSubs < mySubs * 10) {
+                    if (!nicheBest || candSubs < nicheBest.statistics?.subscribers) {
+                      nicheBest = {
+                        channelName: candCached.data.channelName,
+                        url: cand.url,
+                        subscribers: candSubs,
+                        avgRecentViews: candCached.data.metrics?.avgRecentViews || 0,
+                        recentVideoTitles: (candCached.data.recentVideos || []).slice(0, 3).map((v: any) => v.title),
+                      };
+                    }
+                  }
+                }
+              }
+            } catch {}
+
+            return {
+              channelName: audit.channelName || entry.channel_name,
+              platform: audit.platform || entry.platform,
+              url: entry.url,
+              subscribers: audit.statistics?.subscribers || 0,
+              avgRecentViews: audit.metrics?.avgRecentViews || 0,
+              avgEngagementRate: audit.metrics?.avgEngagementRate || 0,
+              healthScore: insights?.healthScore,
+              healthLabel: insights?.healthLabel,
+              executiveSummary: insights?.executiveSummary,
+              topRecommendation: insights?.recommendations?.[0]?.title,
+              bestPerformingVideos: (insights?.bestPerformingVideos || []).slice(0, 2).map((v: any) => ({
+                title: v.title,
+                views: v.views,
+                whyItWorked: v.whyItWorked,
+                replicationTip: v.replicationTip,
+              })),
+              worstPerformingVideos: (insights?.worstPerformingVideos || []).slice(0, 2).map((v: any) => ({
+                title: v.title,
+                views: v.views,
+                whyItUnderperformed: v.whyItUnderperformed,
+                fixTip: v.fixTip,
+              })),
+              recentVideoTitles: (audit.recentVideos || []).slice(0, 5).map((v: any) => v.title),
+              nicheBestChannel: nicheBest,
+            };
+          } catch (e: any) {
+            console.warn(`[morning-audit] channel failed for ${entry.url}:`, e?.message);
+            return null;
+          }
+        }),
+      );
+
+      const validSignals = perChannelSignals.filter(Boolean);
+      if (!validSignals.length) continue;
+      channelsProcessed += validSignals.length;
+
+      // 3. Build the LLM prompt — one call per user that synthesizes ALL channels'
+      //    signals into the structured brief the user wanted.
+      const systemPrompt = `You are ClipAI's morning audit engine. You analyse ALL of a creator's audited channels (and their niche) every morning to produce a single, deeply-actionable "morning brief".
+
+Return ONLY valid JSON (no markdown, no prose outside the JSON) in this exact shape:
+{
+  "headline": "string — 5-9 word punchy headline for today, e.g. 'Mirror your last viral hook to ride the Valorant wave'",
+  "focusArea": "string — one of: 'Content Strategy', 'Posting Cadence', 'Audience Growth', 'Engagement', 'Monetization', 'Trend Capitalization'",
+  "channels": [
+    {
+      "channelName": "string",
+      "platform": "string",
+      "healthNote": "1-sentence summary of this channel's current state",
+      "improvementSuggestions": [
+        {
+          "title": "3-6 word actionable title",
+          "body": "1-2 sentence specific recommendation citing the user's actual data",
+          "priority": "high" | "medium" | "low",
+          "action": "concrete next step"
+        }
+      ],
+      "bestTricks": ["2-3 specific 'best tricks to level up the game' for this channel — be concrete, not generic"],
+      "nicheComparison": "string — what the best-performing channel in the same niche does better, and how to close the gap (or null if no niche-best available)",
+      "viralMirrorRecipe": {
+        "basedOn": "string — which past viral video from the user (or similar channel) this recipe mirrors",
+        "nextVideoTitle": "string — 6-12 word title to use",
+        "nextVideoHook": "string — first 3 seconds of the next video",
+        "format": "string — content format to use (e.g. '60s Vertical Edit with on-screen subtitle burn-in')",
+        "bestTrick": "string — the single best trick to replicate the past viral's success"
+      },
+      "flopRecoveryRecipe": {
+        "basedOn": "string — which past underperformer this addresses",
+        "whatWentWrong": "string — 1-sentence diagnosis",
+        "nextVideoPlan": "string — concrete plan to fix it on the next upload"
+      }
+    }
+  ],
+  "insights": [
+    {
+      "title": "3-6 word cross-channel insight title",
+      "body": "1-2 sentence insight that synthesises across multiple channels or identifies the highest-leverage action today",
+      "priority": "high" | "medium" | "low",
+      "action": "concrete next step"
+    }
+  ]
+}
+
+Rules:
+- For each channel in the input, output a corresponding entry in "channels[]".
+- improvementSuggestions: 2-3 per channel, each referencing the channel's actual numbers (subscribers, avg views, health score, top videos).
+- bestTricks: 2-3 concrete, non-generic tactics for that channel. NO "post consistently" — say "post Tuesday 7pm WAT — your top performer went live then".
+- viralMirrorRecipe: ALWAYS present. Mirror the user's best-performing video, OR (if a similar-channel niche-best was provided) mirror one of their recent video titles.
+- flopRecoveryRecipe: ALWAYS present. Address the user's worst-performing video.
+- nicheComparison: Reference the niche-best channel by name + cite what they do better. null ONLY if no niche-best was provided.
+- insights[]: 3-5 cross-channel insights, ordered high→low priority.
+- Tone: direct coach. No fluff. Information-dense.`;
+
+      const userPrompt = `User's audited channels + their deep audit signals (today: ${dateStr}):
+
+${JSON.stringify(validSignals, null, 2)}
+
+Generate today's morning brief for this user. Match each input channel with a corresponding entry in "channels[]".`;
+
+      let brief: any;
+      try {
+        brief = await llmJson<any>(env, userPrompt, systemPrompt, 6000);
+        // Validate / normalise shape
+        if (!brief || !Array.isArray(brief.channels) || !Array.isArray(brief.insights)) {
+          throw new Error('LLM returned invalid brief shape');
+        }
+        // Clamp arrays to reasonable sizes
+        brief.channels = brief.channels.slice(0, 8).map((ch: any) => ({
+          channelName: String(ch.channelName || '').slice(0, 120),
+          platform: String(ch.platform || '').slice(0, 30),
+          healthNote: String(ch.healthNote || '').slice(0, 300),
+          improvementSuggestions: (Array.isArray(ch.improvementSuggestions) ? ch.improvementSuggestions : []).slice(0, 3).map((s: any) => ({
+            title: String(s.title || '').slice(0, 120),
+            body: String(s.body || '').slice(0, 600),
+            priority: ['high', 'medium', 'low'].includes(s.priority) ? s.priority : 'medium',
+            action: String(s.action || '').slice(0, 300),
+          })),
+          bestTricks: (Array.isArray(ch.bestTricks) ? ch.bestTricks : []).slice(0, 3).map((t: any) => String(t).slice(0, 300)),
+          nicheComparison: ch.nicheComparison ? String(ch.nicheComparison).slice(0, 600) : null,
+          viralMirrorRecipe: ch.viralMirrorRecipe ? {
+            basedOn: String(ch.viralMirrorRecipe.basedOn || '').slice(0, 300),
+            nextVideoTitle: String(ch.viralMirrorRecipe.nextVideoTitle || '').slice(0, 200),
+            nextVideoHook: String(ch.viralMirrorRecipe.nextVideoHook || '').slice(0, 400),
+            format: String(ch.viralMirrorRecipe.format || '').slice(0, 300),
+            bestTrick: String(ch.viralMirrorRecipe.bestTrick || '').slice(0, 400),
+          } : null,
+          flopRecoveryRecipe: ch.flopRecoveryRecipe ? {
+            basedOn: String(ch.flopRecoveryRecipe.basedOn || '').slice(0, 300),
+            whatWentWrong: String(ch.flopRecoveryRecipe.whatWentWrong || '').slice(0, 400),
+            nextVideoPlan: String(ch.flopRecoveryRecipe.nextVideoPlan || '').slice(0, 600),
+          } : null,
+        }));
+        brief.insights = brief.insights.slice(0, 5).map((i: any) => ({
+          title: String(i.title || '').slice(0, 120),
+          body: String(i.body || '').slice(0, 600),
+          priority: ['high', 'medium', 'low'].includes(i.priority) ? i.priority : 'medium',
+          action: String(i.action || '').slice(0, 300),
+        }));
+        brief.headline = String(brief.headline || "Today's brief").slice(0, 150);
+        brief.focusArea = String(brief.focusArea || 'Content Strategy').slice(0, 60);
+        brief.generatedAt = new Date().toISOString();
+        brief.date = dateStr;
+        brief.version = MORNING_BRIEF_VERSION;
+      } catch (e: any) {
+        console.warn(`[morning-audit] LLM failed for user ${userId}:`, e?.message);
+        llmFailures++;
+        continue;  // skip caching — next user's brief will still be attempted
+      }
+
+      // 4. Cache the brief at morning_brief:${userId}:${dateStr}
+      const briefKey = `morning_brief:${userId}:${dateStr}`;
+      try {
+        await cacheWrite(env, briefKey, brief, MORNING_BRIEF_TTL);
+      } catch (e: any) {
+        console.warn(`[morning-audit] cacheWrite failed for user ${userId}:`, e?.message);
+      }
+      usersProcessed++;
+    } catch (e: any) {
+      console.warn(`[morning-audit] user ${userId} failed:`, e?.message);
+    }
+  }
+
+  return json({
+    usersProcessed,
+    channelsProcessed,
+    llmFailures,
+    durationMs: Date.now() - startedAt,
+    date: dateStr,
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// GET /api/daily-insight — surfaces today's morning brief (if the morning
+// pipeline has run) OR generates an on-demand brief from cached signals.
+//
+// Priority:
+//   1. Read morning_brief:${userId}:${YYYY-MM-DD} — the deep multi-channel
+//      brief produced by /cron/morning-audit (improvement suggestions per
+//      channel + niche comparison + viral mirror recipe + flop recovery).
+//   2. If no morning brief exists yet, fall back to the legacy on-demand
+//      generator (single LLM call from cached audit signals).
+//
+// Frontend localStorage tracks "dismissed today" state (no API call needed).
+// Free for the user (no credit charge — reuses cached audit/analysis data).
+// ════════════════════════════════════════════════════════════════════════════
 // Aggregation strategy:
 //   1. Pull the user's most recent saved channel audits (up to 3)
 //   2. Pull the user's most recent viral forge analyses (up to 3)
@@ -7044,6 +7412,30 @@ app.get('/daily-insight', requireAuth, async (c) => {
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
   const cacheKey = `daily_insight:${userId}:${dateStr}`;
+
+  // ─── Priority 1: Morning brief (deep multi-channel analysis) ──────────────
+  // The /cron/morning-audit pipeline runs once per day for every user with
+  // saved audits and produces a comprehensive brief keyed at
+  // morning_brief:${userId}:${YYYY-MM-DD}. If present, we surface it directly —
+  // it includes per-channel improvement suggestions, niche comparison, viral
+  // mirror recipe, and flop recovery recipe.
+  const morningBriefKey = `morning_brief:${userId}:${dateStr}`;
+  const morningBrief = await cacheRead<any>(env, morningBriefKey);
+  if (morningBrief?.data?.channels || morningBrief?.data?.insights) {
+    // Also mirror it into the legacy daily_insight cache key so subsequent
+    // calls (within the same day) hit the cheaper read path.
+    if (morningBrief.fresh) {
+      try {
+        await cacheWrite(env, cacheKey, morningBrief.data, 20 * 60 * 60);
+      } catch {}
+    }
+    return json({
+      date: dateStr,
+      ...morningBrief.data,
+      cached: true,
+      morningBrief: true,
+    });
+  }
 
   // 1. Check KV cache first (20h TTL — covers the day, rolls over by tomorrow)
   const cached = await cacheRead<any>(env, cacheKey);

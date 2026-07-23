@@ -517,20 +517,57 @@ export async function getAuditInsights(
 // from the user's recent audits, analyses, trending topics, and profile.
 // Cached for 20h server-side (per user per day). Free — no credit charge.
 // Falls back to a deterministic brief if the LLM is unavailable.
+//
+// Two brief shapes can be returned:
+//   1. Morning brief (preferred) — produced by the /cron/morning-audit pipeline
+//      at 6 AM WAT daily. Includes deep per-channel analysis (improvement
+//      suggestions, best tricks, niche comparison, viral mirror recipe, flop
+//      recovery recipe) + cross-channel insights. Look for `morningBrief: true`.
+//   2. On-demand brief (fallback) — generated on the fly from cached audit
+//      signals when the morning pipeline hasn't run yet today. Only includes
+//      the cross-channel `insights[]` array.
 export interface DailyInsightItem {
   title: string;
   body: string;
   priority: 'high' | 'medium' | 'low';
   action: string;
 }
+
+export interface MorningChannelBrief {
+  channelName: string;
+  platform: string;
+  healthNote: string;
+  improvementSuggestions: DailyInsightItem[];
+  bestTricks: string[];
+  nicheComparison: string | null;
+  viralMirrorRecipe: {
+    basedOn: string;
+    nextVideoTitle: string;
+    nextVideoHook: string;
+    format: string;
+    bestTrick: string;
+  } | null;
+  flopRecoveryRecipe: {
+    basedOn: string;
+    whatWentWrong: string;
+    nextVideoPlan: string;
+  } | null;
+}
+
 export interface DailyInsightResponse {
   date: string;            // YYYY-MM-DD
   headline: string;
   focusArea: string;
+  /** Cross-channel insights — present in both morning briefs and on-demand briefs. */
   insights: DailyInsightItem[];
+  /** Per-channel deep analysis — only present in morning briefs. */
+  channels?: MorningChannelBrief[];
   generatedAt: string;
   cached?: boolean;
   fallback?: boolean;
+  /** True when this brief was produced by the /cron/morning-audit pipeline. */
+  morningBrief?: boolean;
+  version?: string;
 }
 export async function getDailyInsight(): Promise<DailyInsightResponse> {
   return apiClient.get<DailyInsightResponse>('/daily-insight');

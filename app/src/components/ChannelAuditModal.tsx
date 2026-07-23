@@ -17,12 +17,37 @@
 import { useEffect } from 'react';
 import {
   X, ExternalLink, Users, Eye, Video, TrendingUp, Heart,
-  AlertCircle, Trash2, MessageCircle, Maximize2,
+  AlertCircle, Trash2, MessageCircle,
 } from 'lucide-react';
 import { PlatformIcon } from '@/components/BrandIcons';
 import { platformTerms } from '@/lib/platformTerminology';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import type { ChannelAudit, AuditPlatform } from '../types';
+
+/** Modern "deep audit" icon — magnifier over stacked analytics bars. */
+function AuditDeepIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* stacked analytics bars */}
+      <rect x="3" y="11" width="3" height="6" rx="1" />
+      <rect x="8"  y="8"  width="3" height="9" rx="1" />
+      <rect x="13" y="5"  width="3" height="12" rx="1" />
+      {/* magnifier circle */}
+      <circle cx="17.5" cy="15.5" r="3.5" />
+      {/* magnifier handle */}
+      <line x1="20" y1="18" x2="22" y2="20" />
+    </svg>
+  );
+}
 
 interface ChannelAuditModalProps {
   audit: ChannelAudit;
@@ -269,7 +294,7 @@ export function ChannelAuditModal({ audit, onClose, onDelete, onViewFull }: Chan
                 onClick={onViewFull}
                 className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-clip-cyan/10 text-clip-cyan border border-clip-cyan/30 hover:bg-clip-cyan/20 transition-colors"
               >
-                <Maximize2 className="w-3.5 h-3.5" />
+                <AuditDeepIcon className="w-3.5 h-3.5" />
                 View Full Audit
               </button>
             )}

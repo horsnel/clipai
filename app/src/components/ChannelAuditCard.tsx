@@ -29,6 +29,7 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
   banner: string;       // gradient behind the avatar
   ring: string;         // ring color around the avatar
   accent: string;       // accent text color
+  statBg: string;       // mini-stat tile bg (platform-tinted)
 }> = {
   youtube: {
     label: 'YouTube',
@@ -36,6 +37,7 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
     banner: 'from-red-500/30 via-red-700/15 to-clip-surface',
     ring: 'ring-red-500/40',
     accent: 'text-red-500',
+    statBg: 'bg-red-500/[0.06] border-red-500/10',
   },
   tiktok: {
     label: 'TikTok',
@@ -43,6 +45,7 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
     banner: 'from-cyan-500/25 via-pink-500/15 to-clip-surface',
     ring: 'ring-cyan-400/40',
     accent: 'text-clip-cyan',
+    statBg: 'bg-cyan-500/[0.06] border-cyan-500/10',
   },
   twitter: {
     label: 'X',
@@ -50,6 +53,7 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
     banner: 'from-slate-500/25 via-slate-700/15 to-clip-surface',
     ring: 'ring-slate-400/40',
     accent: 'text-slate-300',
+    statBg: 'bg-slate-400/[0.06] border-slate-400/10',
   },
   instagram: {
     label: 'Instagram',
@@ -57,6 +61,7 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
     banner: 'from-purple-500/25 via-pink-500/15 to-amber-500/10',
     ring: 'ring-pink-400/40',
     accent: 'text-pink-400',
+    statBg: 'bg-pink-500/[0.06] border-pink-500/10',
   },
   reddit: {
     label: 'Reddit',
@@ -64,6 +69,7 @@ const PLATFORM_CONFIG: Record<AuditPlatform, {
     banner: 'from-orange-500/25 via-red-500/15 to-clip-surface',
     ring: 'ring-orange-400/40',
     accent: 'text-orange-500',
+    statBg: 'bg-orange-500/[0.06] border-orange-500/10',
   },
 };
 
@@ -82,13 +88,13 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
   return (
     <button
       onClick={onClick}
-      className="group relative w-full text-left transition-all duration-300 hover:-translate-y-1 focus:outline-none"
+      className="group relative w-full text-left transition-all duration-300 hover:-translate-y-1 focus:outline-none h-full"
     >
-      {/* Square container */}
-      <div className="card-glass overflow-hidden hover:border-white/[0.12] transition-colors">
+      {/* Square container — min-h keeps every card in a row the same height */}
+      <div className="card-glass overflow-hidden hover:border-white/[0.12] transition-colors h-full min-h-[248px] flex flex-col">
 
         {/* Top banner (gradient), avatar overlaps this edge */}
-        <div className={`relative h-20 bg-gradient-to-br ${config.banner} overflow-hidden`}>
+        <div className={`relative h-20 bg-gradient-to-br ${config.banner} overflow-hidden flex-shrink-0`}>
           {/* Faint platform icon watermark in the banner */}
           <PlatformIcon platform={audit.platform} className={`absolute -right-3 -top-3 w-20 h-20 ${config.iconColor} opacity-10`} />
           {/* "Audited" pill */}
@@ -99,8 +105,8 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
         </div>
 
         {/* Avatar — centered, overlapping the banner bottom edge */}
-        <div className="relative px-4 pb-3">
-          <div className="flex justify-center -mt-8 mb-2">
+        <div className="relative px-4 pb-4 pt-1 flex-1 flex flex-col">
+          <div className="flex justify-center -mt-8 mb-2.5">
             {audit.avatar ? (
               <img
                 src={audit.avatar}
@@ -116,32 +122,35 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
           </div>
 
           {/* Channel name + platform icon */}
-          <div className="text-center mb-3">
+          <div className="text-center mb-3.5">
             <p className="font-display font-semibold text-clip-text text-sm truncate leading-tight">
               {audit.channelName}
             </p>
-            <div className="flex items-center justify-center gap-1 mt-0.5">
+            <div className="flex items-center justify-center gap-1 mt-1">
               <PlatformIcon platform={audit.platform} className={`w-3 h-3 ${config.iconColor}`} />
-              <span className="text-[10px] text-clip-muted truncate">{audit.channelHandle || config.label}</span>
+              <span className="text-[11px] text-clip-muted truncate">{audit.channelHandle || config.label}</span>
             </div>
           </div>
 
-          {/* Analytics inside the square */}
-          {hasRealStats ? (
-            <div className="grid grid-cols-3 gap-1.5">
-              <Stat icon={Users}      value={formatCount(audit.statistics.subscribers)} label={terms.followersShort} color={config.accent} />
-              <Stat icon={Eye}        value={formatCount(audit.statistics.totalViews)}  label={terms.viewsLabel}    color={config.accent} />
-              <Stat icon={TrendingUp} value={formatCount(audit.metrics.avgRecentViews)} label="Avg/post" color={config.accent} />
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-1.5">
-              <Stat icon={Video}      value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label={terms.postsLabel} color={config.accent} />
-              <Stat icon={AlertCircle} value="N/A" label="Stats" color="text-clip-muted" />
-            </div>
-          )}
+          {/* Analytics inside the square — 2-col grid (was 3-col, too cramped) */}
+          <div className="flex-1 flex flex-col justify-end">
+            {hasRealStats ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Stat icon={Users}      value={formatCount(audit.statistics.subscribers)} label={terms.followersShort}  color={config.accent} bg={config.statBg} />
+                <Stat icon={Eye}        value={formatCount(audit.statistics.totalViews)}  label={terms.viewsLabel}      color={config.accent} bg={config.statBg} />
+                <Stat icon={TrendingUp} value={formatCount(audit.metrics.avgRecentViews)} label="Avg/post"              color={config.accent} bg={config.statBg} />
+                <Stat icon={Video}      value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label={terms.postsLabel} color={config.accent} bg={config.statBg} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Stat icon={Video}       value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label={terms.postsLabel} color={config.accent} bg={config.statBg} />
+                <Stat icon={AlertCircle} value="N/A" label="Stats" color="text-clip-muted" bg="bg-white/[0.02] border-white/[0.04]" />
+              </div>
+            )}
+          </div>
 
           {/* Footer hint */}
-          <div className="mt-3 pt-2 border-t border-white/[0.025] flex items-center justify-center gap-1 text-[10px] text-clip-muted group-hover:text-clip-cyan transition-colors">
+          <div className="mt-3 pt-2.5 border-t border-white/[0.04] flex items-center justify-center gap-1 text-[10px] text-clip-muted group-hover:text-clip-cyan transition-colors">
             <span>Click for full audit</span>
           </div>
         </div>
@@ -150,14 +159,14 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
   );
 }
 
-function Stat({ icon: Icon, value, label, color }: {
-  icon: React.ElementType; value: string; label: string; color: string;
+function Stat({ icon: Icon, value, label, color, bg }: {
+  icon: React.ElementType; value: string; label: string; color: string; bg: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center bg-clip-surface/60 rounded-lg py-1.5 border border-white/[0.025]">
-      <Icon className={`w-3 h-3 ${color} mb-0.5`} />
-      <span className="text-xs font-bold text-clip-text tabular-nums leading-tight">{value}</span>
-      <span className="text-[9px] text-clip-muted uppercase tracking-wider leading-tight">{label}</span>
+    <div className={`flex flex-col items-center justify-center ${bg} rounded-lg py-2 border`}>
+      <Icon className={`w-3.5 h-3.5 ${color} mb-1`} />
+      <span className="text-sm font-bold text-clip-text tabular-nums leading-tight">{value}</span>
+      <span className="text-[10px] text-clip-muted uppercase tracking-wide leading-tight mt-0.5">{label}</span>
     </div>
   );
 }
