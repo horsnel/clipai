@@ -15,7 +15,6 @@ import {
   Users, Eye, TrendingUp, Video, AlertCircle,
 } from 'lucide-react';
 import { PlatformIcon } from '@/components/BrandIcons';
-import { platformTerms } from '@/lib/platformTerminology';
 import type { ChannelAudit, AuditPlatform } from '../types';
 
 interface ChannelAuditCardProps {
@@ -79,11 +78,21 @@ function formatCount(n: number): string {
   return String(n);
 }
 
+// Compact stat labels — short enough to fit a ~50px tile without wrapping.
+// Full labels ("Subscribers", "Impressions", etc.) are shown in the modal/full view.
+const STAT_LABELS: Record<AuditPlatform, { followers: string; views: string; avg: string; posts: string }> = {
+  youtube:   { followers: 'SUBS',  views: 'VIEWS', avg: 'AVG',  posts: 'VIDS' },
+  tiktok:    { followers: 'FOLL',  views: 'VIEWS', avg: 'AVG',  posts: 'POSTS' },
+  twitter:   { followers: 'FOLL',  views: 'IMP',   avg: 'AVG',  posts: 'POSTS' },
+  instagram: { followers: 'FOLL',  views: 'VIEWS', avg: 'AVG',  posts: 'POSTS' },
+  reddit:    { followers: 'MEM',   views: 'SCORE', avg: 'AVG',  posts: 'POSTS' },
+};
+
 export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
   const config = PLATFORM_CONFIG[audit.platform] || PLATFORM_CONFIG.youtube;
-  const terms = platformTerms(audit.platform);
   const hasRealStats = (audit.platform === 'youtube' || audit.platform === 'reddit' || audit.platform === 'tiktok' || audit.platform === 'instagram' || audit.platform === 'twitter') && !audit.statistics.hiddenSubscriberCount;
   const avatarFallback = audit.channelHandle || audit.channelName || '?';
+  const labels = STAT_LABELS[audit.platform] || STAT_LABELS.youtube;
 
   return (
     <button
@@ -95,18 +104,18 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
 
         {/* Top banner (gradient), avatar overlaps this edge */}
         <div className={`relative h-20 bg-gradient-to-br ${config.banner} overflow-hidden flex-shrink-0`}>
-          {/* Faint platform icon watermark in the banner */}
-          <PlatformIcon platform={audit.platform} className={`absolute -right-3 -top-3 w-20 h-20 ${config.iconColor} opacity-10`} />
+          {/* Faint platform icon watermark — bottom-left so it never overlaps the top-right pill */}
+          <PlatformIcon platform={audit.platform} className={`absolute -left-4 -bottom-4 w-20 h-20 ${config.iconColor} opacity-10`} />
           {/* "Audited" pill */}
-          <span className="absolute top-2 right-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-black/50 backdrop-blur-sm text-white/90 border border-white/10">
+          <span className="absolute top-2 right-2 z-10 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-black/50 backdrop-blur-sm text-white/90 border border-white/10">
             <span className="w-1 h-1 rounded-full bg-green-400" />
             Audited
           </span>
         </div>
 
         {/* Avatar — centered, overlapping the banner bottom edge */}
-        <div className="relative px-4 pb-4 pt-1 flex-1 flex flex-col">
-          <div className="flex justify-center -mt-8 mb-2.5">
+        <div className="relative px-3 pb-3 pt-1 flex-1 flex flex-col">
+          <div className="flex justify-center -mt-8 mb-2">
             {audit.avatar ? (
               <img
                 src={audit.avatar}
@@ -122,36 +131,31 @@ export function ChannelAuditCard({ audit, onClick }: ChannelAuditCardProps) {
           </div>
 
           {/* Channel name + platform icon */}
-          <div className="text-center mb-3.5">
-            <p className="font-display font-semibold text-clip-text text-sm truncate leading-tight">
+          <div className="text-center mb-3 px-1 min-w-0">
+            <p className="font-display font-semibold text-clip-text text-xs truncate leading-tight">
               {audit.channelName}
             </p>
-            <div className="flex items-center justify-center gap-1 mt-1">
-              <PlatformIcon platform={audit.platform} className={`w-3 h-3 ${config.iconColor}`} />
-              <span className="text-[11px] text-clip-muted truncate">{audit.channelHandle || config.label}</span>
+            <div className="flex items-center justify-center gap-1 mt-0.5 min-w-0 px-1">
+              <PlatformIcon platform={audit.platform} className={`w-2.5 h-2.5 ${config.iconColor} flex-shrink-0`} />
+              <span className="text-[9px] text-clip-muted truncate min-w-0">{audit.channelHandle || config.label}</span>
             </div>
           </div>
 
-          {/* Analytics inside the square — 2-col grid (was 3-col, too cramped) */}
+          {/* Analytics inside the square — 2-col grid with tiny fitted text */}
           <div className="flex-1 flex flex-col justify-end">
             {hasRealStats ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Stat icon={Users}      value={formatCount(audit.statistics.subscribers)} label={terms.followersShort}  color={config.accent} bg={config.statBg} />
-                <Stat icon={Eye}        value={formatCount(audit.statistics.totalViews)}  label={terms.viewsLabel}      color={config.accent} bg={config.statBg} />
-                <Stat icon={TrendingUp} value={formatCount(audit.metrics.avgRecentViews)} label="Avg/post"              color={config.accent} bg={config.statBg} />
-                <Stat icon={Video}      value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label={terms.postsLabel} color={config.accent} bg={config.statBg} />
+              <div className="grid grid-cols-2 gap-1.5">
+                <Stat icon={Users}      value={formatCount(audit.statistics.subscribers)} label={labels.followers} color={config.accent} bg={config.statBg} />
+                <Stat icon={Eye}        value={formatCount(audit.statistics.totalViews)}  label={labels.views}     color={config.accent} bg={config.statBg} />
+                <Stat icon={TrendingUp} value={formatCount(audit.metrics.avgRecentViews)} label={labels.avg}       color={config.accent} bg={config.statBg} />
+                <Stat icon={Video}      value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label={labels.posts} color={config.accent} bg={config.statBg} />
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <Stat icon={Video}       value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label={terms.postsLabel} color={config.accent} bg={config.statBg} />
-                <Stat icon={AlertCircle} value="N/A" label="Stats" color="text-clip-muted" bg="bg-white/[0.02] border-white/[0.04]" />
+              <div className="grid grid-cols-2 gap-1.5">
+                <Stat icon={Video}       value={String(audit.statistics.videoCount || audit.metrics.recentVideoCount)} label={labels.posts} color={config.accent} bg={config.statBg} />
+                <Stat icon={AlertCircle} value="N/A" label="STATS" color="text-clip-muted" bg="bg-white/[0.02] border-white/[0.04]" />
               </div>
             )}
-          </div>
-
-          {/* Footer hint */}
-          <div className="mt-3 pt-2.5 border-t border-white/[0.04] flex items-center justify-center gap-1 text-[10px] text-clip-muted group-hover:text-clip-cyan transition-colors">
-            <span>Click for full audit</span>
           </div>
         </div>
       </div>
@@ -163,10 +167,10 @@ function Stat({ icon: Icon, value, label, color, bg }: {
   icon: React.ElementType; value: string; label: string; color: string; bg: string;
 }) {
   return (
-    <div className={`flex flex-col items-center justify-center ${bg} rounded-lg py-2 border`}>
-      <Icon className={`w-3.5 h-3.5 ${color} mb-1`} />
-      <span className="text-sm font-bold text-clip-text tabular-nums leading-tight">{value}</span>
-      <span className="text-[10px] text-clip-muted uppercase tracking-wide leading-tight mt-0.5">{label}</span>
+    <div className={`flex flex-col items-center justify-center ${bg} rounded-md py-1.5 px-1 border min-w-0 overflow-hidden`}>
+      <Icon className={`w-2.5 h-2.5 ${color} mb-1 flex-shrink-0`} />
+      <span className="text-[11px] font-bold text-clip-text tabular-nums leading-none max-w-full whitespace-nowrap">{value}</span>
+      <span className="text-[8px] text-clip-muted uppercase leading-none mt-1 whitespace-nowrap">{label}</span>
     </div>
   );
 }

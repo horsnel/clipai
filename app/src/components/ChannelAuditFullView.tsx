@@ -27,6 +27,7 @@ import { getAuditInsights } from '@/services/api';
 import { platformTerms } from '@/lib/platformTerminology';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import { exportAuditCSV, exportAuditDOC, exportAuditPDF } from '@/lib/auditExport';
+import { ColorReportSection } from './ColorReportSection';
 import { toast } from 'sonner';
 import type { ChannelAudit, AuditPlatform, AuditInsights } from '../types';
 
@@ -203,11 +204,11 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
               disabled={loading}
               aria-label="Export report"
               title="Export report"
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-full border border-clip-cyan/40 text-clip-cyan hover:bg-clip-cyan/10 hover:border-clip-cyan disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-bold"
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-full border border-clip-cyan/40 text-clip-cyan hover:bg-clip-cyan/10 hover:border-clip-cyan disabled:opacity-50 disabled:cursor-not-allowed transition-all text-xs font-bold leading-none"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Export</span>
-              <ChevronDown className={`w-3 h-3 transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
+              <Download className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="hidden sm:inline leading-none">Export</span>
+              <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${exportOpen ? 'rotate-180' : ''}`} />
             </button>
             {exportOpen && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-clip-surface border border-white/[0.10] rounded-xl shadow-2xl overflow-hidden z-30">
@@ -474,6 +475,11 @@ export function ChannelAuditFullView({ audit, onExit }: ChannelAuditFullViewProp
               ))}
             </div>
           </div>
+        )}
+
+        {/* ─── Thumbnail Color Report ─── */}
+        {audit.recentVideos && audit.recentVideos.some(v => v.thumbnail) && (
+          <ColorReportSection audit={audit} />
         )}
       </div>
     </div>
